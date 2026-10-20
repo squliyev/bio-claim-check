@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help sync lint format typecheck test cov verify hooks secrets up down clean
+.PHONY: help sync lint format typecheck arch test cov verify hooks secrets up down clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -21,13 +21,16 @@ format:  ## Apply ruff fixes and formatting
 typecheck:  ## Pyright strict
 	$(UV) run pyright
 
+arch:  ## Import contracts (import-linter); rule-fire proofs run in `test` (marker arch)
+	$(UV) run lint-imports --no-logo --no-cache
+
 test:  ## Offline tests (everything except `live`)
 	$(UV) run pytest -m "not live"
 
 cov:  ## Offline tests with branch coverage
 	$(UV) run pytest -m "not live" --cov --cov-report=term-missing
 
-verify: lint typecheck test  ## The single gate: lint, types, offline tests
+verify: lint typecheck arch test  ## The single gate: lint, types, import contracts, offline tests
 
 hooks:  ## Install git pre-commit hooks
 	$(UV) run pre-commit install

@@ -13,3 +13,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule: {interval: weekly}
+    ignore:
+      # Python is pinned to 3.13 (ADR 0001); a minor upgrade is a deliberate decision, not a bump.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]

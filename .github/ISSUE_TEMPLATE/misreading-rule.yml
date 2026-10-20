@@ -1,0 +1,49 @@
+name: New misreading rule
+description: A way findings in your field get overstated or misread. No code needed.
+title: "[rule] "
+labels: ["rule-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! Accepted rules are added to a rule pack credited to you.
+        Please use only published abstracts (give the PMID). Do not paste unpublished or patient data.
+  - type: input
+    id: field
+    attributes:
+      label: Field
+      placeholder: "e.g. neurodegeneration pharmacology"
+    validations:
+      required: true
+  - type: textarea
+    id: misreading
+    attributes:
+      label: The misreading
+      description: What gets overstated, and why it is wrong.
+      placeholder: "A neuroprotective effect in a mouse model is reported as a benefit in patients."
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: A misleading claim, plus the exact abstract sentence it relies on.
+      placeholder: |
+        Claim: "Drug X slows cognitive decline in Alzheimer's disease."
+        Abstract sentence: "In APP/PS1 mice, drug X reduced plaque load..."
+    validations:
+      required: true
+  - type: input
+    id: pmid
+    attributes:
+      label: PMID of the example abstract
+      placeholder: "12345678"
+    validations:
+      required: true
+  - type: input
+    id: credit
+    attributes:
+      label: How should we credit you?
+      description: Name as it should appear in the rule pack, plus an optional ORCID. Leave empty to stay anonymous.
+    validations:
+      required: false

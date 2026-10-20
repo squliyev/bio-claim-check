@@ -46,6 +46,9 @@ jobs:
       - name: Typecheck (pyright strict)
         run: uv run --frozen pyright
 
+      - name: Architecture (import-linter)
+        run: uv run --frozen lint-imports --no-logo --no-cache
+
       - name: Test (offline)
         run: uv run --frozen pytest -m "not live" --junitxml=junit.xml --cov --cov-report=term
 

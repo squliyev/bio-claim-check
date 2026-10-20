@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "bio-claim-check: checking life-science agent claims against the abstracts they cite"
+abstract: >-
+  An open-source claim checker for life-science agents (pre-alpha, in development). It is designed to
+  answer a research question from Europe PMC abstracts, check every claim against the paper it cites,
+  and measure what the verifier catches with planted traps.
+type: software
+license: Apache-2.0
+repository-code: "https://github.com/squliyev/bio-claim-check"
+keywords:
+  - claim verification
+  - life science
+  - LLM evaluation
+  - scientific spin
+authors:
+  - family-names: Guliyev
+    given-names: Samir
+version: 0.0.1

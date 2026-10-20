@@ -3,6 +3,8 @@ name = "bio-claim-check"
 version = "0.0.1"
 description = "Does this agent's answer hold up? Checks life-science agent claims against the abstracts they cite, with planted traps that measure what the verifier catches."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "Samir Guliyev", email = "63205250+squliyev@users.noreply.github.com" }
 ]
@@ -25,13 +27,15 @@ dependencies = [
 bio-claim-check = "bio_claim_check.app.cli:app"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.4"]  # exact: build backend is not in uv.lock; Dependabot proposes bumps
 build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.5",
-    "import-linter>=2.15",
+    "import-linter==2.15.*",  # the rule-fire harness asserts on its CLI output format
+    "pyyaml>=6.0.3",
+    "types-pyyaml>=6.0.12",
     "pre-commit>=4.7.0",
     "pyright>=1.1.414",
     "pytest>=9.1.1",
@@ -56,9 +60,71 @@ ban-relative-imports = "all"
 "os.environ".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
 "os.getenv".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
 "os.putenv".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
+"tests".msg = "Production code never imports test support (ADR 0002)."
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "TID251"]  # tests may import tests.support; the ban stays active in src/**
+
+# ---------------------------------------------------------------- import-linter
+# Every contract has an `id`; tests/arch/test_rules_fire.py proves each one fails on a planted violation.
+[tool.importlinter]
+root_package = "bio_claim_check"
+
+[[tool.importlinter.contracts]]
+id = "rings"
+name = "Rings point inward (ADR 0002)"
+type = "layers"
+layers = [
+    "bio_claim_check.app",
+    "bio_claim_check.infrastructure",
+    "bio_claim_check.features",
+    "bio_claim_check.engine",
+    "bio_claim_check.common",
+]
+
+[[tool.importlinter.contracts]]
+id = "slices"
+name = "Feature slices are independent; only features.contracts is shared (ADR 0002)"
+type = "independence"
+modules = [
+    "bio_claim_check.features.annotate",
+    "bio_claim_check.features.answer",
+    "bio_claim_check.features.baselines",
+    "bio_claim_check.features.bench",
+    "bio_claim_check.features.checks",
+    "bio_claim_check.features.report",
+    "bio_claim_check.features.retrieval",
+    "bio_claim_check.features.traps",
+    "bio_claim_check.features.verify",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-llm-in-deterministic-code"
+name = "Deterministic code never calls an LLM (ADR 0003)"
+type = "forbidden"
+source_modules = [
+    "bio_claim_check.features.annotate.agreement",
+    "bio_claim_check.features.bench.stats",
+    "bio_claim_check.features.checks",
+]
+forbidden_modules = ["bio_claim_check.engine.llm"]
+
+[[tool.importlinter.contracts]]
+id = "contracts-do-not-depend-on-slices"
+name = "features.contracts depends on no feature slice (ADR 0002)"
+type = "forbidden"
+source_modules = ["bio_claim_check.features.contracts"]
+forbidden_modules = [
+    "bio_claim_check.features.annotate",
+    "bio_claim_check.features.answer",
+    "bio_claim_check.features.baselines",
+    "bio_claim_check.features.bench",
+    "bio_claim_check.features.checks",
+    "bio_claim_check.features.report",
+    "bio_claim_check.features.retrieval",
+    "bio_claim_check.features.traps",
+    "bio_claim_check.features.verify",
+]
 
 # ---------------------------------------------------------------- pyright
 [tool.pyright]
@@ -74,6 +140,7 @@ venv = ".venv"
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
+pythonpath = ["."]  # makes `tests.support` importable (tests only; src never imports it)
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 xfail_strict = true
 filterwarnings = ["error"]
