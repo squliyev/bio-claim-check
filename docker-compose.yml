@@ -1,0 +1,11 @@
+# Local laptop target. `var/` is the ONLY writable mount: cache, ledger, runs and annotations survive
+# `docker compose down`/`up`. Secrets come from the git-ignored .env as environment, never as a mounted file.
+services:
+  app:
+    build: .
+    image: bio-claim-check:dev
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./var:/app/var

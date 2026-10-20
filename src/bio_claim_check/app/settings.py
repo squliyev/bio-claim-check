@@ -1,0 +1,97 @@
+"""[RING:app] Validated configuration — the single place the process environment is read.
+
+Why: configuration errors should fail once, at startup, with a precise message — not as a ``KeyError``
+deep inside a provider call. Every other module receives a typed ``Settings`` object; reading
+``os.environ`` anywhere else is banned by ruff ``TID251`` (ADR 0001).
+
+Secrets are ``SecretStr`` so they never appear in ``repr``, logs or the ``config`` command output.
+Real values live only in the git-ignored ``.env`` file; ``.env.example`` documents every key.
+"""
+
+from pathlib import Path
+from typing import Literal, Self
+
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, SecretStr, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+type CacheMode = Literal["read-write", "read-only", "off"]
+type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+
+ENV_PREFIX = "BCC_"
+
+
+class FoundrySettings(BaseModel):
+    """Azure AI Foundry resource. ``base_url`` is the resource endpoint, never committed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    base_url: AnyHttpUrl
+    api_key: SecretStr
+
+
+class AnthropicSettings(BaseModel):
+    """Direct Anthropic API access."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    api_key: SecretStr
+
+
+class OllamaSettings(BaseModel):
+    """Local Ollama server (open-weight models, no key)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    base_url: AnyHttpUrl = AnyHttpUrl("http://localhost:11434")
+
+
+class Settings(BaseSettings):
+    """Process configuration. Construct with :func:`load_settings`; never instantiate ad hoc in features."""
+
+    model_config = SettingsConfigDict(
+        env_prefix=ENV_PREFIX,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        extra="forbid",
+        frozen=True,
+    )
+
+    contact_email: EmailStr
+    """Sent in the User-Agent to Europe PMC, as their usage etiquette asks."""
+
+    var_dir: Path = Path("var")
+    """The single writable root: cache, ledger, runs, annotations."""
+
+    cache_mode: CacheMode = "read-write"
+    """``read-only`` replays from cache and fails closed on a miss (CI and offline demos)."""
+
+    log_level: LogLevel = "INFO"
+
+    foundry: FoundrySettings | None = None
+    anthropic: AnthropicSettings | None = None
+    ollama: OllamaSettings | None = None
+
+    answer_model: str = "gpt-6.1-sol"
+    verifier_model: str = "claude-opus-4-8"
+    trap_model: str = "Kimi-K2.6-1"
+
+    @model_validator(mode="after")
+    def _live_modes_need_a_provider(self) -> Self:
+        if self.cache_mode != "read-only" and not self.configured_providers:
+            msg = (
+                "live cache modes need at least one LLM provider (BCC_FOUNDRY__*, BCC_ANTHROPIC__* or "
+                "BCC_OLLAMA__*); use BCC_CACHE_MODE=read-only to replay from cache"
+            )
+            raise ValueError(msg)
+        return self
+
+    @property
+    def configured_providers(self) -> tuple[str, ...]:
+        candidates = {"foundry": self.foundry, "anthropic": self.anthropic, "ollama": self.ollama}
+        return tuple(name for name, cfg in candidates.items() if cfg is not None)
+
+
+def load_settings(env_file: Path | None = Path(".env")) -> Settings:
+    """Load settings from the environment and, if present, ``env_file``. Pass ``None`` to skip the file."""
+    return Settings(_env_file=env_file)  # pyright: ignore[reportCallIssue]

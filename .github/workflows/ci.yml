@@ -1,0 +1,81 @@
+# Offline gate on every push and PR. Live provider tests never run here (no secrets in CI).
+# All actions are pinned by full commit SHA; Dependabot proposes updates.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      checks: write  # test report
+    env:
+      BCC_CACHE_MODE: read-only
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Install (frozen lockfile)
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run --frozen ruff check --output-format=github .
+
+      - name: Format
+        run: uv run --frozen ruff format --check .
+
+      - name: Typecheck (pyright strict)
+        run: uv run --frozen pyright
+
+      - name: Test (offline)
+        run: uv run --frozen pytest -m "not live" --junitxml=junit.xml --cov --cov-report=term
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: junit
+          path: junit.xml
+
+      - name: Test report
+        if: always() && github.event_name == 'push'
+        uses: dorny/test-reporter@a43b3a5f7366b97d083190328d2c652e1a8b6aa2  # v3.0.0
+        with:
+          name: pytest
+          path: junit.xml
+          reporter: java-junit
+
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Gitleaks (history + project rules)
+        run: >-
+          docker run --rm -v "$PWD:/repo" -w /repo
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          git --config .gitleaks.toml --redact --verbose .

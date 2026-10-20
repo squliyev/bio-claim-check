@@ -1,0 +1,28 @@
+# Secrets: real environment files never enter git (only the documented template does)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data: the single writable root (cache, ledger, runs, annotations)
+var/
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+junit.xml
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

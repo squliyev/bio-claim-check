@@ -1,0 +1,94 @@
+[project]
+name = "bio-claim-check"
+version = "0.0.1"
+description = "Does this agent's answer hold up? Checks life-science agent claims against the abstracts they cite, with planted traps that measure what the verifier catches."
+readme = "README.md"
+authors = [
+    { name = "Samir Guliyev", email = "63205250+squliyev@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+keywords = ["claim verification", "life science", "llm evaluation", "europe pmc", "drug discovery"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic-settings>=2.6",
+    "pydantic[email]>=2.9",
+    "typer>=0.15",
+]
+
+[project.scripts]
+bio-claim-check = "bio_claim_check.app.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.170.5",
+    "import-linter>=2.15",
+    "pre-commit>=4.7.0",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 110
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# BLE/E722: no blind except · T20: no print · TID251: banned APIs · S: bandit · PTH: pathlib
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "BLE", "T20", "S", "TID", "RUF", "PTH", "N", "C4", "PT", "RET"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.environ".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
+"os.getenv".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
+"os.putenv".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+
+# ---------------------------------------------------------------- pyright
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.13"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "error"
+reportUnnecessaryTypeIgnoreComment = "error"
+venvPath = "."
+venv = ".venv"
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+minversion = "9.0"
+testpaths = ["tests"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+xfail_strict = true
+filterwarnings = ["error"]
+markers = [
+    "unit: fast, offline, no I/O beyond tmp_path",
+    "contract: shared port scenarios run against every implementation",
+    "arch: architecture rules and guards",
+    "live: real network/LLM calls; opt-in only, never in CI",
+]
+
+[tool.coverage.run]
+source = ["bio_claim_check"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError", "\\.\\.\\."]

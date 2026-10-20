@@ -1,0 +1,13 @@
+# Default gitleaks rules + project rules. Real provider endpoints are private configuration:
+# they live only in the git-ignored .env, never in the repository.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "azure-ai-endpoint"
+description = "Real Azure AI Foundry / Azure OpenAI endpoint (belongs in .env only)"
+regex = '''https://[a-z0-9][a-z0-9-]{1,62}\.(?:services\.ai\.azure\.com|openai\.azure\.com|cognitiveservices\.azure\.com)'''
+keywords = ["azure.com"]
+  [[rules.allowlists]]
+  description = "Documented placeholders and test fixtures"
+  regexes = ['''https://(?:example-resource|your-resource|contoso)\.''']
