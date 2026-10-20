@@ -75,5 +75,6 @@ explains why it exists and what it must not do. Test support lives in `tests/sup
   - Some code that could be a direct call goes through a port and a container.
   - New slices must be added to the `slices` contract; a parity test fails until they are.
 - **Follow-ups:**
-  - `app/container.py` in S05.
+  - Built in S05: `app/container.py` (the only place concrete classes meet) and `app/usecases/run.py`
+    (the first code that combines slices).
   - The first real ports in S06 and S08.

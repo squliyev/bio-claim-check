@@ -47,6 +47,13 @@ class Disposition(StrEnum):
     FLAGGED = "flagged"
 
 
+class AnswerMode(StrEnum):
+    """How the answering agent behaves. Over-eager exists to produce overstatements to catch."""
+
+    STRICT = "strict"
+    OVER_EAGER = "over_eager"
+
+
 class FailureKind(StrEnum):
     """Why the verifier produced no usable output for a pair. Counted, never dropped."""
 

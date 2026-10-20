@@ -11,9 +11,16 @@ import typer
 from pydantic import ValidationError
 
 from bio_claim_check import __version__
+from bio_claim_check.app.container import build_fake_container
 from bio_claim_check.app.settings import load_settings
+from bio_claim_check.app.usecases.run import run_question
+from bio_claim_check.features.contracts.labels import AnswerMode
 from bio_claim_check.features.contracts.rulepack import RulePack
 from bio_claim_check.infrastructure.rulepack_yaml import RulePackError, load_default_rulepack, load_rulepack
+from bio_claim_check.infrastructure.run_store import write_report
+
+DEFAULT_K = 4
+DEFAULT_RUNS_DIR = Path("var/runs")  # relative to the working directory; --fake never reads settings
 
 app = typer.Typer(
     name="bio-claim-check",
@@ -89,3 +96,30 @@ def _print_summary(pack: RulePack) -> None:
     for rule in pack.rules:
         typer.echo(f"  - {rule.id} ({rule.reason.value}): {len(rule.examples)} example(s)")
     typer.echo(f"examples: {len(examples)} ({len(examples) - reviewed} author-written, {reviewed} reviewed)")
+
+
+@app.command("run")
+def run(
+    question: Annotated[str, typer.Argument(help="The research question to answer and check.")],
+    fake: Annotated[
+        bool, typer.Option("--fake", help="Fictional papers, scripted answer and verdicts (offline demo).")
+    ] = False,
+    mode: Annotated[AnswerMode, typer.Option(help="How the answering agent behaves.")] = AnswerMode.STRICT,
+    k: Annotated[int, typer.Option("--k", min=1, help="Number of papers to retrieve.")] = DEFAULT_K,
+    out: Annotated[Path, typer.Option(help="Folder that receives <run_id>/report.json.")] = DEFAULT_RUNS_DIR,
+) -> None:
+    """Answer a question, check every claim against the paper it cites, and write the report."""
+    if not fake:
+        typer.echo("Live runs arrive in S12; use --fake for the offline demo.", err=True)
+        raise typer.Exit(code=2)
+    if not question.strip():
+        typer.echo("The question must not be blank.", err=True)
+        raise typer.Exit(code=2)
+    report = run_question(build_fake_container(), question, mode, k=k)
+    typer.echo(report.notice)
+    path = write_report(out, report)
+    typer.echo(f"report: {path}")
+    for name, counts in (("pairs", report.pair_counts), ("claims", report.claim_counts)):
+        typer.echo(f"{name}: " + ", ".join(f"{d.value}={n}" for d, n in counts.items()))
+    for note in report.notes:
+        typer.echo(f"note: {note}")

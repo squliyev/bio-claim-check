@@ -176,6 +176,7 @@ markers = [
     "unit: fast, offline, no I/O beyond tmp_path",
     "contract: shared port scenarios run against every implementation",
     "arch: architecture rules and guards",
+    "e2e: the whole offline flow through the CLI, incl. the installed console script",
     "live: real network/LLM calls; opt-in only, never in CI",
 ]
 

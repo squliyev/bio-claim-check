@@ -4,7 +4,7 @@
 - **Date:** 2026-10-22
 - **Supersedes / Extends:** Extends 0003 and 0005
 - **Related:** 0003, 0005
-- **Enforced by:** `tests/unit/contracts/test_verdict.py::test_every_cell_is_table_or_impossible`, `tests/unit/contracts/test_verdict.py::test_table_matches_adr_0006`, `tests/unit/contracts/test_claim_disposition.py::test_claim_disposition_worst_case`, `tests/unit/contracts/test_verdict.py::test_verify_against_rejects_forged_spans`, `tests/unit/contracts/test_verdict.py::test_a_stored_negation_result_must_be_reproduced`, `tests/arch/test_guards.py::test_no_verdict_is_constructed_outside_its_home`, `tests/unit/contracts/test_verifier_output.py::test_the_llm_facing_schema_is_strict_mode_compatible`, `tests/arch/test_schemas.py::test_committed_schemas_are_fresh`, `tests/arch/test_project_files.py::test_glossary_matches_the_enums`.
+- **Enforced by:** `tests/unit/contracts/test_verdict.py::test_every_cell_is_table_or_impossible`, `tests/unit/contracts/test_verdict.py::test_table_matches_adr_0006`, `tests/unit/contracts/test_claim_disposition.py::test_claim_disposition_worst_case`, `tests/unit/app/test_run_usecase.py::test_non_retrieved_cites_never_reach_the_verifier`, `tests/unit/contracts/test_verdict.py::test_verify_against_rejects_forged_spans`, `tests/unit/contracts/test_verdict.py::test_a_stored_negation_result_must_be_reproduced`, `tests/arch/test_guards.py::test_no_verdict_is_constructed_outside_its_home`, `tests/unit/contracts/test_verifier_output.py::test_the_llm_facing_schema_is_strict_mode_compatible`, `tests/arch/test_schemas.py::test_committed_schemas_are_fresh`, `tests/arch/test_project_files.py::test_glossary_matches_the_enums`.
 
 ## Context
 
@@ -43,6 +43,10 @@ model that flags everything would look like a good detector. These definitions a
 3. **The pair is the unit of analysis** (as in SciFact-style evaluation). A claim's disposition is the
    **worst** of its pairs: `flagged` > `failed` > `needs_review` > `passed`. Every cited source must have
    exactly one outcome; a missing, extra or misfiled outcome raises.
+   - **Extended in S05:** an outcome is a `Verdict`, a `VerifierFailure` or a `CitationNotRetrieved`.
+     A cited source that retrieval never returned is `flagged` without calling the verifier: judging a
+     claim against nothing is meaningless, and `failed` would hide a fabricated citation as a pipeline
+     error.
 4. **One trusted path to a verdict.** `Verdict.finalise` computes the evidence status and span with
    `locate_quote`/`near_match`, and the negation result by running a negation detector on the located
    span (no detector → `not_run`); it never accepts a stored negation value. Outside

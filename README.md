@@ -49,6 +49,18 @@ uv run bio-claim-check --version
 uv run bio-claim-check config   # validates settings, secrets redacted
 ```
 
+Try the whole pipeline offline, with no `.env` and no API keys:
+
+```bash
+uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake
+uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake --mode over_eager
+```
+
+This is a **fake run**: fictional papers (`FAKE:1`–`FAKE:4`) and a scripted answer and verdicts. It
+exercises the real contracts and checks and writes `var/runs/<run_id>/report.json`, but it is a demo of
+the pipeline, not a result. Nothing is `passed` yet, because the negation check arrives in S10. Live runs
+arrive in S12.
+
 With Docker:
 
 ```bash

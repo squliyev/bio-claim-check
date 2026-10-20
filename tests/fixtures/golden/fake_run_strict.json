@@ -1,0 +1,156 @@
+{
+  "claim_counts": {
+    "failed": 0,
+    "flagged": 1,
+    "needs_review": 2,
+    "passed": 0
+  },
+  "claims": [
+    {
+      "claim": {
+        "cites": [
+          "FAKE:1"
+        ],
+        "id": "s1",
+        "text": "OS-912 reduced amyloid plaque load in APP/PS1 mice."
+      },
+      "disposition": "needs_review",
+      "pairs": [
+        {
+          "disposition": "needs_review",
+          "outcome": "verdict",
+          "verdict": {
+            "claim_id": "s1",
+            "evidence_quote": "OS-912 (10 mg/kg) reduced amyloid plaque load by 38%",
+            "evidence_span": {
+              "end": 135,
+              "start": 83
+            },
+            "evidence_status": "located",
+            "negation": "not_run",
+            "overstated_reason": null,
+            "reason": "The mouse result is stated.",
+            "semantic_label": "supported",
+            "source_id": "FAKE:1"
+          }
+        }
+      ]
+    },
+    {
+      "claim": {
+        "cites": [
+          "FAKE:3",
+          "FAKE:4"
+        ],
+        "id": "s2",
+        "text": "OS-912 use was associated with a lower incidence of dementia in adults."
+      },
+      "disposition": "flagged",
+      "pairs": [
+        {
+          "disposition": "needs_review",
+          "outcome": "verdict",
+          "verdict": {
+            "claim_id": "s2",
+            "evidence_quote": "OS-912 use was associated with a lower incidence of dementia",
+            "evidence_span": {
+              "end": 80,
+              "start": 20
+            },
+            "evidence_status": "located",
+            "negation": "not_run",
+            "overstated_reason": null,
+            "reason": "The association is stated as an association.",
+            "semantic_label": "supported",
+            "source_id": "FAKE:3"
+          }
+        },
+        {
+          "disposition": "flagged",
+          "outcome": "verdict",
+          "verdict": {
+            "claim_id": "s2",
+            "evidence_quote": null,
+            "evidence_span": null,
+            "evidence_status": "not_required",
+            "negation": "not_run",
+            "overstated_reason": null,
+            "reason": "The review does not mention OS-912 or dementia incidence.",
+            "semantic_label": "not_in_source",
+            "source_id": "FAKE:4"
+          }
+        }
+      ]
+    },
+    {
+      "claim": {
+        "cites": [
+          "FAKE:2"
+        ],
+        "id": "s3",
+        "text": "HX-15 did not significantly change cognitive scores in a phase 2 trial."
+      },
+      "disposition": "needs_review",
+      "pairs": [
+        {
+          "disposition": "needs_review",
+          "outcome": "verdict",
+          "verdict": {
+            "claim_id": "s3",
+            "evidence_quote": "HX-15 did not significantly change cognitive scores (p = 0.41)",
+            "evidence_span": {
+              "end": 105,
+              "start": 44
+            },
+            "evidence_status": "located",
+            "negation": "not_run",
+            "overstated_reason": null,
+            "reason": "The null result is stated.",
+            "semantic_label": "supported",
+            "source_id": "FAKE:2"
+          }
+        }
+      ]
+    }
+  ],
+  "findings": [],
+  "mode": "strict",
+  "notes": [
+    "Negation check not run (arrives in S10): supported claims with located evidence are needs_review, never passed."
+  ],
+  "notice": "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result.",
+  "pair_counts": {
+    "failed": 0,
+    "flagged": 1,
+    "needs_review": 3,
+    "passed": 0
+  },
+  "papers": [
+    {
+      "raw_abstract": "<h4>Background</h4><p>OS-912 is a fictional plaque-binding compound.</p><h4>Results</h4><p>In <i>APP/PS1</i> mice, OS-912 (10 mg/kg) reduced amyloid plaque load by 38% compared with vehicle (p &lt; 0.01). No cognitive outcomes were measured.</p>",
+      "source_id": "FAKE:1",
+      "title": "OS-912 lowers amyloid plaque load in APP/PS1 mice",
+      "year": 2021
+    },
+    {
+      "raw_abstract": "In a 52-week phase 2 trial of 120 patients, HX-15 did not significantly change cognitive scores (p = 0.41). Serum marker level fell from 4.1 &times; 10<sup>3</sup> to 3.6 &times; 10<sup>3</sup> units.",
+      "source_id": "FAKE:2",
+      "title": "HX-15 in early cognitive decline: a fictional phase 2 trial",
+      "year": 2022
+    },
+    {
+      "raw_abstract": "Among 4,210 adults, OS-912 use was associated with a lower incidence of dementia (hazard ratio 0.81, 95% CI 0.70&ndash;0.94). Residual confounding cannot be excluded.",
+      "source_id": "FAKE:3",
+      "title": "OS-912 use and dementia incidence: a fictional retrospective cohort",
+      "year": 2023
+    },
+    {
+      "raw_abstract": "Plaque-targeting compounds have shown mixed results in human trials.",
+      "source_id": "FAKE:4",
+      "title": "Plaque-targeting compounds: a fictional narrative review",
+      "year": 2020
+    }
+  ],
+  "provenance": "fake",
+  "question": "Does OS-912 slow cognitive decline?"
+}

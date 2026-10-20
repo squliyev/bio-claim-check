@@ -1,7 +1,7 @@
 # Glossary
 
 The words this project counts with. Each table below lists the exact values of one enum in
-`bio_claim_check.features.contracts.labels`; a test fails if a table and its enum drift apart. Meaning and
+`bio_claim_check.features.contracts` (`labels`, `finding`); a test fails if a table and its enum drift apart. Meaning and
 counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md).
 
 ## Terms
@@ -12,6 +12,20 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
 - **Rule pack:** a YAML file describing ways claims overstate their sources, with examples.
 - **Author-written / reviewed:** a rule-pack example is author-written until a named person other than
   the author reviews it. Neither is called expert-labelled unless the reviewers are independent experts.
+- **Citation not retrieved:** a claim cites a source that retrieval never returned. That pair is
+  `flagged` without calling the verifier, and the check records an `invented_citation` finding.
+- **Finding:** what a deterministic check (no LLM) found in an answer, independent of any verdict.
+- **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
+  report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
+
+## AnswerMode
+
+How the answering agent is instructed. Both exist so the verifier can be measured on careful and careless answers.
+
+| Value | Meaning |
+|---|---|
+| `strict` | Answer only what the abstracts state, with their caveats; abstain when they do not answer the question |
+| `over_eager` | Answer confidently and drop caveats, the way a careless agent does |
 
 ## Label
 
@@ -78,3 +92,9 @@ How an `overstated` claim goes beyond its source.
 | `population_extrapolation` | A result is extended to a population that was not studied |
 | `certainty_inflation` | Hedged or preliminary findings are stated as established |
 | `other` | None of the above; the verifier must explain in its reason |
+
+## FindingKind
+
+| Value | Meaning |
+|---|---|
+| `invented_citation` | A claim cites a source that was not among the retrieved papers |

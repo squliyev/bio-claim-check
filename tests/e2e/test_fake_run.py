@@ -1,0 +1,118 @@
+"""`bio-claim-check run --fake`, end to end (I18, I19, I20).
+
+Golden files pin the whole report; hand-computed counts check it independently, so regenerating a
+golden file (`--update-golden`) can never silently bless a wrong number.
+"""
+
+import json
+import os
+import subprocess
+from pathlib import Path
+
+import pytest
+from tests.support.paths import ROOT, VENV_BIN
+from typer.testing import CliRunner
+
+from bio_claim_check.app.cli import app
+from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.report.models import FAKE_NOTICE
+
+pytestmark = pytest.mark.e2e
+runner = CliRunner()
+
+Q = "Does OS-912 slow cognitive decline?"
+GOLDEN = ROOT / "tests" / "fixtures" / "golden"
+
+# Hand-computed from the scripts in features/{answer,verify}/fakes.py (see the S05 dev-log).
+EXPECTED_COUNTS = {
+    AnswerMode.STRICT: {
+        "pair_counts": {"passed": 0, "needs_review": 3, "failed": 0, "flagged": 1},
+        "claim_counts": {"passed": 0, "needs_review": 2, "failed": 0, "flagged": 1},
+    },
+    AnswerMode.OVER_EAGER: {
+        "pair_counts": {"passed": 0, "needs_review": 1, "failed": 1, "flagged": 4},
+        "claim_counts": {"passed": 0, "needs_review": 1, "failed": 1, "flagged": 4},
+    },
+}
+
+
+def _run(out: Path, *args: str) -> tuple[str, Path]:
+    result = runner.invoke(app, ["run", *args, "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    reports = list(out.glob("*/report.json"))
+    assert len(reports) == 1
+    return result.stdout, reports[0]
+
+
+@pytest.mark.parametrize("mode", list(AnswerMode))
+def test_fake_run_matches_golden_and_hand_counts(
+    mode: AnswerMode, tmp_path: Path, update_golden: bool
+) -> None:
+    stdout, path = _run(tmp_path, Q, "--fake", "--mode", mode.value)
+    golden = GOLDEN / f"fake_run_{mode.value}.json"
+    if update_golden:
+        golden.write_bytes(path.read_bytes())
+        pytest.fail(f"rewrote {golden.name}; review the diff and rerun without --update-golden")
+    assert path.read_bytes() == golden.read_bytes()
+    report = json.loads(path.read_bytes())
+    assert {k: report[k] for k in ("pair_counts", "claim_counts")} == EXPECTED_COUNTS[mode]
+    assert report["notice"] == FAKE_NOTICE
+    assert stdout.splitlines()[0] == FAKE_NOTICE
+    assert f"report: {path}" in stdout
+    assert '"passed"' not in json.dumps([c["disposition"] for c in report["claims"]])
+
+
+def test_a_second_run_is_byte_identical(tmp_path: Path) -> None:
+    _, first = _run(tmp_path / "a", Q, "--fake")
+    _, second = _run(tmp_path / "b", Q, "--fake")
+    assert first.read_bytes() == second.read_bytes()
+    assert first.parent.name == second.parent.name
+
+
+def test_non_ascii_question_is_echoed_exactly(tmp_path: Path) -> None:
+    question = "Does OS-912 help cafe\u0301 workers — and β-cell function?"
+    _, first = _run(tmp_path / "a", question, "--fake")
+    _, second = _run(tmp_path / "b", question, "--fake")
+    assert json.loads(first.read_text(encoding="utf-8"))["question"] == question
+    assert first.parent.name == second.parent.name
+
+
+def test_live_run_is_refused_until_s12(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["run", Q, "--out", str(tmp_path)])
+    assert result.exit_code == 2
+    assert "use --fake" in result.output
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize(
+    "args", [["   ", "--fake"], [Q, "--fake", "--k", "0"], [Q, "--fake", "--mode", "over-eager"]]
+)
+def test_bad_input_exits_2(args: list[str], tmp_path: Path) -> None:
+    assert runner.invoke(app, ["run", *args, "--out", str(tmp_path)]).exit_code == 2
+
+
+def test_installed_script_ignores_hostile_env_and_writes_to_var_runs(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        "BCC_CONTACT_EMAIL=not-an-email\nBCC_CACHE_MODE=bogus\nnot a dotenv line\n"
+    )
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "BCC_VAR_DIR": str(tmp_path / "elsewhere"),
+        "BCC_CONTACT_EMAIL": "also-not-an-email",
+        "BCC_FOUNDRY__API_KEY": "should-never-be-read",
+    }
+    result = subprocess.run(  # noqa: S603 -- fixed argv, our own console script from this venv
+        [str(VENV_BIN / "bio-claim-check"), "run", Q, "--fake"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[0] == FAKE_NOTICE
+    reports = list((tmp_path / "var" / "runs").glob("*/report.json"))
+    assert len(reports) == 1
+    assert reports[0].read_bytes() == (GOLDEN / "fake_run_strict.json").read_bytes()
+    assert not (tmp_path / "elsewhere").exists()

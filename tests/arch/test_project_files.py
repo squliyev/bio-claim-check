@@ -10,7 +10,9 @@ from typing import cast
 import pytest
 import yaml
 
+from bio_claim_check.features.contracts.finding import FindingKind
 from bio_claim_check.features.contracts.labels import (
+    AnswerMode,
     Disposition,
     EvidenceStatus,
     FailureKind,
@@ -173,12 +175,14 @@ def _glossary_tables(text: str) -> dict[str, list[str]]:
 
 def test_glossary_matches_the_enums() -> None:
     enums: list[type[StrEnum]] = [
+        AnswerMode,
         Label,
         EvidenceStatus,
         NegationCheck,
         Disposition,
         FailureKind,
         OverstatedReason,
+        FindingKind,
     ]
     tables = _glossary_tables((DOCS / "glossary.md").read_text(encoding="utf-8"))
     assert set(tables) == {e.__name__ for e in enums}

@@ -101,7 +101,7 @@ NegationDetector = Callable[[Span, CleanedText], NegationCheck]
 """Decides whether a located span sits under a negation (S10). Re-run on replay, so it must be pure."""
 
 
-class _Validated(BaseModel):
+class ValidatedModel(BaseModel):
     """Frozen, extra=forbid, no unvalidated copies (pydantic's `model_copy(update=...)` skips validation)."""
 
     model_config = _FROZEN
@@ -112,7 +112,7 @@ class _Validated(BaseModel):
         return super().model_copy(deep=deep)
 
 
-class Claim(_Validated):
+class Claim(ValidatedModel):
     """One atomic claim from an answer and the sources it cites, in citation order."""
 
     id: ClaimId
@@ -180,7 +180,7 @@ def _negation(span: Span | None, abstract: CleanedText, detector: NegationDetect
     return detector(span, abstract)
 
 
-class Verdict(_Validated):
+class Verdict(ValidatedModel):
     """The system's conclusion for one (claim, source) pair. Build it with `Verdict.finalise`."""
 
     claim_id: ClaimId
@@ -264,7 +264,7 @@ class Verdict(_Validated):
             )
 
 
-class VerifierFailure(_Validated):
+class VerifierFailure(ValidatedModel):
     """The verifier produced no usable output for one pair. Always FAILED; never silently dropped."""
 
     claim_id: ClaimId
@@ -276,7 +276,22 @@ class VerifierFailure(_Validated):
         return Disposition.FAILED
 
 
-def claim_disposition(claim: Claim, outcomes: Mapping[SourceId, Verdict | VerifierFailure]) -> Disposition:
+class CitationNotRetrieved(ValidatedModel):
+    """The claim cites a source that retrieval never returned. Always FLAGGED; never sent to a verifier."""
+
+    claim_id: ClaimId
+    source_id: SourceId
+
+    @property
+    def disposition(self) -> Disposition:
+        return Disposition.FLAGGED
+
+
+type PairOutcome = Verdict | VerifierFailure | CitationNotRetrieved
+"""Everything that can happen to one (claim, source) pair."""
+
+
+def claim_disposition(claim: Claim, outcomes: Mapping[SourceId, PairOutcome]) -> Disposition:
     """The worst disposition over every cited source (FLAGGED > FAILED > NEEDS_REVIEW > PASSED).
 
     Every cited source needs an explicit outcome: a missing or extra key raises, so a lost verdict can

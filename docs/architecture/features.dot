@@ -1,13 +1,18 @@
 digraph {
     node [fontname=helvetica]
     ".annotate" [label=".annotate/"]
-    ".answer"
+    ".answer" [label=".answer/"]
     ".baselines"
     ".bench" [label=".bench/"]
-    ".checks"
+    ".checks" [label=".checks/"]
     ".contracts" [label=".contracts/"]
-    ".report"
-    ".retrieval"
+    ".report" [label=".report/"]
+    ".retrieval" [label=".retrieval/"]
     ".traps"
-    ".verify"
+    ".verify" [label=".verify/"]
+    ".answer" ->  ".contracts"
+    ".checks" ->  ".contracts"
+    ".report" ->  ".contracts"
+    ".retrieval" ->  ".contracts"
+    ".verify" ->  ".contracts"
 }
