@@ -14,6 +14,11 @@ before speed.
 
 - Rings point inward: `common ← engine ← features ← infrastructure ← app`. Only `app` wires concrete
   classes together.
+- Core rings (`common`, `engine`, `features`) never import the driver modules listed in the
+  `core-has-no-driver-imports` contract. A new runtime dependency must
+  be classified in `tests/arch/test_dependency_policy.py`.
+- No static import cycles, and no module imports its own ancestor package.
+- After changing imports between packages, run `make graph` and commit `docs/architecture/*.dot`.
 - Feature slices never import each other; shared models go in `features/contracts`. Code that combines
   slices goes in `app/usecases`.
 - A slice grows in this order:

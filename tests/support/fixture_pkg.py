@@ -43,13 +43,31 @@ class ForbiddenContract:
     forbidden_modules: tuple[str, ...]
 
 
-type Contract = LayersContract | IndependenceContract | ForbiddenContract
+@dataclass(frozen=True, slots=True)
+class AcyclicSiblingsContract:
+    id: str
+    name: str
+    ancestors: tuple[str, ...]
+    depth: int
+
+
+type Contract = LayersContract | IndependenceContract | ForbiddenContract | AcyclicSiblingsContract
 
 _KEYS: dict[str, set[str]] = {
     "layers": {"id", "name", "type", "layers"},
     "independence": {"id", "name", "type", "modules"},
     "forbidden": {"id", "name", "type", "source_modules", "forbidden_modules"},
+    "acyclic_siblings": {"id", "name", "type", "ancestors", "depth"},
 }
+_OPTIONS = {"root_package", "include_external_packages", "contracts"}
+EXTERNAL = "ext:"  # case-module prefix for a third-party/stdlib module, e.g. "ext:httpx"
+
+
+@dataclass(frozen=True, slots=True)
+class LinterConfig:
+    root: str
+    include_external_packages: bool
+    contracts: tuple[Contract, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,12 +80,18 @@ class ContractCase:
 
     contract_id: str
     importer: str
-    imported: str
+    imported: str  # root-relative, or ``ext:<top-level module>`` for a third-party/stdlib module
     kind: Literal["rogue", "allowed"]
+    also: tuple[tuple[str, str], ...] = ()  # extra planted imports, e.g. the return edge of a cycle
+
+    @property
+    def edges(self) -> tuple[tuple[str, str], ...]:
+        return ((self.importer, self.imported), *self.also)
 
     def __str__(self) -> str:
         arrow = "-x->" if self.kind == "rogue" else "--->"
-        return f"{self.contract_id}:{self.importer}{arrow}{self.imported}"
+        extra = "".join(f"+{a}->{b}" for a, b in self.also)
+        return f"{self.contract_id}:{self.importer}{arrow}{self.imported}{extra}"
 
 
 class Outcome(StrEnum):
@@ -111,12 +135,15 @@ def _strs(raw: object, where: str) -> tuple[str, ...]:
     return tuple(_str(item, where) for item in items)
 
 
-def load_contracts(pyproject: Path) -> tuple[str, list[Contract]]:
-    """Return ``(root_package, contracts)`` exactly as configured in ``pyproject.toml``."""
+def load_contracts(pyproject: Path) -> LinterConfig:
+    """Return the import-linter configuration exactly as written in ``pyproject.toml``."""
     config = tomllib.loads(pyproject.read_text(encoding="utf-8"))["tool"]["importlinter"]
+    if unknown := set(config) - _OPTIONS:
+        raise ValueError(f"unsupported import-linter options: {sorted(unknown)}")
     root = _str(config["root_package"], "root_package")
-    if set(config) - {"root_package", "contracts"}:
-        raise ValueError(f"unsupported import-linter options: {set(config) - {'root_package', 'contracts'}}")
+    externals = config.get("include_external_packages", False)
+    if not isinstance(externals, bool):
+        raise TypeError("include_external_packages: expected a bool")
     contracts: list[Contract] = []
     for raw in config["contracts"]:
         kind = _str(raw.get("type"), "type")
@@ -127,34 +154,70 @@ def load_contracts(pyproject: Path) -> tuple[str, list[Contract]]:
             contracts.append(LayersContract(cid, name, _strs(raw["layers"], cid)))
         elif kind == "independence":
             contracts.append(IndependenceContract(cid, name, _strs(raw["modules"], cid)))
-        else:
+        elif kind == "forbidden":
             contracts.append(
                 ForbiddenContract(
                     cid, name, _strs(raw["source_modules"], cid), _strs(raw["forbidden_modules"], cid)
                 )
             )
-    return root, contracts
+        else:
+            depth = raw["depth"]
+            if not isinstance(depth, int) or isinstance(depth, bool):
+                raise TypeError(f"{cid}: depth must be an int")
+            contracts.append(AcyclicSiblingsContract(cid, name, _strs(raw["ancestors"], cid), depth))
+    return LinterConfig(root, externals, tuple(contracts))
 
 
 def relative(module: str, root: str) -> str:
+    """``root.a.b`` -> ``a.b``; the root itself -> ``""``. Anything else is rejected."""
+    if module == root:
+        return ""
     if not module.startswith(f"{root}."):
         raise ValueError(f"{module} is outside {root}")
     return module.removeprefix(f"{root}.")
 
 
-def _modules(contract: Contract) -> tuple[str, ...]:
+def to_fixture(module: str, root: str) -> str:
+    """Re-root one configured module name onto ``fixturepkg``.
+
+    exact root -> ``fixturepkg``; descendant -> ``fixturepkg.<rest>``; a top-level external module
+    (no dot, not the root) -> unchanged and never generated; anything else -> ValueError.
+    """
+    if module == root or module.startswith(f"{root}."):
+        rest = relative(module, root)
+        return f"{FIXTURE_ROOT}.{rest}" if rest else FIXTURE_ROOT
+    if module.isidentifier():
+        return module
+    raise ValueError(f"cannot re-root {module!r}: neither inside {root} nor a top-level external module")
+
+
+def case_target(module: str) -> str:
+    """Case-module (root-relative or ``ext:x``) -> the name written in the planted import."""
+    if module.startswith(EXTERNAL):
+        return module.removeprefix(EXTERNAL)
+    return f"{FIXTURE_ROOT}.{module}" if module else FIXTURE_ROOT
+
+
+def _internal(modules: tuple[str, ...], root: str) -> tuple[str, ...]:
+    return tuple(relative(m, root) for m in modules if m == root or m.startswith(f"{root}."))
+
+
+def _modules(contract: Contract, root: str) -> tuple[str, ...]:
+    """Root-relative internal modules a contract names (externals are never generated)."""
     match contract:
         case LayersContract(layers=layers):
-            return layers
+            return _internal(layers, root)
         case IndependenceContract(modules=modules):
-            return modules
+            return _internal(modules, root)
         case ForbiddenContract(source_modules=src, forbidden_modules=forbidden):
-            return src + forbidden
+            return _internal(src + forbidden, root)
+        case AcyclicSiblingsContract(ancestors=ancestors):
+            return _internal(ancestors, root)
 
 
 def _ini(contract: Contract, root: str) -> str:
     def rel(mods: tuple[str, ...]) -> str:
-        return "".join(f"\n    {FIXTURE_ROOT}.{relative(m, root)}" for m in mods)
+        return "".join(f"\n    {to_fixture(m, root)}" for m in mods)
 
     head = f"[importlinter:contract:{contract.id}]\nname = {contract.name}\n"
     match contract:
@@ -166,6 +229,8 @@ def _ini(contract: Contract, root: str) -> str:
             return (
                 f"{head}type = forbidden\nsource_modules ={rel(src)}\nforbidden_modules ={rel(forbidden)}\n"
             )
+        case AcyclicSiblingsContract(ancestors=ancestors, depth=depth):
+            return f"{head}type = acyclic_siblings\nancestors ={rel(ancestors)}\ndepth = {depth}\n"
 
 
 def _ensure_package(project: Path, module: str) -> Path:
@@ -182,19 +247,26 @@ def _ensure_package(project: Path, module: str) -> Path:
     return init
 
 
-def build_fixture_package(tmp: Path, root: str, contracts: list[Contract], case: ContractCase) -> Path:
-    """Generate a project whose only import is ``case.importer -> case.imported``; return its directory."""
+def build_fixture_package(tmp: Path, config: LinterConfig, case: ContractCase) -> Path:
+    """Generate a project whose only imports are ``case.edges``; return its directory."""
     project = tmp / "project"
     project.mkdir()
-    for contract in contracts:
-        for module in _modules(contract):
-            _ensure_package(project, relative(module, root))
-    _ensure_package(project, case.imported)
-    importer = _ensure_package(project, case.importer)
-    importer.write_text(f"import {FIXTURE_ROOT}.{case.imported}\n", encoding="utf-8")
-    body = "\n".join(_ini(c, root) for c in contracts)
+    for contract in config.contracts:
+        for module in _modules(contract, config.root):
+            _ensure_package(project, module)
+    planted: dict[Path, list[str]] = {}
+    for importer, imported in case.edges:
+        if not imported.startswith(EXTERNAL):
+            _ensure_package(project, imported)
+        init = _ensure_package(project, importer)
+        planted.setdefault(init, []).append(f"import {case_target(imported)}\n")
+    for init, lines in planted.items():
+        init.write_text("".join(lines), encoding="utf-8")
+    body = "\n".join(_ini(c, config.root) for c in config.contracts)
+    externals = "true" if config.include_external_packages else "false"
     (project / ".importlinter").write_text(
-        f"[importlinter]\nroot_package = {FIXTURE_ROOT}\n\n{body}", encoding="utf-8"
+        f"[importlinter]\nroot_package = {FIXTURE_ROOT}\ninclude_external_packages = {externals}\n\n{body}",
+        encoding="utf-8",
     )
     return project
 

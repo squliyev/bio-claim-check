@@ -1,11 +1,16 @@
 """Residual guards: proven on synthetic input first, then run over the real repository."""
 
+import importlib
+import sys
 from pathlib import Path, PurePosixPath
 
+import grimp
 import pytest
 
 from tests.support.guards import (
+    PACKAGE_NAME,
     check_adr_fields,
+    check_no_ancestor_imports,
     check_ring_header,
     check_test_support_header,
     expected_ring,
@@ -118,3 +123,65 @@ def test_every_adr_has_status_date_and_enforced_by() -> None:
     files = sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md"))
     assert files, "no ADRs discovered"
     assert [v for f in files for v in check_adr_fields(f, f.read_text(encoding="utf-8"))] == []
+
+
+# ---------------------------------------------------------------- ancestor imports (cycle gap)
+
+
+class _Graph:
+    def __init__(self, edges: dict[str, set[str]]) -> None:
+        self._edges = edges
+
+    @property
+    def modules(self) -> set[str]:
+        return set(self._edges) | {m for targets in self._edges.values() for m in targets}
+
+    def find_modules_directly_imported_by(self, module: str) -> set[str]:
+        return self._edges.get(module, set())
+
+
+@pytest.mark.parametrize(
+    "edges",
+    [
+        {"pkg.a.child": {"pkg.a"}},  # child imports its parent package (re-export loop)
+        {"pkg.a.b.c": {"pkg.a"}},  # grandchild imports a grandparent
+        {"pkg": {"pkg.a"}},  # the root package imports something internal
+    ],
+)
+def test_ancestor_guard_rejects(edges: dict[str, set[str]]) -> None:
+    assert len(check_no_ancestor_imports(_Graph(edges), "pkg")) == 1
+
+
+@pytest.mark.parametrize(
+    "edges",
+    [
+        {"pkg.a.child": {"pkg"}},  # reading the root (e.g. __version__) is fine
+        {"pkg.a": {"pkg.a.child"}},  # a package importing its own child is fine
+        {"pkg.a.child": {"pkg.b", "pydantic"}},  # sibling packages and externals are not ancestors
+        {"pkg.ab.x": {"pkg.a"}},  # name prefix is not ancestry
+        {"pkg": {"importlib"}},  # the root may import externals
+    ],
+)
+def test_ancestor_guard_accepts(edges: dict[str, set[str]]) -> None:
+    assert check_no_ancestor_imports(_Graph(edges), "pkg") == []
+
+
+def test_ancestor_guard_catches_a_real_reexport_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """End to end with grimp: the exact cycle shape that import-linter's acyclic_siblings misses."""
+    pkg = tmp_path / "cyclepkg" / "verify"
+    pkg.mkdir(parents=True)
+    (tmp_path / "cyclepkg" / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / "__init__.py").write_text("from cyclepkg.verify.svc import f\n", encoding="utf-8")
+    (pkg / "svc.py").write_text("from cyclepkg.verify import g\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "path", [str(tmp_path), *sys.path])
+    importlib.invalidate_caches()
+    found = check_no_ancestor_imports(grimp.build_graph("cyclepkg", cache_dir=None), "cyclepkg")
+    assert [v.detail.split(":")[0] for v in found] == ["cyclepkg.verify.svc -> cyclepkg.verify"]
+
+
+def test_the_real_package_has_no_ancestor_imports() -> None:
+    graph = grimp.build_graph(PACKAGE_NAME, cache_dir=None)
+    assert len(list(graph.modules)) > 1  # discovered something
+    assert check_no_ancestor_imports(graph, PACKAGE_NAME) == []

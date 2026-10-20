@@ -1,0 +1,13 @@
+digraph {
+    node [fontname=helvetica]
+    ".annotate" [label=".annotate/"]
+    ".answer"
+    ".baselines"
+    ".bench" [label=".bench/"]
+    ".checks"
+    ".contracts"
+    ".report"
+    ".retrieval"
+    ".traps"
+    ".verify"
+}

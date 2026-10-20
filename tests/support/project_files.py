@@ -27,6 +27,9 @@ class Invariant:
     refs: tuple[str, ...]
 
 
+REF_SEPARATOR = " · "
+
+
 def parse_invariants(path: Path) -> list[Invariant]:
     rows: list[Invariant] = []
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -35,7 +38,8 @@ def parse_invariants(path: Path) -> list[Invariant]:
         match = _ROW.match(line)
         if match is None:
             raise ValueError(f"malformed invariant row: {line!r}")
-        refs = (match.group(3).strip(), match.group(4).strip())
+        cells = (match.group(3), match.group(4))
+        refs = tuple(ref.strip() for cell in cells for ref in cell.split(REF_SEPARATOR))
         rows.append(Invariant(match.group(1), refs))
     if not rows:
         raise ValueError(f"no invariants found in {path}")

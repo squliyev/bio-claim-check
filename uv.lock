@@ -32,8 +32,10 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "grimp" },
     { name = "hypothesis" },
     { name = "import-linter" },
+    { name = "packaging" },
     { name = "pre-commit" },
     { name = "pyright" },
     { name = "pytest" },
@@ -52,8 +54,10 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "grimp", specifier = ">=3.17" },
     { name = "hypothesis", specifier = ">=6.170.5" },
     { name = "import-linter", specifier = "==2.15.*" },
+    { name = "packaging", specifier = ">=26.0" },
     { name = "pre-commit", specifier = ">=4.7.0" },
     { name = "pyright", specifier = ">=1.1.414" },
     { name = "pytest", specifier = ">=9.1.1" },

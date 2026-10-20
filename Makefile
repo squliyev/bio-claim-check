@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help sync lint format typecheck arch test cov verify hooks secrets up down clean
+.PHONY: help sync lint format typecheck arch graph test cov verify hooks secrets up down clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -23,6 +23,10 @@ typecheck:  ## Pyright strict
 
 arch:  ## Import contracts (import-linter); rule-fire proofs run in `test` (marker arch)
 	$(UV) run lint-imports --no-logo --no-cache
+
+graph:  ## Regenerate docs/architecture/*.dot (import-linter drawgraph; a test fails if they are stale)
+	$(UV) run import-linter drawgraph bio_claim_check --show-cycle-breakers > docs/architecture/rings.dot
+	$(UV) run import-linter drawgraph bio_claim_check.features --show-cycle-breakers > docs/architecture/features.dot
 
 test:  ## Offline tests (everything except `live`)
 	$(UV) run pytest -m "not live"

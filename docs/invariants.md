@@ -12,6 +12,8 @@ Reference kinds:
 - `pytest:<file>::<test>`
 - `ci:<job>`
 
+A cell may hold several references separated by ` · `.
+
 | id | Invariant | Static guard | Semantic test |
 |----|-----------|--------------|---------------|
 | I1 | Rings point inward (ADR 0002) | import-linter:rings | pytest:tests/arch/test_rules_fire.py::test_contract_fires_only_on_rogue_imports |
@@ -24,3 +26,7 @@ Reference kinds:
 | I8 | Every ADR states how it is enforced | pytest:tests/arch/test_guards.py::test_every_adr_has_status_date_and_enforced_by | pytest:tests/arch/test_guards.py::test_adr_fields_rejects |
 | I9 | Secrets are never rendered (ADR 0001) | pytest:tests/unit/app/test_settings.py::test_secrets_never_render | pytest:tests/unit/app/test_cli.py::test_config_redacts_secrets |
 | I10 | No secrets or real endpoints in git history (ADR 0001) | ci:secrets | ci:secrets |
+| I11 | No cycles in the statically detected import graph: siblings are acyclic at every depth, and no module imports its own ancestor package (ADR 0002) | import-linter:no-cycles · pytest:tests/arch/test_guards.py::test_the_real_package_has_no_ancestor_imports | pytest:tests/arch/test_rules_fire.py::test_contract_fires_only_on_rogue_imports · pytest:tests/arch/test_guards.py::test_ancestor_guard_rejects · pytest:tests/arch/test_guards.py::test_ancestor_guard_catches_a_real_reexport_cycle |
+| I12 | The core rings (`common`, `engine`, `features`) never import the listed driver modules (`httpx`, `openai`, `anthropic`, `tenacity`, `sqlite3`, `streamlit`, `typer`, `pydantic_settings`), directly or through internal modules. It is a deny-list: it does not inspect inside allowed third-party packages, and new drivers are caught by the I13 classification review (ADR 0002) | import-linter:core-has-no-driver-imports | pytest:tests/arch/test_rules_fire.py::test_core_rings_are_the_driver_free_sources |
+| I13 | Every direct runtime dependency is classified as core-allowed or app-only, consistently with I12, so a new dependency cannot be added without a deliberate, reviewed decision | pytest:tests/arch/test_dependency_policy.py::test_every_direct_dependency_is_classified_exactly_once | pytest:tests/arch/test_dependency_policy.py::test_policy_matches_the_driver_contract |
+| I14 | The committed dependency graph matches the code | pytest:tests/arch/test_dependency_policy.py::test_committed_dependency_graph_is_fresh | pytest:tests/arch/test_dependency_policy.py::test_committed_dependency_graph_is_fresh |

@@ -1,0 +1,8 @@
+digraph {
+    node [fontname=helvetica]
+    ".app" [label=".app/"]
+    ".common"
+    ".engine" [label=".engine/"]
+    ".features" [label=".features/"]
+    ".infrastructure"
+}

@@ -33,7 +33,9 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.5",
+    "grimp>=3.17",  # import graph for the ancestor-import guard (tests/support/guards.py)
     "import-linter==2.15.*",  # the rule-fire harness asserts on its CLI output format
+    "packaging>=26.0",  # parses [project].dependencies in the dependency-policy test
     "pyyaml>=6.0.3",
     "types-pyyaml>=6.0.12",
     "pre-commit>=4.7.0",
@@ -69,6 +71,7 @@ ban-relative-imports = "all"
 # Every contract has an `id`; tests/arch/test_rules_fire.py proves each one fails on a planted violation.
 [tool.importlinter]
 root_package = "bio_claim_check"
+include_external_packages = true  # lets `core-has-no-driver-imports` see third-party and stdlib imports
 
 [[tool.importlinter.contracts]]
 id = "rings"
@@ -124,6 +127,29 @@ forbidden_modules = [
     "bio_claim_check.features.retrieval",
     "bio_claim_check.features.traps",
     "bio_claim_check.features.verify",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-cycles"
+name = "No import cycles between sibling modules at any depth (ADR 0002)"
+type = "acyclic_siblings"
+ancestors = ["bio_claim_check"]
+depth = 10
+
+[[tool.importlinter.contracts]]
+id = "core-has-no-driver-imports"
+name = "Core rings import no driver libraries (ADR 0002)"
+type = "forbidden"
+source_modules = ["bio_claim_check.common", "bio_claim_check.engine", "bio_claim_check.features"]
+forbidden_modules = [
+    "anthropic",
+    "httpx",
+    "openai",
+    "pydantic_settings",
+    "sqlite3",
+    "streamlit",
+    "tenacity",
+    "typer",
 ]
 
 # ---------------------------------------------------------------- pyright

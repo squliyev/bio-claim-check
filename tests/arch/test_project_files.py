@@ -40,7 +40,7 @@ def test_adr_numbers_are_unique_and_titles_match_filenames() -> None:
 
 
 def _context() -> RefContext:
-    _, contracts = load_contracts(PYPROJECT)
+    contracts = load_contracts(PYPROJECT).contracts
     return RefContext(
         root=ROOT,
         contract_ids=frozenset(c.id for c in contracts),
@@ -91,6 +91,12 @@ def test_invariant_parser_rejects_malformed_rows(tmp_path: Path) -> None:
     doc.write_text("| I1 | only two | columns |\n", encoding="utf-8")
     with pytest.raises(ValueError, match="malformed"):
         parse_invariants(doc)
+
+
+def test_invariant_parser_splits_multiple_refs(tmp_path: Path) -> None:
+    doc = tmp_path / "inv.md"
+    doc.write_text("| I1 | text | ruff:A · ci:b | pytest:c |\n", encoding="utf-8")
+    assert parse_invariants(doc)[0].refs == ("ruff:A", "ci:b", "pytest:c")
 
 
 def test_citation_cff_metadata_smoke() -> None:

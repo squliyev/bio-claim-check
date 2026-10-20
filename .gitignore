@@ -26,3 +26,6 @@ junit.xml
 .DS_Store
 .idea/
 .vscode/
+
+# local knowledge-graph tooling (graphify)
+graphify-out/

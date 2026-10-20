@@ -28,6 +28,9 @@ flowchart LR
   engine --> common["common<br/>text · errors · ids"]
 ```
 
+- The generated dependency graphs ([rings](docs/architecture/rings.dot),
+  [features](docs/architecture/features.dot)) come from `make graph`, and a test fails when they are
+  stale. Render them locally with `dot -Tsvg`.
 - **Structure in code, judgement in the LLM.** Quote location, scoring and statistics are deterministic
   and never call a model ([ADR 0003](docs/adr/0003-structure-in-code-judgement-in-llm.md)).
 - Decisions are recorded in [docs/adr](docs/adr/README.md). The rules that must never break, and the

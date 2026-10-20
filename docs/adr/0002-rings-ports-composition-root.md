@@ -4,7 +4,7 @@
 - **Date:** 2026-10-20
 - **Supersedes / Extends:** —
 - **Related:** 0001, 0003
-- **Enforced by:** import-linter contracts `rings`, `slices` and `contracts-do-not-depend-on-slices`, proven by `tests/arch/test_rules_fire.py` · ruff `TID251` ban on `tests` in `src/` · `tests/arch/test_guards.py::test_every_source_module_has_a_correct_ring_header`
+- **Enforced by:** import-linter contracts `rings`, `slices`, `contracts-do-not-depend-on-slices`, `no-cycles` and `core-has-no-driver-imports`, plus `tests/arch/test_guards.py::test_the_real_package_has_no_ancestor_imports`, proven by `tests/arch/test_rules_fire.py` · ruff `TID251` ban on `tests` in `src/` · `tests/arch/test_guards.py::test_every_source_module_has_a_correct_ring_header`
 
 ## Context
 
@@ -34,6 +34,20 @@ app ─► infrastructure ─► features ─► engine ─► common
 - They are mutually independent.
 - They share vocabulary only through `features.contracts`, which itself imports no slice.
 - Work that combines slices lives in `app.usecases`.
+
+**Core rings hold no drivers.** `common`, `engine` and `features` never import the listed driver
+modules (`httpx`, `openai`, `anthropic`, `tenacity`, `sqlite3`, `streamlit`,
+`typer`, `pydantic_settings`). Those belong to `infrastructure` (adapters) and `app`. Every direct
+runtime dependency is classified as core-allowed or app-only in `tests/arch/test_dependency_policy.py`,
+so a new SDK cannot arrive without a deliberate, reviewed classification. The list is a deny-list,
+not a detector of every possible driver. The rule sees direct imports and imports through our own
+modules; it does not inspect the internals of allowed third-party packages.
+
+**No import cycles** in the statically detected import graph (dynamic `importlib` loading is out of
+scope). Sibling modules are acyclic at every depth (`no-cycles`). That contract cannot
+see a package `__init__` that re-exports from a child which imports the package back, so a guard also
+forbids any module from importing its own ancestor package (the root package is exempt as a target
+and must itself import nothing internal).
 
 **Ports belong to their consumer.** A domain port (for example `LiteratureSource`, `Verifier`) is
 declared by the slice that *uses* it, in that slice's `ports.py`. `infrastructure` implements it, and

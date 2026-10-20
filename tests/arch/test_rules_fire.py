@@ -11,6 +11,9 @@ from pathlib import Path
 import pytest
 
 from tests.support.fixture_pkg import (
+    EXTERNAL,
+    FIXTURE_ROOT,
+    AcyclicSiblingsContract,
     Contract,
     ContractCase,
     ForbiddenContract,
@@ -18,18 +21,23 @@ from tests.support.fixture_pkg import (
     LayersContract,
     Outcome,
     build_fixture_package,
+    case_target,
     load_contracts,
     relative,
     run_lint_imports,
+    to_fixture,
 )
-from tests.support.paths import FEATURES, PYPROJECT
+from tests.support.paths import FEATURES, PACKAGE, PYPROJECT
 
 pytestmark = pytest.mark.arch
 
-ROOT, CONTRACTS = load_contracts(PYPROJECT)
+CONFIG = load_contracts(PYPROJECT)
+ROOT, CONTRACTS = CONFIG.root, CONFIG.contracts
 EXPECTED_RINGS = ("app", "infrastructure", "features", "engine", "common")  # outermost first (ADR 0002)
 SLICES = ("annotate", "answer", "baselines", "bench", "checks", "report", "retrieval", "traps", "verify")
 DETERMINISTIC = ("features.annotate.agreement", "features.bench.stats", "features.checks")
+CORE = ("common", "engine", "features")  # rings that hold no driver library (ADR 0002)
+CORE_ALLOWED_EXTERNAL = "pydantic"  # the one third-party library core may use today
 
 
 def contract(cid: str) -> Contract:
@@ -54,6 +62,17 @@ def _slice_cases() -> list[ContractCase]:
     return cases
 
 
+def _driver_cases() -> list[ContractCase]:
+    """One rogue case per forbidden library, rotating through the core rings and a nested slice."""
+    io = contract("core-has-no-driver-imports")
+    assert isinstance(io, ForbiddenContract)
+    sources = (*CORE, "features.verify")
+    return [
+        ContractCase("core-has-no-driver-imports", sources[i % len(sources)], f"{EXTERNAL}{lib}", "rogue")
+        for i, lib in enumerate(io.forbidden_modules)
+    ]
+
+
 CASES: list[ContractCase] = [
     *_ring_cases(),
     *_slice_cases(),
@@ -62,17 +81,57 @@ CASES: list[ContractCase] = [
     ContractCase("no-llm-in-deterministic-code", "features.verify", "engine.llm", "allowed"),
     ContractCase("contracts-do-not-depend-on-slices", "features.contracts", "features.verify", "rogue"),
     ContractCase("contracts-do-not-depend-on-slices", "features.contracts", "common", "allowed"),
+    # cycles: one between rings (depth 1) and one inside a slice (depth 3) prove recursion
+    ContractCase("no-cycles", "engine", "common", "rogue", also=(("common", "engine"),)),
+    ContractCase(
+        "no-cycles",
+        "features.verify.a",
+        "features.verify.b",
+        "rogue",
+        also=(("features.verify.b", "features.verify.a"),),
+    ),
+    ContractCase("no-cycles", "features.verify.a", "features.verify.b", "allowed"),  # one-way is fine
+    *_driver_cases(),
+    ContractCase(
+        "core-has-no-driver-imports", "features.verify", f"{EXTERNAL}{CORE_ALLOWED_EXTERNAL}", "allowed"
+    ),
+    ContractCase(
+        "core-has-no-driver-imports", "infrastructure", f"{EXTERNAL}httpx", "allowed"
+    ),  # adapters may
+    ContractCase("core-has-no-driver-imports", "app", f"{EXTERNAL}typer", "allowed"),  # the CLI lives in app
+    # indirect: core reaches a driver only through a non-core internal module; the whole chain is reported
+    ContractCase(
+        "core-has-no-driver-imports",
+        "features.verify",
+        "infrastructure",
+        "rogue",
+        also=(("infrastructure", f"{EXTERNAL}httpx"),),
+    ),
 ]
+
+
+def _cycle_evidence(case: ContractCase) -> tuple[str, set[str]]:
+    """Cycle output names the parent package and nominates ONE planted edge (relative) as a breaker."""
+    parent = case.importer.rsplit(".", 1)[0] if "." in case.importer else ""
+    rel = {f"- .{a.rsplit('.', 1)[-1]} -> .{b.rsplit('.', 1)[-1]} (1 import)" for a, b in case.edges}
+    return f"No cycles are allowed in {case_target(parent)}.", rel
 
 
 @pytest.mark.parametrize("case", CASES, ids=str)
 def test_contract_fires_only_on_rogue_imports(case: ContractCase, tmp_path: Path) -> None:
-    project = build_fixture_package(tmp_path, ROOT, CONTRACTS, case)
+    project = build_fixture_package(tmp_path, CONFIG, case)
     result = run_lint_imports(project, case.contract_id)
     outcome = result.classify(contract(case.contract_id).name)
     if case.kind == "rogue":
         assert outcome is Outcome.BROKEN, result.output
-        assert f"fixturepkg.{case.importer} -> fixturepkg.{case.imported}" in result.output, result.output
+        if isinstance(contract(case.contract_id), AcyclicSiblingsContract):
+            header, breakers = _cycle_evidence(case)
+            assert header in result.output, result.output
+            assert any(b in result.output for b in breakers), result.output
+        else:
+            for importer, imported in case.edges:
+                edge = f"{case_target(importer)} -> {case_target(imported)}"
+                assert edge in result.output, result.output
     else:
         assert outcome is Outcome.KEPT, result.output
 
@@ -106,10 +165,70 @@ def test_shared_contracts_forbid_every_slice() -> None:
     assert {relative(m, ROOT).removeprefix("features.") for m in leaf.forbidden_modules} == set(SLICES)
 
 
+def test_core_rings_are_the_driver_free_sources() -> None:
+    io = contract("core-has-no-driver-imports")
+    assert isinstance(io, ForbiddenContract)
+    assert tuple(relative(m, ROOT) for m in io.source_modules) == CORE
+    assert all("." not in m and not m.startswith(ROOT) for m in io.forbidden_modules)  # top-level externals
+    assert CORE_ALLOWED_EXTERNAL not in io.forbidden_modules
+
+
+def test_cycle_contract_covers_the_whole_package_at_full_depth() -> None:
+    cycles = contract("no-cycles")
+    assert isinstance(cycles, AcyclicSiblingsContract)
+    assert cycles.ancestors == (ROOT,)
+    deepest = max(len(p.relative_to(PACKAGE).parts) for p in PACKAGE.rglob("*.py"))
+    assert deepest < cycles.depth, "package nesting reached the configured depth: raise `depth`"
+
+
+def test_acyclic_siblings_misses_ancestor_reexport_cycles(tmp_path: Path) -> None:
+    """Documents the known gap that tests/support/guards.check_no_ancestor_imports closes.
+
+    If a future import-linter catches this, the test fails and the guard can be reconsidered.
+    """
+    case = ContractCase(
+        "no-cycles",
+        "features.verify",
+        "features.verify.svc",
+        "allowed",
+        also=(("features.verify.svc", "features.verify"),),
+    )
+    project = build_fixture_package(tmp_path, CONFIG, case)
+    result = run_lint_imports(project, "no-cycles")
+    assert result.classify(contract("no-cycles").name) is Outcome.KEPT, result.output
+
+
+def test_generated_config_mirrors_the_external_packages_option(tmp_path: Path) -> None:
+    case = ContractCase("rings", "app", "common", "allowed")
+    ini = (build_fixture_package(tmp_path, CONFIG, case) / ".importlinter").read_text(encoding="utf-8")
+    assert CONFIG.include_external_packages is True
+    assert "include_external_packages = true" in ini
+    assert "\n    httpx" in ini
+    assert f"{FIXTURE_ROOT}.httpx" not in ini
+
+
+@pytest.mark.parametrize(
+    ("module", "expected"),
+    [
+        ("bio_claim_check", FIXTURE_ROOT),
+        ("bio_claim_check.features.verify", f"{FIXTURE_ROOT}.features.verify"),
+        ("httpx", "httpx"),
+    ],
+)
+def test_to_fixture_reroots_internal_and_keeps_external(module: str, expected: str) -> None:
+    assert to_fixture(module, ROOT) == expected
+
+
+@pytest.mark.parametrize("module", ["other_pkg.sub", "bio_claim_checkx.a", "not a module"])
+def test_to_fixture_rejects_anything_else(module: str) -> None:
+    with pytest.raises(ValueError, match="cannot re-root"):
+        to_fixture(module, ROOT)
+
+
 def test_a_missing_module_is_a_config_error_not_a_pass(tmp_path: Path) -> None:
     """Guards the harness itself: a broken fixture must never be counted as a broken contract."""
     case = ContractCase("rings", "common", "features", "rogue")
-    project = build_fixture_package(tmp_path, ROOT, CONTRACTS, case)
+    project = build_fixture_package(tmp_path, CONFIG, case)
     (project / "fixturepkg" / "app" / "__init__.py").unlink()
     (project / "fixturepkg" / "app").rmdir()
     result = run_lint_imports(project, "rings")
@@ -118,7 +237,7 @@ def test_a_missing_module_is_a_config_error_not_a_pass(tmp_path: Path) -> None:
 
 def test_an_unknown_contract_id_is_a_config_error(tmp_path: Path) -> None:
     case = ContractCase("rings", "app", "common", "allowed")
-    project = build_fixture_package(tmp_path, ROOT, CONTRACTS, case)
+    project = build_fixture_package(tmp_path, CONFIG, case)
     result = run_lint_imports(project, "no-such-contract")
     assert result.classify("no-such-contract") is Outcome.CONFIG_ERROR, result.output
 

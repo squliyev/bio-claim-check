@@ -7,8 +7,10 @@ whole text; nothing is stripped, so a violation hidden in a comment or string is
 
 import ast
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Protocol
 
 PACKAGE_NAME = "bio_claim_check"
 TEST_SUPPORT_TAG = "[TEST SUPPORT]"
@@ -75,3 +77,40 @@ def check_adr_fields(path: Path, text: str) -> list[Violation]:
         for field, pattern in _ADR_FIELDS.items()
         if pattern.search(text) is None
     ]
+
+
+class ImportGraph(Protocol):
+    """The slice of ``grimp.ImportGraph`` the cycle guard needs (keeps the guard testable with a dict)."""
+
+    @property
+    def modules(self) -> Iterable[str]: ...
+    def find_modules_directly_imported_by(self, module: str) -> Iterable[str]: ...
+
+
+def check_no_ancestor_imports(graph: ImportGraph, root: str) -> list[Violation]:
+    """Close the one cycle shape import-linter's ``acyclic_siblings`` cannot see.
+
+    ``acyclic_siblings`` checks siblings at every depth, so any cycle that does not pass through a
+    package's own ``__init__`` from below is caught there. The remaining shape is
+    ``pkg/__init__ -> pkg.child -> pkg`` (a re-export loop). Forbidding a module from importing any of
+    its ancestor packages removes it. The root package is exempt as an import target (modules may read
+    ``__version__``) only because the root itself must import nothing internal, so it cannot sit on a
+    cycle.
+    """
+    found: list[Violation] = []
+    for module in sorted(graph.modules):
+        if module != root and not module.startswith(f"{root}."):
+            continue
+        for imported in sorted(graph.find_modules_directly_imported_by(module)):
+            internal = imported == root or imported.startswith(f"{root}.")
+            if module == root and internal:
+                found.append(
+                    _cycle_violation(module, imported, "the root package must import nothing internal")
+                )
+            elif module.startswith(f"{imported}.") and imported != root:
+                found.append(_cycle_violation(module, imported, "imports its own ancestor package"))
+    return found
+
+
+def _cycle_violation(module: str, imported: str, why: str) -> Violation:
+    return Violation("no-ancestor-imports", Path(*module.split(".")), 0, f"{module} -> {imported}: {why}")
