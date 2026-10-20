@@ -4,6 +4,7 @@ Golden files pin the whole report; hand-computed counts check it independently, 
 golden file (`--update-golden`) can never silently bless a wrong number.
 """
 
+import hashlib
 import json
 import os
 import subprocess
@@ -23,7 +24,8 @@ runner = CliRunner()
 Q = "Does OS-912 slow cognitive decline?"
 GOLDEN = ROOT / "tests" / "fixtures" / "golden"
 
-# Hand-computed from the scripts in features/{answer,verify}/fakes.py (see the S05 dev-log).
+# Hand-computed from the scripts in features/answer/scripted_answerer.py and
+# features/verify/scripted_verifier.py (see the S05 dev-log).
 EXPECTED_COUNTS = {
     AnswerMode.STRICT: {
         "pair_counts": {"passed": 0, "needs_review": 3, "failed": 0, "flagged": 1},
@@ -67,6 +69,7 @@ def test_a_second_run_is_byte_identical(tmp_path: Path) -> None:
     _, second = _run(tmp_path / "b", Q, "--fake")
     assert first.read_bytes() == second.read_bytes()
     assert first.parent.name == second.parent.name
+    assert first.parent.name == hashlib.sha256(first.read_bytes()).hexdigest()[:16]
 
 
 def test_non_ascii_question_is_echoed_exactly(tmp_path: Path) -> None:

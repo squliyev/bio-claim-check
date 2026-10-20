@@ -14,7 +14,7 @@ import tomllib
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, cast, override
 
 from tests.support.paths import VENV_BIN
 
@@ -41,6 +41,7 @@ class ForbiddenContract:
     name: str
     source_modules: tuple[str, ...]
     forbidden_modules: tuple[str, ...]
+    allow_indirect_imports: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +60,7 @@ _KEYS: dict[str, set[str]] = {
     "forbidden": {"id", "name", "type", "source_modules", "forbidden_modules"},
     "acyclic_siblings": {"id", "name", "type", "ancestors", "depth"},
 }
+_OPTIONAL_KEYS: dict[str, set[str]] = {"forbidden": {"allow_indirect_imports"}}
 _OPTIONS = {"root_package", "include_external_packages", "contracts"}
 EXTERNAL = "ext:"  # case-module prefix for a third-party/stdlib module, e.g. "ext:httpx"
 
@@ -88,6 +90,7 @@ class ContractCase:
     def edges(self) -> tuple[tuple[str, str], ...]:
         return ((self.importer, self.imported), *self.also)
 
+    @override
     def __str__(self) -> str:
         arrow = "-x->" if self.kind == "rogue" else "--->"
         extra = "".join(f"+{a}->{b}" for a, b in self.also)
@@ -147,7 +150,8 @@ def load_contracts(pyproject: Path) -> LinterConfig:
     contracts: list[Contract] = []
     for raw in config["contracts"]:
         kind = _str(raw.get("type"), "type")
-        if kind not in _KEYS or set(raw) != _KEYS[kind]:
+        optional = _OPTIONAL_KEYS.get(kind, set())
+        if kind not in _KEYS or not _KEYS[kind] <= set(raw) <= _KEYS[kind] | optional:
             raise ValueError(f"unsupported contract shape: type={kind!r} keys={sorted(raw)}")
         cid, name = _str(raw["id"], "id"), _str(raw["name"], "name")
         if kind == "layers":
@@ -155,9 +159,16 @@ def load_contracts(pyproject: Path) -> LinterConfig:
         elif kind == "independence":
             contracts.append(IndependenceContract(cid, name, _strs(raw["modules"], cid)))
         elif kind == "forbidden":
+            indirect = raw.get("allow_indirect_imports", False)
+            if not isinstance(indirect, bool):
+                raise TypeError(f"{cid}: allow_indirect_imports must be a bool")
             contracts.append(
                 ForbiddenContract(
-                    cid, name, _strs(raw["source_modules"], cid), _strs(raw["forbidden_modules"], cid)
+                    cid,
+                    name,
+                    _strs(raw["source_modules"], cid),
+                    _strs(raw["forbidden_modules"], cid),
+                    indirect,
                 )
             )
         else:
@@ -225,9 +236,10 @@ def _ini(contract: Contract, root: str) -> str:
             return f"{head}type = layers\nlayers ={rel(layers)}\n"
         case IndependenceContract(modules=modules):
             return f"{head}type = independence\nmodules ={rel(modules)}\n"
-        case ForbiddenContract(source_modules=src, forbidden_modules=forbidden):
+        case ForbiddenContract(source_modules=src, forbidden_modules=forbidden, allow_indirect_imports=ind):
             return (
                 f"{head}type = forbidden\nsource_modules ={rel(src)}\nforbidden_modules ={rel(forbidden)}\n"
+                f"allow_indirect_imports = {'true' if ind else 'false'}\n"
             )
         case AcyclicSiblingsContract(ancestors=ancestors, depth=depth):
             return f"{head}type = acyclic_siblings\nancestors ={rel(ancestors)}\ndepth = {depth}\n"

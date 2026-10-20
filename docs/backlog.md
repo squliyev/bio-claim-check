@@ -17,6 +17,7 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | A5 | As a developer, I want typed domain contracts with two separate verdict axes, so that the model's judgement and code's evidence check never overwrite each other | ✅ |
 | A5b | As a researcher, I want a validated rule-pack format with a shipped seed pack, so that I can propose how papers in my field get misread without writing code | ✅ |
 | A6 | As a reviewer, I want an end-to-end run on fakes, so that the structure is proven before any provider exists | ✅ |
+| A7 | As a contributor, I want one obvious shape for ports and backends and rules that describe kinds, so that a new slice or backend passes the architecture checks without anyone editing them | ✅ |
 
 ## Feature B — Real adapters and the product
 
@@ -47,5 +48,6 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 |---|---|
 | Guardrails before code | Agent-written code is cheapest to keep in shape from the first file |
 | Fakes end to end before providers | Proves the structure without network, cost or flakiness |
+| Port shape before the first backend | Moving 3 ports is cheap; moving them after S06/S08 would mean 3 more ports and 5 more implementations |
 | Sealed split before prompt tuning | Tuning on the test split would invalidate every result |
 | Baselines and protocol before the study | The comparison and analysis are fixed before the numbers exist |

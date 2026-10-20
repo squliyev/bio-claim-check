@@ -1,7 +1,8 @@
 """[RING:app/cli] Command-line driving adapter — the primary interface.
 
 The CLI parses arguments, calls the composition root and renders results. It holds no business logic:
-anything worth testing lives in ``features`` or ``app.usecases`` and is called from here.
+anything worth testing lives in ``features`` or ``app.usecases`` and is called from here. It reaches
+infrastructure only through ``app.container`` (contract ``driving-adapters-use-the-container``).
 """
 
 from pathlib import Path
@@ -11,13 +12,16 @@ import typer
 from pydantic import ValidationError
 
 from bio_claim_check import __version__
-from bio_claim_check.app.container import build_fake_container
+from bio_claim_check.app.container import (
+    build_fake_run_ports,
+    default_rulepack,
+    load_rulepack,
+    publish_report,
+)
 from bio_claim_check.app.settings import load_settings
 from bio_claim_check.app.usecases.run import run_question
 from bio_claim_check.features.contracts.labels import AnswerMode
-from bio_claim_check.features.contracts.rulepack import RulePack
-from bio_claim_check.infrastructure.rulepack_yaml import RulePackError, load_default_rulepack, load_rulepack
-from bio_claim_check.infrastructure.run_store import write_report
+from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
 
 DEFAULT_K = 4
 DEFAULT_RUNS_DIR = Path("var/runs")  # relative to the working directory; --fake never reads settings
@@ -79,7 +83,7 @@ def validate_rulepack(
 ) -> None:
     """Validate a rule pack and summarise what it covers and who reviewed it."""
     try:
-        pack = load_default_rulepack() if path is None else load_rulepack(path)
+        pack = default_rulepack() if path is None else load_rulepack(path)
     except RulePackError as err:
         typer.echo(f"Invalid rule pack ({len(err.problems)} problem(s)):", err=True)
         for problem in err.problems:
@@ -115,9 +119,9 @@ def run(
     if not question.strip():
         typer.echo("The question must not be blank.", err=True)
         raise typer.Exit(code=2)
-    report = run_question(build_fake_container(), question, mode, k=k)
+    report = run_question(build_fake_run_ports(), question, mode, k=k)
     typer.echo(report.notice)
-    path = write_report(out, report)
+    path = publish_report(out, report)
     typer.echo(f"report: {path}")
     for name, counts in (("pairs", report.pair_counts), ("claims", report.claim_counts)):
         typer.echo(f"{name}: " + ", ".join(f"{d.value}={n}" for d, n in counts.items()))

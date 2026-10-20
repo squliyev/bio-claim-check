@@ -1,34 +1,30 @@
-"""[RING:infrastructure] Read a rule pack from YAML, refusing anything ambiguous.
+"""[RING:infrastructure] Parse YAML so that every file means exactly one thing.
 
-Why: a rule pack is written by hand and reviewed by pull request, so the loader must make every file
-mean exactly one thing. Plain `yaml.safe_load` silently keeps the last of two duplicate keys, expands
-anchors and aliases (shared or exponential structure), applies `<<` merge precedence and turns
-`!!binary` into bytes. This loader rejects all of those, then checks that only plain scalars remain,
-and lets the pydantic models in `features.contracts.rulepack` do the rest.
-Must not: decide what a valid rule is (that is the model's job) or read any path it was not given.
+Why: hand-written, PR-reviewed files (rule packs today) must be unambiguous. Plain `yaml.safe_load`
+silently keeps the last of two duplicate keys, expands anchors and aliases (shared or exponential
+structure), applies `<<` merge precedence and turns `!!binary` into bytes. This parser rejects all of
+those and checks that only plain scalars, lists and string-keyed mappings remain. It replaced the
+rule-pack-specific loader of S04 (S05b): what a valid rule pack is now lives in
+`features.contracts.rulepack.parse_rulepack`, and the app composes the two.
+Must not: know any document schema, read files, or import features or engine (transport only).
 
 No LLM is involved in this module.
 """
 
 from collections.abc import Hashable, Iterator
-from importlib.resources import files
-from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, override
 
 import yaml
-from pydantic import ValidationError
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode, ScalarNode
-
-from bio_claim_check.features.contracts.rulepack import RulePack
 
 _MERGE_TAG = "tag:yaml.org,2002:merge"
 _STR_TAG = "tag:yaml.org,2002:str"
 _SCALARS = (str, int, float, bool, type(None))
 
 
-class RulePackError(Exception):
-    """A rule pack could not be loaded. `problems` holds one human-readable line per problem."""
+class StrictYamlError(Exception):
+    """The text is not unambiguous YAML. `problems` holds one located, human-readable line per problem."""
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("\n".join(problems))
@@ -36,6 +32,7 @@ class RulePackError(Exception):
 
 
 class _StrictLoader(yaml.SafeLoader):
+    @override
     def construct_mapping(self, node: MappingNode, deep: bool = False) -> dict[Hashable, Any]:
         seen: set[str] = set()
         for key_node, _ in node.value:
@@ -77,49 +74,25 @@ def _join(path: str, part: str) -> str:
     return f"{path}.{part}" if path else part
 
 
-def parse_rulepack(text: str, source: str) -> RulePack:
-    """Parse rule-pack YAML text; `source` names the file in error messages."""
+def load_strict_yaml(text: str, source: str) -> object:
+    """Parse `text`; `source` names it in error messages. An empty or comment-only text gives None."""
     try:
-        return _parse(text, source)
+        return _load(text, source)
     except RecursionError:  # PyYAML's composer recurses per nesting level; a hostile file can exhaust it
-        raise RulePackError([f"{source}: nesting is too deep"]) from None
+        raise StrictYamlError([f"{source}: nesting is too deep"]) from None
 
 
-def _parse(text: str, source: str) -> RulePack:
+def _load(text: str, source: str) -> object:
     try:
         if lines := _anchor_lines(text):
-            raise RulePackError([f"{source}:{line}: anchors and aliases are not allowed" for line in lines])
+            raise StrictYamlError([f"{source}:{line}: anchors and aliases are not allowed" for line in lines])
         data: object = yaml.load(text, Loader=_StrictLoader)  # noqa: S506 - _StrictLoader extends SafeLoader
     except yaml.MarkedYAMLError as err:
         mark = err.problem_mark
         where = f"{source}:{mark.line + 1}" if mark else source
-        raise RulePackError([f"{where}: {err.problem or err}"]) from None
+        raise StrictYamlError([f"{where}: {err.problem or err}"]) from None
     except yaml.YAMLError as err:
-        raise RulePackError([f"{source}: {err}"]) from None
-    if data is None:
-        raise RulePackError([f"{source}: the file is empty"])
+        raise StrictYamlError([f"{source}: {err}"]) from None
     if bad := _non_scalar_paths(data, ""):
-        raise RulePackError([f"{source}: {problem}" for problem in bad])
-    try:
-        return RulePack.model_validate(data)
-    except ValidationError as err:
-        problems: list[str] = []
-        for problem in err.errors(include_input=False, include_url=False):
-            location = ".".join(str(part) for part in problem["loc"]) or "(root)"
-            problems.append(f"{source}: {location}: {problem['msg']}")
-        raise RulePackError(problems) from None
-
-
-def load_rulepack(path: Path) -> RulePack:
-    """Load a rule pack from a file."""
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as err:
-        raise RulePackError([f"{path}: cannot read: {err}"]) from None
-    return parse_rulepack(text, str(path))
-
-
-def load_default_rulepack() -> RulePack:
-    """The rule pack shipped with the package (author-written seed rules)."""
-    resource = files("bio_claim_check") / "data" / "rulepacks" / "default.yaml"
-    return parse_rulepack(resource.read_text(encoding="utf-8"), "default.yaml")
+        raise StrictYamlError([f"{source}: {problem}" for problem in bad])
+    return data

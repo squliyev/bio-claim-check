@@ -10,12 +10,14 @@ No LLM is involved in this module.
 """
 
 from collections.abc import Mapping
+from typing import override
 
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import FailureKind, Label, OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack
 from bio_claim_check.features.contracts.verdict import Claim, Verdict, VerifierFailure, VerifierOutput
+from bio_claim_check.features.verify.base_verifier import BaseVerifier
 
 type Script = Mapping[tuple[ClaimId, SourceId], VerifierOutput | FailureKind]
 
@@ -70,12 +72,13 @@ VERDICT_SCRIPT: Script = {
 """Scripted model output per (claim, source). `FAKE:99` (claim o5) is never retrieved, so never here."""
 
 
-class ScriptedVerifier:
+class ScriptedVerifier(BaseVerifier):
     """Looks up the scripted output for a pair and finalises it against the paper's cleaned abstract."""
 
     def __init__(self, script: Script = VERDICT_SCRIPT) -> None:
         self._script = script
 
+    @override
     def verify(self, claim: Claim, paper: Paper, rules: RulePack) -> Verdict | VerifierFailure:
         del rules  # scripted: the rule pack only shapes a real verifier's prompt
         scripted = self._script.get((claim.id, paper.source_id))

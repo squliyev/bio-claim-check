@@ -16,7 +16,7 @@ No LLM is involved in this module.
 """
 
 from collections.abc import Callable, Mapping
-from typing import Annotated, Any, Self, cast
+from typing import Annotated, Any, Self, cast, override
 
 from pydantic import (
     AfterValidator,
@@ -106,6 +106,7 @@ class ValidatedModel(BaseModel):
 
     model_config = _FROZEN
 
+    @override
     def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
         if update:
             raise TypeError(f"{type(self).__name__} is validated on construction; build a new one (finalise)")

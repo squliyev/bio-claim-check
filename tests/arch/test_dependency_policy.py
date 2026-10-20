@@ -18,15 +18,16 @@ from tests.support.paths import DOCS, PYPROJECT, ROOT, VENV_BIN
 
 pytestmark = pytest.mark.arch
 
-type Policy = Literal["core", "app-only"]
+# core: any module may import it. driver: only infrastructure, app and backend modules (ADR 0007).
+type Policy = Literal["core", "driver"]
 
 # distribution -> (import root, where it may be imported)
 DIRECT_DEPENDENCIES: dict[str, tuple[str, Policy]] = {
     "pydantic": ("pydantic", "core"),
-    "pydantic-settings": ("pydantic_settings", "app-only"),
-    "pyyaml": ("yaml", "app-only"),
+    "pydantic-settings": ("pydantic_settings", "driver"),
+    "pyyaml": ("yaml", "driver"),
     "rapidfuzz": ("rapidfuzz", "core"),
-    "typer": ("typer", "app-only"),
+    "typer": ("typer", "driver"),
 }
 
 
@@ -36,7 +37,7 @@ def _direct_requirements() -> list[str]:
 
 
 def _driver_free_forbidden() -> set[str]:
-    io = next(c for c in load_contracts(PYPROJECT).contracts if c.id == "core-has-no-driver-imports")
+    io = next(c for c in load_contracts(PYPROJECT).contracts if c.id == "pure-modules-import-no-drivers")
     assert isinstance(io, ForbiddenContract)
     return set(io.forbidden_modules)
 
@@ -50,7 +51,7 @@ def test_every_direct_dependency_is_classified_exactly_once() -> None:
 @pytest.mark.parametrize(("dist", "policy"), [(d, p) for d, (_, p) in DIRECT_DEPENDENCIES.items()])
 def test_policy_matches_the_driver_contract(dist: str, policy: Policy) -> None:
     import_root = DIRECT_DEPENDENCIES[dist][0]
-    assert (import_root in _driver_free_forbidden()) is (policy == "app-only"), dist
+    assert (import_root in _driver_free_forbidden()) is (policy == "driver"), dist
 
 
 def test_extras_do_not_change_the_distribution() -> None:

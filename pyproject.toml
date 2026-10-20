@@ -64,6 +64,23 @@ ban-relative-imports = "all"
 "os.getenv".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
 "os.putenv".msg = "Read configuration through bio_claim_check.app.settings only (ADR 0001)."
 "tests".msg = "Production code never imports test support (ADR 0002)."
+"importlib.import_module".msg = "Import statically so the import rules can see it (ADR 0007)."
+"datetime.date.today".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"datetime.datetime.now".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"datetime.datetime.today".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"datetime.datetime.utcnow".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"random".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"secrets".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"os.getrandom".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"os.urandom".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"time.monotonic".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"time.monotonic_ns".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"time.perf_counter".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"time.perf_counter_ns".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"time.time".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"time.time_ns".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"uuid.uuid1".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"uuid.uuid4".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "TID251"]  # tests may import tests.support; the ban stays active in src/**
@@ -72,7 +89,7 @@ ban-relative-imports = "all"
 # Every contract has an `id`; tests/arch/test_rules_fire.py proves each one fails on a planted violation.
 [tool.importlinter]
 root_package = "bio_claim_check"
-include_external_packages = true  # lets `core-has-no-driver-imports` see third-party and stdlib imports
+include_external_packages = true  # lets `pure-modules-import-no-drivers` see third-party and stdlib imports
 
 [[tool.importlinter.contracts]]
 id = "rings"
@@ -103,13 +120,25 @@ modules = [
 ]
 
 [[tool.importlinter.contracts]]
+# Sources mirror the "No LLM is involved" docstring markers exactly (tests/arch: marker parity).
 id = "no-llm-in-deterministic-code"
 name = "Deterministic code never calls an LLM (ADR 0003)"
 type = "forbidden"
 source_modules = [
+    "bio_claim_check.common",
+    "bio_claim_check.engine.events",
     "bio_claim_check.features.annotate.agreement",
+    "bio_claim_check.features.answer.base_answerer",
+    "bio_claim_check.features.answer.scripted_answerer",
     "bio_claim_check.features.bench.stats",
     "bio_claim_check.features.checks",
+    "bio_claim_check.features.contracts",
+    "bio_claim_check.features.report",
+    "bio_claim_check.features.retrieval.base_literature_source",
+    "bio_claim_check.features.retrieval.in_memory_literature_source",
+    "bio_claim_check.features.verify.base_verifier",
+    "bio_claim_check.features.verify.scripted_verifier",
+    "bio_claim_check.infrastructure",
 ]
 forbidden_modules = ["bio_claim_check.engine.llm"]
 
@@ -138,10 +167,20 @@ ancestors = ["bio_claim_check"]
 depth = 10
 
 [[tool.importlinter.contracts]]
-id = "core-has-no-driver-imports"
-name = "Core rings import no driver libraries (ADR 0002)"
+# Pure kinds only. Elsewhere in common/engine/features a driver may be imported only by a backend module
+# (`<backend>_<x>.py` beside `base_<x>.py`); tests/support/guards.check_driver_imports enforces that.
+id = "pure-modules-import-no-drivers"
+name = "Pure modules import no driver libraries (ADR 0002, ADR 0007)"
 type = "forbidden"
-source_modules = ["bio_claim_check.common", "bio_claim_check.engine", "bio_claim_check.features"]
+source_modules = [
+    "bio_claim_check.common",
+    "bio_claim_check.engine.events",
+    "bio_claim_check.features.annotate.agreement",
+    "bio_claim_check.features.bench.stats",
+    "bio_claim_check.features.checks",
+    "bio_claim_check.features.contracts",
+    "bio_claim_check.features.report",
+]
 forbidden_modules = [
     "anthropic",
     "httpx",
@@ -154,6 +193,40 @@ forbidden_modules = [
     "yaml",
 ]
 
+[[tool.importlinter.contracts]]
+id = "engine-is-feature-agnostic"
+name = "The engine is the feature-agnostic core runtime: it never imports features (ADR 0002, ADR 0007)"
+type = "forbidden"
+source_modules = ["bio_claim_check.engine"]
+forbidden_modules = ["bio_claim_check.features", "bio_claim_check.infrastructure", "bio_claim_check.app"]
+
+[[tool.importlinter.contracts]]
+id = "infrastructure-holds-only-transport"
+name = "Infrastructure holds only generic transport: no feature or engine imports (ADR 0007)"
+type = "forbidden"
+source_modules = ["bio_claim_check.infrastructure"]
+forbidden_modules = ["bio_claim_check.features", "bio_claim_check.engine"]
+
+[[tool.importlinter.contracts]]
+id = "driving-adapters-use-the-container"
+name = "CLI and UI reach infrastructure only through app.container (ADR 0002)"
+type = "forbidden"
+source_modules = ["bio_claim_check.app.cli", "bio_claim_check.app.ui"]
+forbidden_modules = ["bio_claim_check.infrastructure"]
+allow_indirect_imports = true  # the container is the one sanctioned path
+
+[[tool.importlinter.contracts]]
+id = "usecases-are-interface-free"
+name = "Use cases receive ports; they never import interfaces, the container or infrastructure (ADR 0002)"
+type = "forbidden"
+source_modules = ["bio_claim_check.app.usecases"]
+forbidden_modules = [
+    "bio_claim_check.app.cli",
+    "bio_claim_check.app.container",
+    "bio_claim_check.app.ui",
+    "bio_claim_check.infrastructure",
+]
+
 # ---------------------------------------------------------------- pyright
 [tool.pyright]
 include = ["src", "tests", "scripts"]
@@ -161,6 +234,7 @@ pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "error"
 reportUnnecessaryTypeIgnoreComment = "error"
+reportImplicitOverride = "error"   # every implementation of a base says so (ADR 0007)
 venvPath = "."
 venv = ".venv"
 

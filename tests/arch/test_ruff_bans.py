@@ -46,3 +46,38 @@ def test_tests_may_import_test_support() -> None:
 def test_env_access_banned_outside_settings() -> None:
     assert _tid251("src/bio_claim_check/engine/x.py", "import os\nos.environ.get('X')\n")
     assert _tid251("src/bio_claim_check/engine/x.py", "import os\nos.getenv('X')\n")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from datetime import datetime\ndatetime.now()\n",
+        "import datetime\ndatetime.datetime.utcnow()\n",
+        "from datetime import date\ndate.today()\n",
+        "import time\ntime.time()\n",
+        "from time import perf_counter\nperf_counter()\n",
+        "import random\n",
+        "from random import choice\n",
+        "import secrets\n",
+        "import uuid\nuuid.uuid4()\n",
+        "from datetime import datetime\ndatetime.today()\n",
+        "import os\nos.urandom(8)\n",
+        "import os\nos.getrandom(8)\n",
+        "import time\ntime.monotonic_ns()\n",
+        "import time\ntime.perf_counter_ns()\n",
+    ],
+)
+def test_wall_clock_and_randomness_banned_in_src(source: str) -> None:
+    assert _tid251("src/bio_claim_check/features/report/x.py", source)
+
+
+def test_dynamic_imports_banned_in_src() -> None:
+    assert _tid251(
+        "src/bio_claim_check/features/report/x.py", "import importlib\nimportlib.import_module('httpx')\n"
+    )
+
+
+def test_deterministic_ids_stay_allowed() -> None:
+    assert not _tid251(
+        "src/bio_claim_check/features/report/x.py", "import uuid\nuuid.uuid5(uuid.NAMESPACE_URL, 'x')\n"
+    )

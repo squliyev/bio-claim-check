@@ -1,20 +1,23 @@
-"""Scripted fakes and the invented-citation check (S05)."""
+"""Scripted answerer and verifier, the in-memory source and the invented-citation check (S05, S05b)."""
 
 import pytest
 
-from bio_claim_check.features.answer.fakes import SCRIPTS, ScriptedAnswerer
+from bio_claim_check.app.container import default_rulepack
+from bio_claim_check.features.answer.scripted_answerer import SCRIPTS, ScriptedAnswerer
 from bio_claim_check.features.checks.citations import invented_citations
 from bio_claim_check.features.contracts.answer import Answer
 from bio_claim_check.features.contracts.finding import FindingKind
 from bio_claim_check.features.contracts.labels import AnswerMode, Disposition, EvidenceStatus
 from bio_claim_check.features.contracts.verdict import Claim, Verdict
-from bio_claim_check.features.retrieval.fakes import FAKE_CORPUS, FakeLiteratureSource
-from bio_claim_check.features.verify.fakes import VERDICT_SCRIPT, ScriptedVerifier
-from bio_claim_check.infrastructure.rulepack_yaml import load_default_rulepack
+from bio_claim_check.features.retrieval.in_memory_literature_source import (
+    FAKE_CORPUS,
+    InMemoryLiteratureSource,
+)
+from bio_claim_check.features.verify.scripted_verifier import VERDICT_SCRIPT, ScriptedVerifier
 
 pytestmark = pytest.mark.unit
 
-RULES = load_default_rulepack()
+RULES = default_rulepack()
 BY_ID = {p.source_id: p for p in FAKE_CORPUS}
 
 
@@ -32,7 +35,7 @@ def test_fake_corpus_exercises_cleaning() -> None:
 
 @pytest.mark.parametrize("limit", [1, 2, 4, 10])
 def test_fake_source_respects_limit_in_rank_order(limit: int) -> None:
-    assert FakeLiteratureSource().search("anything", limit=limit) == FAKE_CORPUS[:limit]
+    assert InMemoryLiteratureSource().search("anything", limit=limit) == FAKE_CORPUS[:limit]
 
 
 @pytest.mark.parametrize("mode", list(AnswerMode))

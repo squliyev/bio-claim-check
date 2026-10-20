@@ -7,7 +7,12 @@ import pytest
 from pydantic import ValidationError
 
 from bio_claim_check.features.contracts.labels import OverstatedReason
-from bio_claim_check.features.contracts.rulepack import RulePack, rulepack_json_schema
+from bio_claim_check.features.contracts.rulepack import (
+    RulePack,
+    RulePackError,
+    parse_rulepack,
+    rulepack_json_schema,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -138,3 +143,34 @@ def test_the_rulepack_schema_describes_the_yaml_shape() -> None:
         "authors",
         "rules",
     }
+
+
+@pytest.mark.parametrize(
+    ("data", "problems"),
+    [
+        pytest.param(None, ["pack.yaml: the file is empty"], id="empty"),
+        pytest.param(
+            [1],
+            ["pack.yaml: (root): Input should be a valid dictionary or instance of RulePack"],
+            id="root-list",
+        ),
+        pytest.param(
+            {"schema_version": 1},
+            [
+                "pack.yaml: version: Field required",
+                "pack.yaml: authors: Field required",
+                "pack.yaml: rules: Field required",
+            ],
+            id="field-paths",
+        ),
+    ],
+)
+def test_parse_rulepack_reports_one_located_line_per_problem(data: object, problems: list[str]) -> None:
+    with pytest.raises(RulePackError) as info:
+        parse_rulepack(data, "pack.yaml")
+    assert info.value.problems == tuple(problems)
+    assert str(info.value) == "\n".join(problems)
+
+
+def test_parse_rulepack_accepts_a_valid_pack() -> None:
+    assert parse_rulepack(_pack(), "pack.yaml") == RulePack.model_validate(_pack())

@@ -4,15 +4,24 @@ Why: the ways papers get overstated are a researcher's knowledge, not code. A pa
 authored document that researchers can extend by pull request without writing Python. Every example
 records who reviewed it; an empty `reviewed_by` means author-written and is never reported as
 expert-labelled. Models are frozen: the verifier never edits its own rules (they change only by PR).
-Must not: read files (the YAML loader lives in infrastructure) or encode one lab's rules as defaults
-in code.
+`parse_rulepack` turns already-parsed data into a pack with one located problem per line; reading and
+YAML parsing live in infrastructure, and the app composes them (S05b).
+Must not: read files or parse YAML, or encode one lab's rules as defaults in code.
 
 No LLM is involved in this module.
 """
 
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, JsonValue, model_validator
+from pydantic import (
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    JsonValue,
+    ValidationError,
+    model_validator,
+)
 
 from bio_claim_check.features.contracts.labels import Label, OverstatedReason
 from bio_claim_check.features.contracts.verdict import NonBlankStr
@@ -96,3 +105,25 @@ class RulePack(BaseModel):
 def rulepack_json_schema() -> dict[str, JsonValue]:
     """JSON Schema for editors and reviewers of rule-pack YAML (validation mode)."""
     return RulePack.model_json_schema(mode="validation")
+
+
+class RulePackError(Exception):
+    """A rule pack could not be loaded. `problems` holds one human-readable line per problem."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("\n".join(problems))
+        self.problems = tuple(problems)
+
+
+def parse_rulepack(data: object, source: str) -> RulePack:
+    """Validate parsed data (None = an empty file) as a rule pack; `source` names it in every problem."""
+    if data is None:
+        raise RulePackError([f"{source}: the file is empty"])
+    try:
+        return RulePack.model_validate(data)
+    except ValidationError as err:
+        problems: list[str] = []
+        for problem in err.errors(include_input=False, include_url=False):
+            location = ".".join(str(part) for part in problem["loc"]) or "(root)"
+            problems.append(f"{source}: {location}: {problem['msg']}")
+        raise RulePackError(problems) from None

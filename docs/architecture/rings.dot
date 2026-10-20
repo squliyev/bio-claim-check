@@ -8,5 +8,4 @@ digraph {
     ".app" ->  ".features"
     ".app" ->  ".infrastructure"
     ".features" ->  ".common"
-    ".infrastructure" ->  ".features"
 }

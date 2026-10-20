@@ -5,19 +5,36 @@ pair → report. It distrusts every port: a source that returns too many or dupl
 that does not echo its question, or a verdict whose evidence does not re-locate in its abstract raises
 instead of becoming a number. A cite outside the retrieved set is never sent to the verifier; it is
 recorded as CitationNotRetrieved (FLAGGED) and as a finding (invariant I18).
-Must not: do I/O (the caller writes the report) or catch errors to keep going.
+Must not: do I/O (the caller writes the report), catch errors to keep going, or import the container,
+the driving adapters or infrastructure: it receives its ports in `RunPorts` (S05b).
 """
 
-from bio_claim_check.app.container import Container
+from dataclasses import dataclass
+
+from bio_claim_check.features.answer.base_answerer import BaseAnswerer
 from bio_claim_check.features.checks.citations import invented_citations
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.contracts.rulepack import RulePack
 from bio_claim_check.features.contracts.verdict import CitationNotRetrieved, PairOutcome, Verdict
 from bio_claim_check.features.report.build import build_report
-from bio_claim_check.features.report.models import Report
+from bio_claim_check.features.report.models import Provenance, Report
+from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.verify.base_verifier import BaseVerifier
 
 
-def run_question(c: Container, question: str, mode: AnswerMode, *, k: int) -> Report:
+@dataclass(frozen=True, slots=True)
+class RunPorts:
+    """Everything one run needs, chosen by the composition root."""
+
+    literature: BaseLiteratureSource
+    answerer: BaseAnswerer
+    verifier: BaseVerifier
+    rules: RulePack
+    provenance: Provenance
+
+
+def run_question(c: RunPorts, question: str, mode: AnswerMode, *, k: int) -> Report:
     """Run the whole flow for one question; `k` is the number of papers to retrieve (≥ 1)."""
     if type(k) is not int or k < 1:
         raise ValueError(f"k must be an integer ≥ 1, got {k!r}")

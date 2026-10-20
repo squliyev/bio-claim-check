@@ -1,12 +1,14 @@
 """`run_question`: the use case distrusts every port (I18)."""
 
 from dataclasses import replace
+from typing import override
 
 import pytest
 
-from bio_claim_check.app.container import Container, build_fake_container
-from bio_claim_check.app.usecases.run import run_question
-from bio_claim_check.features.answer.fakes import ScriptedAnswerer
+from bio_claim_check.app.container import build_fake_run_ports
+from bio_claim_check.app.usecases.run import RunPorts, run_question
+from bio_claim_check.features.answer.base_answerer import BaseAnswerer
+from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
 from bio_claim_check.features.contracts.answer import Answer
 from bio_claim_check.features.contracts.labels import AnswerMode, Disposition, EvidenceStatus, Label
 from bio_claim_check.features.contracts.paper import Paper
@@ -18,58 +20,66 @@ from bio_claim_check.features.contracts.verdict import (
     VerifierFailure,
     VerifierOutput,
 )
-from bio_claim_check.features.retrieval.fakes import FAKE_CORPUS, FakeLiteratureSource
-from bio_claim_check.features.verify.fakes import ScriptedVerifier
+from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.retrieval.in_memory_literature_source import (
+    FAKE_CORPUS,
+    InMemoryLiteratureSource,
+)
+from bio_claim_check.features.verify.base_verifier import BaseVerifier
+from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
 
 pytestmark = pytest.mark.unit
 
 Q = "Does OS-912 slow cognitive decline?"
 
 
-class SpyVerifier:
+class SpyVerifier(BaseVerifier):
     """Records every call and delegates to the scripted verifier."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
         self._inner = ScriptedVerifier()
 
+    @override
     def verify(self, claim: Claim, paper: Paper, rules: RulePack) -> Verdict | VerifierFailure:
         self.calls.append((claim.id, paper.source_id))
         return self._inner.verify(claim, paper, rules)
 
 
-class FixedAnswerer:
+class FixedAnswerer(BaseAnswerer):
     def __init__(
         self, claims: tuple[Claim, ...], question: str | None = None, mode: AnswerMode | None = None
     ):
         self._claims, self._question, self._mode = claims, question, mode
 
+    @override
     def answer(self, question: str, papers: tuple[Paper, ...], mode: AnswerMode) -> Answer:
         return Answer(question=self._question or question, mode=self._mode or mode, claims=self._claims)
 
 
-class FixedSource:
+class FixedSource(BaseLiteratureSource):
     def __init__(self, papers: tuple[Paper, ...]) -> None:
         self._papers = papers
 
+    @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
         return self._papers
 
 
-def _container(**changes: object) -> Container:
-    return replace(build_fake_container(), **changes)
+def _container(**changes: object) -> RunPorts:
+    return replace(build_fake_run_ports(), **changes)
 
 
 @pytest.mark.parametrize("k", [0, -1, True, 2.0])
 def test_k_must_be_a_positive_int(k: object) -> None:
     with pytest.raises(ValueError, match="k must be"):
-        run_question(build_fake_container(), Q, AnswerMode.STRICT, k=k)  # pyright: ignore[reportArgumentType]
+        run_question(build_fake_run_ports(), Q, AnswerMode.STRICT, k=k)  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.parametrize("question", ["", "   ", "\t\n"])
 def test_question_must_not_be_blank(question: str) -> None:
     with pytest.raises(ValueError, match="blank"):
-        run_question(build_fake_container(), question, AnswerMode.STRICT, k=4)
+        run_question(build_fake_run_ports(), question, AnswerMode.STRICT, k=4)
 
 
 def test_source_returning_more_than_k_is_rejected() -> None:
@@ -115,7 +125,7 @@ def test_empty_retrieval_makes_every_cite_not_retrieved() -> None:
 
 
 def test_small_k_reports_unretrieved_cites_honestly() -> None:
-    report = run_question(build_fake_container(), Q, AnswerMode.STRICT, k=1)
+    report = run_question(build_fake_run_ports(), Q, AnswerMode.STRICT, k=1)
     assert [p.source_id for p in report.papers] == ["FAKE:1"]
     assert {(f.claim_id, f.source_id) for f in report.findings} == {
         ("s2", "FAKE:3"),
@@ -142,9 +152,10 @@ def test_zero_claims_gives_an_empty_report() -> None:
     assert set(report.pair_counts.values()) == {0}
 
 
-class ForgingVerifier:
+class ForgingVerifier(BaseVerifier):
     """Returns an internally consistent verdict whose span was located in a different abstract."""
 
+    @override
     def verify(self, claim: Claim, paper: Paper, rules: RulePack) -> Verdict | VerifierFailure:
         out = VerifierOutput(
             label=Label.SUPPORTED, overstated_reason=None, evidence="OS-912 use was associated", reason="r"
@@ -156,7 +167,7 @@ def test_a_forged_span_from_another_abstract_is_rejected() -> None:
     forged = ForgingVerifier().verify(
         ScriptedAnswerer().answer(Q, (), AnswerMode.STRICT).claims[0],
         FAKE_CORPUS[0],
-        build_fake_container().rules,
+        build_fake_run_ports().rules,
     )
     assert isinstance(forged, Verdict)
     assert forged.evidence_status is EvidenceStatus.LOCATED
@@ -165,4 +176,4 @@ def test_a_forged_span_from_another_abstract_is_rejected() -> None:
 
 
 def test_fake_source_ignores_question_text() -> None:
-    assert FakeLiteratureSource().search("x", limit=4) == FakeLiteratureSource().search(Q, limit=4)
+    assert InMemoryLiteratureSource().search("x", limit=4) == InMemoryLiteratureSource().search(Q, limit=4)

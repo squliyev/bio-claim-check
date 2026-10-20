@@ -5,6 +5,8 @@ pyproject.toml (see tests/support/fixture_pkg.py). Parity tests make sure the co
 describe the intended architecture, so a reorder or a forgotten slice fails here.
 """
 
+import ast
+import shutil
 from itertools import combinations, pairwise
 from pathlib import Path
 
@@ -35,13 +37,30 @@ CONFIG = load_contracts(PYPROJECT)
 ROOT, CONTRACTS = CONFIG.root, CONFIG.contracts
 EXPECTED_RINGS = ("app", "infrastructure", "features", "engine", "common")  # outermost first (ADR 0002)
 SLICES = ("annotate", "answer", "baselines", "bench", "checks", "report", "retrieval", "traps", "verify")
-DETERMINISTIC = ("features.annotate.agreement", "features.bench.stats", "features.checks")
-CORE = ("common", "engine", "features")  # rings that hold no driver library (ADR 0002)
-CORE_ALLOWED_EXTERNAL = "pydantic"  # the one third-party library core may use today
+PURE = (  # kinds that never import a driver; backends elsewhere are checked by the driver guard
+    "common",
+    "engine.events",
+    "features.annotate.agreement",
+    "features.bench.stats",
+    "features.checks",
+    "features.contracts",
+    "features.report",
+)
+CORE_ALLOWED_EXTERNAL = "pydantic"  # the one third-party library pure modules may use today
+NO_LLM_MARKER = "No LLM is involved"
 
 
 def contract(cid: str) -> Contract:
     return next(c for c in CONTRACTS if c.id == cid)
+
+
+def _forbidden(cid: str) -> ForbiddenContract:
+    found = contract(cid)
+    assert isinstance(found, ForbiddenContract)
+    return found
+
+
+DETERMINISTIC = tuple(relative(m, ROOT) for m in _forbidden("no-llm-in-deterministic-code").source_modules)
 
 
 def _ring_cases() -> list[ContractCase]:
@@ -62,13 +81,19 @@ def _slice_cases() -> list[ContractCase]:
     return cases
 
 
+DRIVERS = "pure-modules-import-no-drivers"
+ENGINE = "engine-is-feature-agnostic"
+TRANSPORT = "infrastructure-holds-only-transport"
+ADAPTERS = "driving-adapters-use-the-container"
+USECASES = "usecases-are-interface-free"
+
+
 def _driver_cases() -> list[ContractCase]:
-    """One rogue case per forbidden library, rotating through the core rings and a nested slice."""
-    io = contract("core-has-no-driver-imports")
-    assert isinstance(io, ForbiddenContract)
-    sources = (*CORE, "features.verify")
+    """One rogue case per forbidden library, rotating through the pure sources and a nested module."""
+    io = _forbidden(DRIVERS)
+    sources = (*PURE, "features.contracts.verdict")
     return [
-        ContractCase("core-has-no-driver-imports", sources[i % len(sources)], f"{EXTERNAL}{lib}", "rogue")
+        ContractCase(DRIVERS, sources[i % len(sources)], f"{EXTERNAL}{lib}", "rogue")
         for i, lib in enumerate(io.forbidden_modules)
     ]
 
@@ -92,21 +117,36 @@ CASES: list[ContractCase] = [
     ),
     ContractCase("no-cycles", "features.verify.a", "features.verify.b", "allowed"),  # one-way is fine
     *_driver_cases(),
+    ContractCase(DRIVERS, "features.checks", f"{EXTERNAL}{CORE_ALLOWED_EXTERNAL}", "allowed"),
+    ContractCase(DRIVERS, "features.verify.httpx_verifier", f"{EXTERNAL}httpx", "allowed"),  # a backend
+    ContractCase(DRIVERS, "infrastructure", f"{EXTERNAL}httpx", "allowed"),
+    ContractCase(DRIVERS, "app", f"{EXTERNAL}typer", "allowed"),  # the CLI lives in app
+    # indirect: a pure module reaches a driver through another module; the whole chain is reported
     ContractCase(
-        "core-has-no-driver-imports", "features.verify", f"{EXTERNAL}{CORE_ALLOWED_EXTERNAL}", "allowed"
+        DRIVERS, "features.checks", "infrastructure", "rogue", also=(("infrastructure", f"{EXTERNAL}httpx"),)
     ),
-    ContractCase(
-        "core-has-no-driver-imports", "infrastructure", f"{EXTERNAL}httpx", "allowed"
-    ),  # adapters may
-    ContractCase("core-has-no-driver-imports", "app", f"{EXTERNAL}typer", "allowed"),  # the CLI lives in app
-    # indirect: core reaches a driver only through a non-core internal module; the whole chain is reported
-    ContractCase(
-        "core-has-no-driver-imports",
-        "features.verify",
-        "infrastructure",
-        "rogue",
-        also=(("infrastructure", f"{EXTERNAL}httpx"),),
+    ContractCase(ENGINE, "engine.pipeline", "features.verify", "rogue"),
+    ContractCase(ENGINE, "engine.events", "features.contracts", "rogue"),
+    ContractCase(ENGINE, "engine.llm", "features.contracts", "rogue"),
+    ContractCase(ENGINE, "engine", "infrastructure", "rogue"),
+    ContractCase(ENGINE, "engine", "app", "rogue"),
+    ContractCase(ENGINE, "features.verify", "engine.pipeline", "allowed"),  # features extend engine bases
+    ContractCase(ENGINE, "features.contracts", "engine.events", "allowed"),  # domain events subclass
+    ContractCase(TRANSPORT, "infrastructure", "features.report", "rogue"),
+    ContractCase(TRANSPORT, "infrastructure", "engine.llm", "rogue"),
+    ContractCase(TRANSPORT, "infrastructure", "common", "allowed"),
+    ContractCase(TRANSPORT, "infrastructure", f"{EXTERNAL}yaml", "allowed"),
+    ContractCase(ADAPTERS, "app.cli", "infrastructure", "rogue"),
+    ContractCase(ADAPTERS, "app.ui", "infrastructure", "rogue"),
+    ContractCase(  # the sanctioned path: through the container
+        ADAPTERS, "app.cli", "app.container", "allowed", also=(("app.container", "infrastructure"),)
     ),
+    ContractCase(USECASES, "app.usecases", "app.container", "rogue"),
+    ContractCase(USECASES, "app.usecases", "app.cli", "rogue"),
+    ContractCase(USECASES, "app.usecases", "app.ui", "rogue"),
+    ContractCase(USECASES, "app.usecases", "infrastructure", "rogue"),
+    ContractCase(USECASES, "app.usecases", "features.verify", "allowed"),
+    ContractCase(USECASES, "app.container", "app.usecases", "allowed"),
 ]
 
 
@@ -153,10 +193,34 @@ def test_slices_contract_lists_every_feature_package() -> None:
     assert {relative(m, ROOT).removeprefix("features.") for m in slices.modules} == on_disk == set(SLICES)
 
 
-def test_deterministic_contract_sources_are_all_exercised() -> None:
-    no_llm = contract("no-llm-in-deterministic-code")
-    assert isinstance(no_llm, ForbiddenContract)
-    assert {relative(m, ROOT) for m in no_llm.source_modules} == set(DETERMINISTIC)
+def _module_name(path: Path) -> str:
+    parts = path.relative_to(PACKAGE).with_suffix("").parts
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+def _marked_modules() -> set[str]:
+    marked: set[str] = set()
+    for path in PACKAGE.rglob("*.py"):
+        doc = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8"))) or ""
+        if NO_LLM_MARKER in doc:
+            marked.add(_module_name(path))
+    return marked
+
+
+def test_no_llm_sources_are_exactly_the_marked_modules() -> None:
+    """The docstring marker is the source of truth: a marked module is covered (itself or an ancestor),
+    and every contract source carries the marker. Marking a new module needs one contract line."""
+    marked = _marked_modules()
+    assert marked, "marker scan found nothing: did the marker wording change?"
+    sources = set(DETERMINISTIC)
+    uncovered = {m for m in marked if not any(m == s or m.startswith(f"{s}.") for s in sources)}
+    assert not uncovered, f"marked 'No LLM' but not in no-llm-in-deterministic-code: {sorted(uncovered)}"
+    assert sources <= marked, f"contract sources without the marker: {sorted(sources - marked)}"
+
+
+def test_every_rogue_contract_case_has_an_allowed_control() -> None:
+    rogue = {c.contract_id for c in CASES if c.kind == "rogue"}
+    assert rogue == {c.contract_id for c in CASES if c.kind == "allowed"}
 
 
 def test_shared_contracts_forbid_every_slice() -> None:
@@ -165,10 +229,10 @@ def test_shared_contracts_forbid_every_slice() -> None:
     assert {relative(m, ROOT).removeprefix("features.") for m in leaf.forbidden_modules} == set(SLICES)
 
 
-def test_core_rings_are_the_driver_free_sources() -> None:
-    io = contract("core-has-no-driver-imports")
-    assert isinstance(io, ForbiddenContract)
-    assert tuple(relative(m, ROOT) for m in io.source_modules) == CORE
+def test_pure_kinds_are_the_driver_free_sources() -> None:
+    io = _forbidden(DRIVERS)
+    assert tuple(relative(m, ROOT) for m in io.source_modules) == PURE
+    assert set(PURE) <= set(DETERMINISTIC), "a driver-free pure module is also LLM-free"
     assert all("." not in m and not m.startswith(ROOT) for m in io.forbidden_modules)  # top-level externals
     assert CORE_ALLOWED_EXTERNAL not in io.forbidden_modules
 
@@ -229,8 +293,7 @@ def test_a_missing_module_is_a_config_error_not_a_pass(tmp_path: Path) -> None:
     """Guards the harness itself: a broken fixture must never be counted as a broken contract."""
     case = ContractCase("rings", "common", "features", "rogue")
     project = build_fixture_package(tmp_path, CONFIG, case)
-    (project / "fixturepkg" / "app" / "__init__.py").unlink()
-    (project / "fixturepkg" / "app").rmdir()
+    shutil.rmtree(project / "fixturepkg" / "app")
     result = run_lint_imports(project, "rings")
     assert result.classify(contract("rings").name) is Outcome.CONFIG_ERROR, result.output
 

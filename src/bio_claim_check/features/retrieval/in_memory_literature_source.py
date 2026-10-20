@@ -1,4 +1,4 @@
-"""[RING:features/retrieval] A fixed, fictional literature source for demos and tests.
+"""[RING:features/retrieval] An in-memory literature source over a fixed corpus (demos, tests, contracts).
 
 Why: the walking skeleton (S05) and the offline demo need retrieval without a network. Every paper is
 invented: compound names are fictional, ids live in the `FAKE:` namespace and no real PMID is used.
@@ -9,7 +9,10 @@ Must not: be wired into a live run, or contain any real paper.
 No LLM is involved in this module.
 """
 
+from typing import override
+
 from bio_claim_check.features.contracts.paper import Paper
+from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 
 FAKE_CORPUS: tuple[Paper, ...] = (
     Paper(
@@ -51,12 +54,13 @@ FAKE_CORPUS: tuple[Paper, ...] = (
 """The whole fictional world, in rank order. Every id is `FAKE:<n>`."""
 
 
-class FakeLiteratureSource:
+class InMemoryLiteratureSource(BaseLiteratureSource):
     """Returns the first `limit` papers of a fixed corpus, whatever the question."""
 
     def __init__(self, corpus: tuple[Paper, ...] = FAKE_CORPUS) -> None:
         self._corpus = corpus
 
+    @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
         del question  # a fixed corpus: ranking does not depend on the question
         return self._corpus[:limit]

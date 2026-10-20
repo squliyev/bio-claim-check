@@ -10,7 +10,9 @@ No LLM is involved in this module.
 """
 
 from collections.abc import Mapping
+from typing import override
 
+from bio_claim_check.features.answer.base_answerer import BaseAnswerer
 from bio_claim_check.features.contracts.answer import Answer
 from bio_claim_check.features.contracts.labels import AnswerMode
 from bio_claim_check.features.contracts.paper import Paper
@@ -45,12 +47,13 @@ SCRIPTS: Mapping[AnswerMode, tuple[Claim, ...]] = {
 }
 
 
-class ScriptedAnswerer:
+class ScriptedAnswerer(BaseAnswerer):
     """Answers any question with the fixed script for the requested mode."""
 
     def __init__(self, scripts: Mapping[AnswerMode, tuple[Claim, ...]] = SCRIPTS) -> None:
         self._scripts = scripts
 
+    @override
     def answer(self, question: str, papers: tuple[Paper, ...], mode: AnswerMode) -> Answer:
         del papers  # scripted: see the module docstring
         return Answer(question=question, mode=mode, claims=self._scripts[mode])
