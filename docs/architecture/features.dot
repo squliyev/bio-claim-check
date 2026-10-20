@@ -5,7 +5,7 @@ digraph {
     ".baselines"
     ".bench" [label=".bench/"]
     ".checks"
-    ".contracts"
+    ".contracts" [label=".contracts/"]
     ".report"
     ".retrieval"
     ".traps"

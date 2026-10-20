@@ -38,6 +38,9 @@ class Span:
     end: int
 
     def __post_init__(self) -> None:
+        # exact ints: parsed artifacts must not turn `true`, "1" or 1.0 into an offset
+        if type(self.start) is not int or type(self.end) is not int:
+            raise TypeError(f"span offsets must be int, got {self.start!r}, {self.end!r}")
         if not 0 <= self.start < self.end:
             raise ValueError(f"invalid span [{self.start}, {self.end})")
 

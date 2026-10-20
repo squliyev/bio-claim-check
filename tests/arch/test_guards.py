@@ -13,6 +13,7 @@ from tests.support.guards import (
     check_no_ancestor_imports,
     check_ring_header,
     check_test_support_header,
+    check_verdict_construction,
     expected_ring,
 )
 from tests.support.paths import ADR_DIR, ROOT, SRC
@@ -185,3 +186,60 @@ def test_the_real_package_has_no_ancestor_imports() -> None:
     graph = grimp.build_graph(PACKAGE_NAME, cache_dir=None)
     assert len(list(graph.modules)) > 1  # discovered something
     assert check_no_ancestor_imports(graph, PACKAGE_NAME) == []
+
+
+def _verdict(text: str, rel: str = "bio_claim_check/features/verify/x.py") -> list[str]:
+    return [v.detail for v in check_verdict_construction(Path(rel), text, src_relative=PurePosixPath(rel))]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param("Verdict(claim_id='c')\n", id="direct"),
+        pytest.param("contracts.verdict.Verdict(claim_id='c')\n", id="qualified"),
+        pytest.param("Verdict.model_construct(claim_id='c')\n", id="model-construct"),
+        pytest.param("verdict.Verdict.model_construct()\n", id="qualified-model-construct"),
+        pytest.param("from bio_claim_check.features.contracts.verdict import Verdict as V\n", id="alias"),
+        pytest.param("V = Verdict\n", id="assignment-alias"),
+        pytest.param("V: type = verdict.Verdict\n", id="annotated-alias"),
+        pytest.param("getattr(Verdict, 'model_construct')()\n", id="getattr"),
+        pytest.param("BaseModel.model_copy(v, update={'negation': 'clear'})\n", id="base-model-copy"),
+    ],
+)
+def test_verdict_guard_rejects(text: str) -> None:
+    assert len(_verdict(text)) == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        pytest.param("Verdict.finalise(c, s, out, abstract)\n", id="finalise"),
+        pytest.param("Verdict.model_validate(data)\n", id="model-validate"),
+        pytest.param("from bio_claim_check.features.contracts.verdict import Verdict\n", id="plain-import"),
+        pytest.param("Other.model_construct()\nx = Verdict.finalise\n", id="other-model"),
+        pytest.param("v.model_copy()\ngetattr(v, 'reason')\n", id="plain-copy-and-getattr"),
+        pytest.param("# Verdict(x)\ns = 'Verdict(x)'\n", id="comment-and-string"),
+    ],
+)
+def test_verdict_guard_accepts(text: str) -> None:
+    assert _verdict(text) == []
+
+
+def test_verdict_guard_exempts_only_its_home() -> None:
+    assert _verdict("Verdict(x)\n", "bio_claim_check/features/contracts/verdict.py") == []
+    assert _verdict("Verdict(x)\n", "bio_claim_check/features/contracts/other.py")
+
+
+def test_no_verdict_is_constructed_outside_its_home() -> None:
+    files = sorted(SRC.rglob("*.py"))
+    assert any(
+        f.relative_to(SRC).as_posix() == "bio_claim_check/features/contracts/verdict.py" for f in files
+    )
+    found = [
+        v
+        for f in files
+        for v in check_verdict_construction(
+            f, f.read_text(encoding="utf-8"), src_relative=PurePosixPath(f.relative_to(SRC).as_posix())
+        )
+    ]
+    assert found == []

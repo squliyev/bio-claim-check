@@ -3,12 +3,21 @@
 import re
 import subprocess
 import zipfile
+from enum import StrEnum
 from pathlib import Path
 from typing import cast
 
 import pytest
 import yaml
 
+from bio_claim_check.features.contracts.labels import (
+    Disposition,
+    EvidenceStatus,
+    FailureKind,
+    Label,
+    NegationCheck,
+    OverstatedReason,
+)
 from tests.support.fixture_pkg import load_contracts
 from tests.support.paths import ADR_DIR, DOCS, PYPROJECT, ROOT, VENV_BIN
 from tests.support.project_files import (
@@ -146,4 +155,32 @@ def test_wheel_ships_the_license(tmp_path: Path) -> None:
         assert any(n.endswith(".dist-info/licenses/LICENSE") for n in names), names
         metadata = zf.read(next(n for n in names if n.endswith(".dist-info/METADATA"))).decode()
     assert "License-Expression: Apache-2.0" in metadata
+    assert "bio_claim_check/data/rulepacks/default.yaml" in names, "the default rule pack must ship"
     assert not any(n.startswith("tests/") for n in names)
+
+
+def _glossary_tables(text: str) -> dict[str, list[str]]:
+    """`## Heading` -> backticked first-column values of the table under it."""
+    tables: dict[str, list[str]] = {}
+    heading = ""
+    for line in text.splitlines():
+        if line.startswith("## "):
+            heading = line[3:].strip()
+        elif heading and (m := re.match(r"^\| `([^`]+)` \|", line)):
+            tables.setdefault(heading, []).append(m.group(1))
+    return tables
+
+
+def test_glossary_matches_the_enums() -> None:
+    enums: list[type[StrEnum]] = [
+        Label,
+        EvidenceStatus,
+        NegationCheck,
+        Disposition,
+        FailureKind,
+        OverstatedReason,
+    ]
+    tables = _glossary_tables((DOCS / "glossary.md").read_text(encoding="utf-8"))
+    assert set(tables) == {e.__name__ for e in enums}
+    for enum in enums:
+        assert tables[enum.__name__] == [m.value for m in enum], enum.__name__

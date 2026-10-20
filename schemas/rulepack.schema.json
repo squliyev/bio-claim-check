@@ -1,0 +1,161 @@
+{
+  "$defs": {
+    "OverstatedReason": {
+      "description": "How a claim goes beyond its source. Mapped to the spin literature in ADR 0006.",
+      "enum": [
+        "preclinical_to_clinical",
+        "background_as_result",
+        "surrogate_as_clinical",
+        "correlation_as_causation",
+        "selective_analysis_as_main",
+        "nonsignificant_as_effect",
+        "dose_or_exposure_extrapolation",
+        "population_extrapolation",
+        "certainty_inflation",
+        "other"
+      ],
+      "title": "OverstatedReason",
+      "type": "string"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "description": "One way a claim can go beyond its source, with cues and contrasting examples.",
+      "properties": {
+        "cues": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Cues",
+          "type": "array"
+        },
+        "definition": {
+          "title": "Definition",
+          "type": "string"
+        },
+        "examples": {
+          "items": {
+            "$ref": "#/$defs/RuleExample"
+          },
+          "title": "Examples",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/OverstatedReason"
+        },
+        "references": {
+          "items": {
+            "type": "string"
+          },
+          "title": "References",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "reason",
+        "definition",
+        "cues",
+        "examples",
+        "references"
+      ],
+      "title": "Rule",
+      "type": "object"
+    },
+    "RuleExample": {
+      "additionalProperties": false,
+      "description": "A claim next to the source excerpt it was built from. Entities are fictional by convention.",
+      "properties": {
+        "claim": {
+          "title": "Claim",
+          "type": "string"
+        },
+        "label": {
+          "enum": [
+            "supported",
+            "overstated"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "note": {
+          "title": "Note",
+          "type": "string"
+        },
+        "overstated_reason": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OverstatedReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reviewed_by": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Reviewed By",
+          "type": "array"
+        },
+        "source_excerpt": {
+          "title": "Source Excerpt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "source_excerpt",
+        "label",
+        "overstated_reason",
+        "note"
+      ],
+      "title": "RuleExample",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A versioned, authored set of rules covering every overstatement reason except `other`.",
+  "properties": {
+    "authors": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Authors",
+      "type": "array"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/Rule"
+      },
+      "title": "Rules",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "version": {
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "version",
+    "authors",
+    "rules"
+  ],
+  "title": "RulePack",
+  "type": "object"
+}

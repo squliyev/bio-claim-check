@@ -29,6 +29,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | ADR | Title | Status | Resolves |
 |---|---|---|---|
 | [0005](./0005-quote-location-fails-closed.md) | Quote location fails closed; no fuzzy pass | Accepted | When quoted evidence counts as found in the abstract |
+| [0006](./0006-two-axis-verdict-and-disposition.md) | Two-axis verdict, one disposition, and the overstatement taxonomy | Accepted | What a verdict means; how pairs and claims are counted; what a rule pack is |
 
 ## Superseded / historical
 

@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "pydantic-settings>=2.6",
     "pydantic[email]>=2.9",
+    "pyyaml>=6.0.3",
     "rapidfuzz>=3.14",
     "typer>=0.15",
 ]
@@ -37,7 +38,6 @@ dev = [
     "grimp>=3.17",  # import graph for the ancestor-import guard (tests/support/guards.py)
     "import-linter==2.15.*",  # the rule-fire harness asserts on its CLI output format
     "packaging>=26.0",  # parses [project].dependencies in the dependency-policy test
-    "pyyaml>=6.0.3",
     "types-pyyaml>=6.0.12",
     "pre-commit>=4.7.0",
     "pyright>=1.1.414",
@@ -151,11 +151,12 @@ forbidden_modules = [
     "streamlit",
     "tenacity",
     "typer",
+    "yaml",
 ]
 
 # ---------------------------------------------------------------- pyright
 [tool.pyright]
-include = ["src", "tests"]
+include = ["src", "tests", "scripts"]
 pythonVersion = "3.13"
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "error"

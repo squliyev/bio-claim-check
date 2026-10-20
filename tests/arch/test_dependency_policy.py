@@ -24,6 +24,7 @@ type Policy = Literal["core", "app-only"]
 DIRECT_DEPENDENCIES: dict[str, tuple[str, Policy]] = {
     "pydantic": ("pydantic", "core"),
     "pydantic-settings": ("pydantic_settings", "app-only"),
+    "pyyaml": ("yaml", "app-only"),
     "rapidfuzz": ("rapidfuzz", "core"),
     "typer": ("typer", "app-only"),
 }

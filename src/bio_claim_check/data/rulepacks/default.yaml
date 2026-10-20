@@ -1,0 +1,205 @@
+# bio-claim-check default rule pack (v0): author-written seed rules, to be revised by domain experts.
+#
+# Every compound, cell line and trial below is FICTIONAL, so no example can leak a real abstract into a
+# benchmark. `reviewed_by: []` means author-written; such examples are never described as expert-labelled.
+# The literature mapping is a starting point and is re-verified in the related-work review.
+schema_version: 1
+version: "0.1.0"
+authors:
+  - "Samir Guliyev"
+rules:
+  - id: preclinical_to_clinical
+    reason: preclinical_to_clinical
+    definition: "A finding from cells or animals is stated as if it held in patients."
+    cues:
+      - "the source mentions mice, rats, cell lines, organoids or in vitro, but the claim names patients or people"
+      - "the claim says 'treats', 'cures' or 'prevents' a human disease"
+    examples:
+      - claim: "XR-417 slows memory decline in people with Alzheimer's disease."
+        source_excerpt: "In APP/PS1 transgenic mice, XR-417 reduced hippocampal plaque load and improved water-maze performance."
+        label: overstated
+        overstated_reason: preclinical_to_clinical
+        note: "Mouse behaviour and plaque load are not memory decline in patients."
+        reviewed_by: []
+      - claim: "In a mouse model of Alzheimer's disease, XR-417 reduced hippocampal plaque load."
+        source_excerpt: "In APP/PS1 transgenic mice, XR-417 reduced hippocampal plaque load and improved water-maze performance."
+        label: supported
+        overstated_reason: null
+        note: "The claim keeps the model organism."
+        reviewed_by: []
+    references:
+      - "Sumner P et al. BMJ 2014;349:g7015"
+  - id: background_as_result
+    reason: background_as_result
+    definition: >-
+      Something the abstract states as background, prior work or motivation is cited as this study's
+      finding. An attribution error rather than spin.
+    cues:
+      - "the supporting sentence is in the background or introduction"
+      - "the source says 'has been reported', 'is known to' or 'previous studies'"
+    examples:
+      - claim: "This study showed that ZT-88 lowers fasting glucose."
+        source_excerpt: "ZT-88 has been reported to lower fasting glucose. Here we examined its effect on hepatic lipid content."
+        label: overstated
+        overstated_reason: background_as_result
+        note: "Glucose lowering is prior work the authors cite, not their result."
+        reviewed_by: []
+      - claim: "This study examined the effect of ZT-88 on hepatic lipid content."
+        source_excerpt: "ZT-88 has been reported to lower fasting glucose. Here we examined its effect on hepatic lipid content."
+        label: supported
+        overstated_reason: null
+        note: "The claim attributes only the study's own aim."
+        reviewed_by: []
+    references:
+      - "Greenberg SA. BMJ 2009;339:b2680"
+  - id: surrogate_as_clinical
+    reason: surrogate_as_clinical
+    definition: "A change in a biomarker or surrogate end point is stated as a clinical benefit."
+    cues:
+      - "the source reports a biomarker, imaging or laboratory value; the claim names survival, events or symptoms"
+    examples:
+      - claim: "VL-203 reduces heart attacks."
+        source_excerpt: "Over 12 weeks, VL-203 lowered LDL cholesterol by 31% compared with placebo."
+        label: overstated
+        overstated_reason: surrogate_as_clinical
+        note: "LDL lowering is a surrogate; myocardial infarction was not measured."
+        reviewed_by: []
+      - claim: "VL-203 lowered LDL cholesterol compared with placebo over 12 weeks."
+        source_excerpt: "Over 12 weeks, VL-203 lowered LDL cholesterol by 31% compared with placebo."
+        label: supported
+        overstated_reason: null
+        note: "The claim stays with the measured end point."
+        reviewed_by: []
+    references:
+      - "Fleming TR, DeMets DL. Ann Intern Med 1996;125(7):605-13"
+  - id: correlation_as_causation
+    reason: correlation_as_causation
+    definition: "An association from an observational design is stated as a cause or effect."
+    cues:
+      - "the source is a cohort, case-control, cross-sectional or registry study"
+      - "the source says 'associated with'; the claim says 'reduces', 'causes' or 'protects'"
+    examples:
+      - claim: "Taking CV-551 prevents colorectal cancer."
+        source_excerpt: "In a registry cohort of 48 000 adults, CV-551 use was associated with lower colorectal cancer incidence (HR 0.82)."
+        label: overstated
+        overstated_reason: correlation_as_causation
+        note: "An observational association does not show prevention."
+        reviewed_by: []
+      - claim: "In a registry cohort, CV-551 use was associated with lower colorectal cancer incidence."
+        source_excerpt: "In a registry cohort of 48 000 adults, CV-551 use was associated with lower colorectal cancer incidence (HR 0.82)."
+        label: supported
+        overstated_reason: null
+        note: "The claim keeps the associational wording."
+        reviewed_by: []
+    references:
+      - "Sumner P et al. BMJ 2014;349:g7015"
+  - id: selective_analysis_as_main
+    reason: selective_analysis_as_main
+    definition: >-
+      A subgroup, secondary outcome or post-hoc analysis is stated as the study's main result, usually
+      when the primary outcome was not met.
+    cues:
+      - "the source says 'subgroup', 'secondary end point', 'exploratory' or 'post hoc'"
+      - "the primary outcome is reported as not significant elsewhere in the source"
+    examples:
+      - claim: "The QL-12 trial showed that QL-12 improves survival."
+        source_excerpt: "QL-12 did not improve overall survival (primary end point). In an exploratory subgroup of patients under 60, survival was longer."
+        label: overstated
+        overstated_reason: selective_analysis_as_main
+        note: "An exploratory subgroup is presented as the trial result while the primary end point failed."
+        reviewed_by: []
+      - claim: "In an exploratory subgroup of patients under 60, survival was longer with QL-12."
+        source_excerpt: "QL-12 did not improve overall survival (primary end point). In an exploratory subgroup of patients under 60, survival was longer."
+        label: supported
+        overstated_reason: null
+        note: "The claim names the analysis as exploratory and as a subgroup."
+        reviewed_by: []
+    references:
+      - "Boutron I et al. JAMA 2010;303(20):2058-64"
+      - "Yavchitz A et al. J Clin Epidemiol 2016;75:56-65"
+  - id: nonsignificant_as_effect
+    reason: nonsignificant_as_effect
+    definition: "A difference that was not statistically significant is stated as an effect or a trend that works."
+    cues:
+      - "the source reports p > 0.05, a confidence interval crossing no effect, or 'did not differ'"
+      - "the claim says 'improved', 'reduced' or 'showed a benefit'"
+    examples:
+      - claim: "NM-36 reduced pain scores."
+        source_excerpt: "Pain scores were lower with NM-36 than placebo, but the difference was not significant (p = 0.21)."
+        label: overstated
+        overstated_reason: nonsignificant_as_effect
+        note: "A non-significant difference is reported as an effect."
+        reviewed_by: []
+      - claim: "Pain scores did not differ significantly between NM-36 and placebo."
+        source_excerpt: "Pain scores were lower with NM-36 than placebo, but the difference was not significant (p = 0.21)."
+        label: supported
+        overstated_reason: null
+        note: "The claim reports the null result as null."
+        reviewed_by: []
+    references:
+      - "Boutron I et al. JAMA 2010;303(20):2058-64"
+  - id: dose_or_exposure_extrapolation
+    reason: dose_or_exposure_extrapolation
+    definition: >-
+      A result at one dose, concentration, route or duration is stated for another, for example an in
+      vitro concentration far above any reachable plasma level, or a single dose stated as long-term use.
+    cues:
+      - "the source names a dose, concentration or duration that the claim drops or changes"
+      - "the claim describes routine or long-term use from a short or high-dose experiment"
+    examples:
+      - claim: "Long-term use of OS-912 protects the liver."
+        source_excerpt: "A single 50 mg/kg dose of OS-912 reduced toxin-induced liver injury in rats."
+        label: overstated
+        overstated_reason: dose_or_exposure_extrapolation
+        note: "One high dose is stated as long-term use (the species change is a second problem)."
+        reviewed_by: []
+      - claim: "A single 50 mg/kg dose of OS-912 reduced toxin-induced liver injury in rats."
+        source_excerpt: "A single 50 mg/kg dose of OS-912 reduced toxin-induced liver injury in rats."
+        label: supported
+        overstated_reason: null
+        note: "Dose, schedule and species are all kept."
+        reviewed_by: []
+    references:
+      - "Yavchitz A et al. J Clin Epidemiol 2016;75:56-65"
+  - id: population_extrapolation
+    reason: population_extrapolation
+    definition: "A result from a narrow population is stated for a broader or different one."
+    cues:
+      - "the source restricts age, sex, disease stage, genotype or setting; the claim does not"
+    examples:
+      - claim: "BT-77 improves glycaemic control in people with diabetes."
+        source_excerpt: "In 140 adults with type 2 diabetes and stage 3 chronic kidney disease, BT-77 lowered HbA1c by 0.6%."
+        label: overstated
+        overstated_reason: population_extrapolation
+        note: "A trial in type 2 diabetes with kidney disease is generalised to all diabetes."
+        reviewed_by: []
+      - claim: "In adults with type 2 diabetes and stage 3 chronic kidney disease, BT-77 lowered HbA1c."
+        source_excerpt: "In 140 adults with type 2 diabetes and stage 3 chronic kidney disease, BT-77 lowered HbA1c by 0.6%."
+        label: supported
+        overstated_reason: null
+        note: "The claim keeps the population."
+        reviewed_by: []
+    references:
+      - "Yavchitz A et al. J Clin Epidemiol 2016;75:56-65"
+  - id: certainty_inflation
+    reason: certainty_inflation
+    definition: "Hedged or preliminary findings are stated as established, or 'may' becomes 'does'."
+    cues:
+      - "the source says 'may', 'suggests', 'preliminary', 'pilot' or 'hypothesis-generating'"
+      - "the claim says 'shows', 'proves', 'is effective' or 'establishes'"
+    examples:
+      - claim: "TX-640 is an effective treatment for migraine."
+        source_excerpt: "These pilot data suggest that TX-640 may reduce migraine frequency; larger trials are needed."
+        label: overstated
+        overstated_reason: certainty_inflation
+        note: "A pilot result hedged with 'suggest' and 'may' is stated as established efficacy."
+        reviewed_by: []
+      - claim: "Pilot data suggest TX-640 may reduce migraine frequency."
+        source_excerpt: "These pilot data suggest that TX-640 may reduce migraine frequency; larger trials are needed."
+        label: supported
+        overstated_reason: null
+        note: "The claim keeps the hedge."
+        reviewed_by: []
+    references:
+      - "Hyland K. Hedging in Scientific Research Articles. John Benjamins; 1998"
+      - "Sumner P et al. BMJ 2014;349:g7015"

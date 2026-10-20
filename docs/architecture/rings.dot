@@ -4,5 +4,9 @@ digraph {
     ".common" [label=".common/"]
     ".engine" [label=".engine/"]
     ".features" [label=".features/"]
-    ".infrastructure"
+    ".infrastructure" [label=".infrastructure/"]
+    ".app" ->  ".features"
+    ".app" ->  ".infrastructure"
+    ".features" ->  ".common"
+    ".infrastructure" ->  ".features"
 }

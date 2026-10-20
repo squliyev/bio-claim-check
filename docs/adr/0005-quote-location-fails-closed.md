@@ -4,7 +4,7 @@
 - **Date:** 2026-10-21
 - **Supersedes / Extends:** —
 - **Related:** 0003
-- **Enforced by:** `tests/unit/common/test_locate_quote.py::test_behaviour_table` (rules L1–L31; L15 has its own test), the oracle properties in `tests/unit/common/test_text_properties.py`, and the `make cov-common` gate (100% branch coverage of `common`, also a CI step).
+- **Enforced by:** `tests/unit/common/test_locate_quote.py::test_behaviour_table` (rules L1–L31; L15 has its own test), the oracle properties in `tests/unit/common/test_text_properties.py`, and the `make cov-core` gate (100% branch coverage of `common` and `features.contracts`, also a CI step; renamed from `cov-common` in S04).
 
 ## Context
 

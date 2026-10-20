@@ -114,3 +114,47 @@ def check_no_ancestor_imports(graph: ImportGraph, root: str) -> list[Violation]:
 
 def _cycle_violation(module: str, imported: str, why: str) -> Violation:
     return Violation("no-ancestor-imports", Path(*module.split(".")), 0, f"{module} -> {imported}: {why}")
+
+
+VERDICT_HOME = PurePosixPath(PACKAGE_NAME, "features", "contracts", "verdict.py")
+
+
+def _dotted_tail(node: ast.expr) -> str:
+    return node.id if isinstance(node, ast.Name) else node.attr if isinstance(node, ast.Attribute) else ""
+
+
+def check_verdict_construction(path: Path, text: str, *, src_relative: PurePosixPath) -> list[Violation]:
+    """Outside contracts/verdict.py, a Verdict is made only by `Verdict.finalise` or `model_validate`.
+
+    Flags `Verdict(...)`, `Verdict.model_construct(...)`, `BaseModel.model_copy(...)` (it skips the
+    validated override), `getattr(..., "model_construct")`, and aliases (`import Verdict as V`,
+    `V = Verdict`) that would hide the others. A backstop only: `Verdict.verify_against` is the
+    integrity check.
+    """
+    if src_relative == VERDICT_HOME:
+        return []
+    found: list[Violation] = []
+
+    def flag(node: ast.stmt | ast.expr, detail: str) -> None:
+        found.append(Violation("verdict-construction", path, node.lineno, detail))
+
+    for node in ast.walk(ast.parse(text, filename=str(path))):
+        if isinstance(node, ast.ImportFrom):
+            for a in node.names:
+                if a.name == "Verdict" and a.asname not in (None, "Verdict"):
+                    flag(node, f"Verdict imported as {a.asname}")
+        elif isinstance(node, ast.Assign | ast.AnnAssign) and node.value is not None:
+            if _dotted_tail(node.value) == "Verdict":
+                flag(node, "Verdict aliased by assignment")
+        elif isinstance(node, ast.Call):
+            name = _dotted_tail(node.func)
+            owner = _dotted_tail(node.func.value) if isinstance(node.func, ast.Attribute) else ""
+            if name == "Verdict" or (name == "model_construct" and owner == "Verdict"):
+                flag(node, "use Verdict.finalise or model_validate")
+            elif name == "model_copy" and owner == "BaseModel":
+                flag(node, "BaseModel.model_copy skips validation")
+            elif name == "getattr" and any(
+                isinstance(arg, ast.Constant) and arg.value == "model_construct" for arg in node.args
+            ):
+                flag(node, "getattr(..., 'model_construct') hides a construction")
+    return found

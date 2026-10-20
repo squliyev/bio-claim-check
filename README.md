@@ -3,7 +3,7 @@
 > **Does this agent's answer hold up?** An open-source claim checker for life-science agents.
 
 `bio-claim-check` will answer a research question from Europe PMC abstracts, then check every claim against
-the paper it cites. Each claim will be labelled *supported*, *overstated* (with a reason), *unsupported* or
+the paper it cites. Each claim will be labelled *supported*, *overstated* (with a reason), *contradicted* or
 *not in source*. Planted traps, such as a mouse result presented as a human effect or a trial's
 background sentence cited as its finding, will measure what the verifier actually catches.
 

@@ -117,3 +117,9 @@ def test_span_rejects_invalid_bounds(start: int, end: int) -> None:
 def test_span_of_rejects_text_that_is_too_short() -> None:
     with pytest.raises(ValueError, match="exceeds text length"):
         Span(0, 5).of(CleanedText("abc"))
+
+
+@pytest.mark.parametrize(("start", "end"), [(True, 2), (0, 2.0), ("1", 2)])
+def test_span_rejects_non_int_offsets(start: object, end: object) -> None:
+    with pytest.raises(TypeError, match="must be int"):
+        Span(start, end)  # pyright: ignore[reportArgumentType]

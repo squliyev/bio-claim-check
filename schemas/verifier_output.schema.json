@@ -1,0 +1,75 @@
+{
+  "$defs": {
+    "Label": {
+      "description": "The verifier's semantic judgement of one claim against one cited source.",
+      "enum": [
+        "supported",
+        "overstated",
+        "contradicted",
+        "not_in_source"
+      ],
+      "title": "Label",
+      "type": "string"
+    },
+    "OverstatedReason": {
+      "description": "How a claim goes beyond its source. Mapped to the spin literature in ADR 0006.",
+      "enum": [
+        "preclinical_to_clinical",
+        "background_as_result",
+        "surrogate_as_clinical",
+        "correlation_as_causation",
+        "selective_analysis_as_main",
+        "nonsignificant_as_effect",
+        "dose_or_exposure_extrapolation",
+        "population_extrapolation",
+        "certainty_inflation",
+        "other"
+      ],
+      "title": "OverstatedReason",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Your judgement of one claim against one cited abstract.",
+  "properties": {
+    "evidence": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "A verbatim quote from the abstract; null only when label is not_in_source.",
+      "title": "Evidence"
+    },
+    "label": {
+      "$ref": "#/$defs/Label"
+    },
+    "overstated_reason": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OverstatedReason"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Required when label is overstated; null otherwise."
+    },
+    "reason": {
+      "description": "One or two sentences explaining the label.",
+      "title": "Reason",
+      "type": "string"
+    }
+  },
+  "required": [
+    "label",
+    "overstated_reason",
+    "evidence",
+    "reason"
+  ],
+  "title": "VerifierOutput",
+  "type": "object"
+}

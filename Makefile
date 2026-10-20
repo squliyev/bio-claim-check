@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help sync lint format typecheck arch graph test cov cov-common verify hooks secrets up down clean
+.PHONY: help sync lint format typecheck arch graph test cov cov-core schemas verify hooks secrets up down clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -34,10 +34,13 @@ test:  ## Offline tests (everything except `live`)
 cov:  ## Offline tests with branch coverage
 	$(UV) run pytest -m "not live" --cov --cov-report=term-missing
 
-cov-common:  ## Gate: `common` (text primitives every verdict depends on) has 100% branch coverage
-	$(UV) run pytest tests/unit/common -q --cov=bio_claim_check.common --cov-branch --cov-fail-under=100 --cov-report=term-missing
+cov-core:  ## Gate: `common` + `features.contracts` (what every verdict depends on) have 100% branch coverage
+	$(UV) run pytest tests/unit/common tests/unit/contracts -q --cov=bio_claim_check.common --cov=bio_claim_check.features.contracts --cov-branch --cov-fail-under=100 --cov-report=term-missing
 
-verify: lint typecheck arch test cov-common  ## The single gate: lint, types, import contracts, offline tests, core coverage
+schemas:  ## Regenerate schemas/*.json from the contracts (a test fails if they are stale)
+	$(UV) run python scripts/gen_schemas.py
+
+verify: lint typecheck arch test cov-core  ## The single gate: lint, types, import contracts, offline tests, core coverage
 
 hooks:  ## Install git pre-commit hooks
 	$(UV) run pre-commit install
