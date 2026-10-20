@@ -13,7 +13,7 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | A2 | As a maintainer, I want import rules that are proven to fire, so that the architecture cannot silently erode | ✅ |
 | A2b | As a maintainer, I want no import cycles, driver-free core rings, classified dependencies and a generated dependency graph, so that the structure is checkable at a glance | ✅ |
 | A3 | As a researcher, I want the licence, citation and contribution path in place from the start, so that I can reuse and credit the work | ✅ |
-| A4 | As a developer, I want quote location that keeps operators and word boundaries, so that `p < 0.05` never matches `p > 0.05` | ⏳ |
+| A4 | As a developer, I want quote location that keeps operators and word boundaries, so that `p < 0.05` never matches `p > 0.05` | ✅ |
 | A5 | As a developer, I want typed domain contracts with two separate verdict axes, so that the model's judgement and code's evidence check never overwrite each other | ⏳ |
 | A6 | As a reviewer, I want an end-to-end run on fakes, so that the structure is proven before any provider exists | ⏳ |
 

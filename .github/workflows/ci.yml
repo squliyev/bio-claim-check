@@ -51,6 +51,13 @@ jobs:
 
       - name: Test (offline)
         run: uv run --frozen pytest -m "not live" --junitxml=junit.xml --cov --cov-report=term
+        env:
+          HYPOTHESIS_PROFILE: ci
+
+      - name: Core coverage (common = 100% branch)
+        run: uv run --frozen pytest tests/unit/common -q --cov=bio_claim_check.common --cov-branch --cov-fail-under=100 --cov-report=term-missing
+        env:
+          HYPOTHESIS_PROFILE: ci
 
       - name: Upload test results
         if: always()

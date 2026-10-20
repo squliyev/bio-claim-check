@@ -1,7 +1,7 @@
 digraph {
     node [fontname=helvetica]
     ".app" [label=".app/"]
-    ".common"
+    ".common" [label=".common/"]
     ".engine" [label=".engine/"]
     ".features" [label=".features/"]
     ".infrastructure"

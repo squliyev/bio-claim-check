@@ -24,6 +24,12 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0002](./0002-rings-ports-composition-root.md) | Rings, slices, ports and a composition root | Accepted | Where code goes; who may import whom |
 | [0003](./0003-structure-in-code-judgement-in-llm.md) | Structure in code, judgement in the LLM | Accepted | Which decisions a model may make |
 
+## Evidence
+
+| ADR | Title | Status | Resolves |
+|---|---|---|---|
+| [0005](./0005-quote-location-fails-closed.md) | Quote location fails closed; no fuzzy pass | Accepted | When quoted evidence counts as found in the abstract |
+
 ## Superseded / historical
 
 None yet.

@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "pydantic-settings>=2.6",
     "pydantic[email]>=2.9",
+    "rapidfuzz>=3.14",
     "typer>=0.15",
 ]
 
