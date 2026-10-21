@@ -1,0 +1,192 @@
+# bio-claim-check evaluation corpus spec (pre-registration, ADR 0010).
+# Provenance: questions AI-drafted, AI-reviewed (consult), author-approved. Never expert-reviewed.
+# An AI consult checked the top 10 Europe PMC hits of the domain 1-2 questions on 2026-10-21 (statins: hit counts only).
+# The full consult output is embargoed until the prompt freeze (prompts-frozen-v1) and disclosed after it.
+# Per-question tag: kept | edited | new (relative to the first AI draft).
+schema_version: 1
+sieve_version: 2
+pool_hits: 100
+cutoff: "2024-12-31"
+split_salt: bio-claim-check/split/v1
+audit_salt: bio-claim-check/audit/v1
+dev_fraction: 0.5
+audit_n: 50
+trap_kinds:
+  - preclinical_to_clinical
+  - correlation_as_causation
+  - nonsignificant_as_effect
+  - certainty_inflation
+  - background_as_result
+domains:
+  - id: glp1-neuro
+    held_out: false
+    description: GLP-1 receptor agonists in Alzheimer's and Parkinson's disease
+  - id: metformin-onc
+    held_out: false
+    description: Metformin in cancer prevention and treatment
+  - id: statin-neuro
+    held_out: true
+    description: Statins in Alzheimer's disease, Parkinson's disease and dementia (held out, test only)
+questions:
+  - id: glp1-q1  # edited
+    domain: glp1-neuro
+    split: dev
+    text: Does exenatide slow motor progression in Parkinson's disease?
+    search: TITLE:exenatide AND TITLE:parkinson*
+    answerable: true
+  - id: glp1-q2  # edited
+    domain: glp1-neuro
+    split: dev
+    text: Does liraglutide change brain glucose metabolism or cognition in people with Alzheimer's disease?
+    search: (TITLE:liraglutide OR TITLE:"GLP-1 analog" OR TITLE:"GLP-1 analogue") AND (TITLE:alzheimer* OR TITLE:dementia)
+    answerable: true
+  - id: glp1-q3  # edited
+    domain: glp1-neuro
+    split: dev
+    text: Are GLP-1 receptor agonists associated with lower dementia risk in people with type 2 diabetes?
+    search: ("GLP-1 receptor agonist*" OR "glucagon-like peptide-1 receptor agonist*" OR liraglutide OR semaglutide OR dulaglutide OR exenatide) AND (TITLE:dementia OR TITLE:alzheimer*) AND diabet* AND (cohort OR "case-control" OR "target trial" OR registry)
+    answerable: true
+  - id: glp1-q4  # edited
+    domain: glp1-neuro
+    split: dev
+    text: What is the cerebrospinal fluid-to-plasma ratio of semaglutide in patients with Alzheimer's disease?
+    search: TITLE:semaglutide AND (cerebrospinal OR CSF OR "blood-brain barrier")
+    answerable: false
+  - id: glp1-q5  # kept
+    domain: glp1-neuro
+    split: test
+    text: Does lixisenatide slow disability progression in early Parkinson's disease?
+    search: lixisenatide AND "Parkinson's disease"
+    answerable: true
+  - id: glp1-q6  # edited
+    domain: glp1-neuro
+    split: test
+    text: Do GLP-1 receptor agonists reduce amyloid or tau pathology in Alzheimer's disease models?
+    search: (TITLE:liraglutide OR TITLE:exenatide OR TITLE:semaglutide OR TITLE:"GLP-1" OR TITLE:"glucagon-like peptide-1") AND alzheimer* AND (amyloid OR tau) AND (mice OR mouse OR rat OR rats)
+    answerable: true
+  - id: glp1-q7  # edited
+    domain: glp1-neuro
+    split: test
+    text: Do GLP-1 receptor agonists protect dopaminergic neurons in Parkinson's disease models?
+    search: (TITLE:liraglutide OR TITLE:exenatide OR TITLE:semaglutide OR TITLE:"GLP-1" OR TITLE:"glucagon-like peptide-1" OR TITLE:NLY01) AND parkinson* AND dopaminergic AND (MPTP OR 6-OHDA OR rotenone OR mice OR rats)
+    answerable: true
+  - id: glp1-q8  # kept
+    domain: glp1-neuro
+    split: test
+    text: Is oral semaglutide more effective than injectable semaglutide at slowing cognitive decline in Alzheimer's disease?
+    search: semaglutide AND oral AND "Alzheimer's disease" AND cognitive
+    answerable: false
+  - id: glp1-q9  # edited
+    domain: glp1-neuro
+    split: test
+    text: Does exenatide reduce falls in people with Parkinson's disease?
+    search: exenatide AND parkinson* AND (falls OR "postural instability" OR gait)
+    answerable: false
+  - id: metformin-q1  # edited
+    domain: metformin-onc
+    split: dev
+    text: Is metformin use associated with lower colorectal cancer incidence in people with diabetes?
+    search: TITLE:metformin AND (TITLE:colorectal OR TITLE:colon) AND (incidence OR risk) AND diabet*
+    answerable: true
+  - id: metformin-q2  # edited
+    domain: metformin-onc
+    split: dev
+    text: Does adjuvant metformin improve invasive disease-free survival in early breast cancer?
+    search: TITLE:metformin AND TITLE:breast AND (adjuvant OR "MA.32" OR "disease-free survival")
+    answerable: true
+  - id: metformin-q3  # edited
+    domain: metformin-onc
+    split: dev
+    text: Does metformin inhibit cancer cell proliferation through AMPK activation?
+    search: TITLE:metformin AND TITLE:AMPK AND (proliferation OR growth) AND (cancer OR tumor OR tumour OR carcinoma)
+    answerable: true
+  - id: metformin-q4  # new
+    domain: metformin-onc
+    split: dev
+    text: What metformin concentration is reached in glioblastoma tissue of patients taking standard antidiabetic doses?
+    search: TITLE:metformin AND (glioblastoma OR glioma) AND (concentration* OR pharmacokinetic* OR "blood-brain barrier")
+    answerable: false
+  - id: metformin-q5  # edited
+    domain: metformin-onc
+    split: test
+    text: Is metformin use associated with longer overall survival in prostate cancer?
+    search: TITLE:metformin AND TITLE:prostate AND (survival OR mortality)
+    answerable: true
+  - id: metformin-q6  # edited
+    domain: metformin-onc
+    split: test
+    text: Does adding metformin to standard systemic therapy improve progression-free or overall survival in advanced non-small cell lung cancer?
+    search: TITLE:metformin AND (TITLE:"lung cancer" OR TITLE:NSCLC OR TITLE:"non-small cell") AND (chemotherapy OR EGFR OR "tyrosine kinase" OR immunotherapy) AND survival
+    answerable: true
+  - id: metformin-q7  # edited
+    domain: metformin-onc
+    split: test
+    text: Is metformin use associated with lower hepatocellular carcinoma risk?
+    search: TITLE:metformin AND (TITLE:hepatocellular OR TITLE:liver) AND (risk OR incidence)
+    answerable: true
+  - id: metformin-q8  # edited
+    domain: metformin-onc
+    split: test
+    text: Does the association between metformin use and survival in pancreatic cancer differ between women and men?
+    search: TITLE:metformin AND TITLE:pancrea* AND (survival OR mortality) AND (sex OR women OR gender)
+    answerable: false
+  - id: metformin-q9  # kept
+    domain: metformin-onc
+    split: test
+    text: Is metformin more effective than aspirin for preventing colorectal adenoma recurrence?
+    search: metformin AND aspirin AND adenoma AND recurrence
+    answerable: false
+  - id: statin-q1  # edited
+    domain: statin-neuro
+    split: test
+    text: Do statins slow cognitive decline in people with Alzheimer's disease?
+    search: (TITLE:statin* OR TITLE:simvastatin OR TITLE:atorvastatin) AND alzheimer* AND (cognitive OR ADAS-Cog OR MMSE) AND (trial OR randomized OR randomised)
+    answerable: true
+  - id: statin-q2  # edited
+    domain: statin-neuro
+    split: test
+    text: Is statin use associated with a lower risk of dementia?
+    search: (TITLE:statin* OR TITLE:"HMG-CoA reductase inhibitor*") AND (TITLE:dementia OR TITLE:alzheimer*) AND (cohort OR "case-control" OR risk)
+    answerable: true
+  - id: statin-q3  # edited
+    domain: statin-neuro
+    split: test
+    text: Does simvastatin slow progression of Parkinson's disease?
+    search: (TITLE:simvastatin OR TITLE:statin*) AND parkinson* AND (progression OR "PD STAT" OR MDS-UPDRS OR trial)
+    answerable: true
+  - id: statin-q4  # edited
+    domain: statin-neuro
+    split: test
+    text: Is statin use associated with Parkinson's disease risk?
+    search: (TITLE:statin* OR TITLE:"HMG-CoA reductase inhibitor*" OR TITLE:simvastatin OR TITLE:atorvastatin) AND parkinson* AND (risk OR incidence)
+    answerable: true
+  - id: statin-q5  # edited
+    domain: statin-neuro
+    split: test
+    text: Do statins reduce amyloid-beta production in Alzheimer's disease models?
+    search: (TITLE:statin* OR TITLE:simvastatin OR TITLE:atorvastatin OR TITLE:lovastatin OR TITLE:pravastatin) AND (amyloid OR "amyloid-beta") AND (mice OR mouse OR rat OR rats OR "cell line" OR neurons OR "in vitro")
+    answerable: true
+  - id: statin-q6  # edited
+    domain: statin-neuro
+    split: test
+    text: Do lipophilic and hydrophilic statins differ in their association with dementia risk?
+    search: (lipophilic OR hydrophilic) AND (statin OR statins) AND (TITLE:dementia OR TITLE:alzheimer* OR TITLE:cognitive)
+    answerable: true
+  - id: statin-q7  # edited
+    domain: statin-neuro
+    split: test
+    text: Does rosuvastatin reduce the risk of Alzheimer's disease in APOE e4 carriers?
+    search: rosuvastatin AND (alzheimer* OR dementia) AND (APOE4 OR "APOE ε4" OR "apolipoprotein E4" OR "APOE e4")
+    answerable: false
+  - id: statin-q8  # kept
+    domain: statin-neuro
+    split: test
+    text: Is stopping statins after an Alzheimer's diagnosis associated with faster functional decline in nursing-home residents?
+    search: (statin OR statins) AND (discontinuation OR deprescribing) AND "Alzheimer's disease" AND "nursing home"
+    answerable: false
+  - id: statin-q9  # kept
+    domain: statin-neuro
+    split: test
+    text: How does statin therapy change cerebrospinal fluid alpha-synuclein levels in Parkinson's disease?
+    search: (statin OR simvastatin) AND "Parkinson's disease" AND "alpha-synuclein" AND (cerebrospinal OR CSF)
+    answerable: false
