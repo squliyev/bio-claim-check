@@ -18,12 +18,14 @@ import httpx
 
 from bio_claim_check import __version__
 from bio_claim_check.app.settings import Settings
+from bio_claim_check.app.usecases.build_corpus import MANIFEST, CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
 from bio_claim_check.engine.cache.base_cache import BaseCache
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
+from bio_claim_check.features.contracts.corpus import CorpusSpec, CorpusSpecError, parse_corpus_spec
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError, parse_rulepack
 from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes, run_id
 from bio_claim_check.features.report.models import Report
@@ -31,7 +33,7 @@ from bio_claim_check.features.retrieval.base_literature_source import BaseLitera
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import InMemoryLiteratureSource
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
-from bio_claim_check.infrastructure.publish import publish_once
+from bio_claim_check.infrastructure.publish import PublishError, publish_once
 from bio_claim_check.infrastructure.strict_yaml import StrictYamlError, load_strict_yaml
 from bio_claim_check.infrastructure.text_files import ReadError, read_package_text, read_text_file
 
@@ -70,6 +72,42 @@ def default_rulepack() -> RulePack:
     except ReadError as err:
         raise RulePackError([str(err)]) from None
     return _rulepack_from_text(text, DEFAULT_RULEPACK[-1])
+
+
+def load_corpus_spec(path: Path) -> CorpusSpec:
+    """The corpus spec from a YAML file; every problem is a `CorpusSpecError` line naming the file."""
+    try:
+        data = load_strict_yaml(read_text_file(path), str(path))
+    except ReadError as err:
+        raise CorpusSpecError([str(err)]) from None
+    except StrictYamlError as err:
+        raise CorpusSpecError(list(err.problems)) from None
+    return parse_corpus_spec(data, str(path))
+
+
+class OutputConflictError(Exception):
+    """An output file exists with different bytes, or cannot be written; nothing is overwritten."""
+
+
+def publish_corpus(out: Path, files: CorpusFiles) -> list[Path]:
+    """Publish every data file once, then the manifest last, so a manifest only exists over complete data.
+
+    Every destination (manifest included) is checked before anything is written, so a conflicting old
+    file never ends up beside new ones. `publish_once` still refuses a file that appears in between.
+    Raises `OutputConflictError` on a conflict or a filesystem error.
+    """
+    plan = [(Path(name), data) for name, data in sorted(files.data.items())]
+    plan.append((Path(MANIFEST), files.manifest))
+    try:
+        for name, data in plan:
+            target = out / name
+            if target.exists() and (not target.is_file() or target.read_bytes() != data):
+                raise OutputConflictError(f"{target} exists with different content; refusing to overwrite")
+        return [publish_once(out.joinpath(*name.parts[:-1]), name.name, data) for name, data in plan]
+    except PublishError as err:
+        raise OutputConflictError(str(err)) from None
+    except OSError as err:
+        raise OutputConflictError(f"cannot write the dataset under {out}: {err}") from None
 
 
 def publish_report(out: Path, report: Report) -> Path:

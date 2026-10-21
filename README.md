@@ -74,6 +74,17 @@ BCC_CACHE_MODE=read-only uv run bio-claim-check retrieve "metformin colorectal c
 Exit codes: 2 bad input or configuration, 3 not cached in read-only mode, 4 Europe PMC failed, 5 the
 cache file is unusable. Retraction status is as of the first fetch.
 
+Build the evaluation corpus from a pre-registered spec (ADR 0010). Each question's pool is fetched
+through the same cache, sieved for trap-eligible abstracts, clustered by trial and split into dev and
+test. The output holds ids, metadata, offsets and hashes, never abstract text. Existing files are never
+overwritten, so a rebuild with `BCC_CACHE_MODE=read-only` is a byte-identical no-op:
+
+```bash
+uv run bio-claim-check corpus build --spec datasets/corpus.yaml --declared-fetched-on <YYYY-MM-DD>
+```
+
+Same exit codes as `retrieve`, plus 6: an existing dataset file differs from the new build.
+
 With Docker:
 
 ```bash

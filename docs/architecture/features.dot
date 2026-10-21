@@ -6,12 +6,14 @@ digraph {
     ".bench" [label=".bench/"]
     ".checks" [label=".checks/"]
     ".contracts" [label=".contracts/"]
+    ".corpus" [label=".corpus/"]
     ".report" [label=".report/"]
     ".retrieval" [label=".retrieval/"]
     ".traps"
     ".verify" [label=".verify/"]
     ".answer" ->  ".contracts"
     ".checks" ->  ".contracts"
+    ".corpus" ->  ".contracts"
     ".report" ->  ".contracts"
     ".retrieval" ->  ".contracts"
     ".verify" ->  ".contracts"

@@ -10,6 +10,7 @@ from bio_claim_check.features.retrieval.citable import QUERY_FILTERS
 from bio_claim_check.features.retrieval.errors import RetrievalError
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import (
     MAX_RETRY_AFTER,
+    MIN_INTERVAL,
     SEARCH_URL,
 )
 
@@ -104,6 +105,32 @@ def test_retry_after_is_honoured_and_capped() -> None:
     )
     assert len(h.source.search("q", limit=1)) == 1
     assert h.sleeps == [2.0, MAX_RETRY_AFTER, 4.0]
+
+
+def test_a_zero_retry_after_still_waits_the_minimum_interval() -> None:
+    h = harness(httpx.Response(429, headers={"Retry-After": "0"}), ok(envelope([good_record()])))
+    assert len(h.source.search("q", limit=1)) == 1
+    assert h.sleeps == [MIN_INTERVAL]
+
+
+def test_consecutive_requests_are_throttled_but_cache_hits_are_not() -> None:
+    h = harness(ok(MIXED), ok(MIXED), ok(MIXED))
+    h.source.search("plaque", limit=25)
+    assert h.sleeps == []
+    h.source.search("plaque", limit=25)
+    assert h.sleeps == []
+    h.source.search("tangle", limit=25)
+    h.source.search("amyloid", limit=25)
+    assert h.sleeps == [MIN_INTERVAL, MIN_INTERVAL]
+    assert len(h.server.requests) == 3
+
+
+def test_a_failed_search_still_counts_for_the_throttle() -> None:
+    h = harness(httpx.Response(400), ok(MIXED))
+    with pytest.raises(RetrievalError):
+        h.source.search("plaque", limit=25)
+    h.source.search("tangle", limit=25)
+    assert h.sleeps == [MIN_INTERVAL]
 
 
 def test_transient_failures_back_off_deterministically() -> None:

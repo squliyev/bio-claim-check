@@ -50,10 +50,23 @@ also writes, so they cannot be the guarantee.
   from the Europe PMC web site"; the RESTful web service is among "the only services that may be used for
   automated downloading". No rate limit is published. Consequences here: **no publisher text is
   committed** (fixtures are fictional; the cache lives in the git-ignored `var/`), and bulk use goes
-  through the API with a throttle (S07). NLM's own terms for MEDLINE data were not read in S06; that is
-  an open item, not an assumption that they impose nothing.
+  through the API with a throttle (S07).
+- **NLM terms** (read 2026-10-21; amended in S07a, which closes the S06 open item). NLM data "include works
+  of the United States Government that are not protected by U.S. copyright law [...] as well as abstracts
+  originating from publications that may be protected by U.S. or non-US copyright law", and NLM "assumes
+  no responsibility or liability associated with use of copyrighted material, including transmitting,
+  reproducing, redistributing" (*Copyright Information & Downloading National Library of Medicine Data*).
+  Users of the data agree to "acknowledge NLM as the source of the data [...] in a clear and conspicuous
+  manner" and to "not indicate or imply that NLM has endorsed its products/services/applications"; those
+  who redistribute agree to "maintain the most current version of all distributed data, or make known in
+  a clear and conspicuous manner that the products/services/applications do not reflect the most
+  current/accurate data available from NLM" (*NLM Terms and Conditions*). Consequences here: **abstract
+  text is never committed or shipped**, only identifiers, NLM metadata (MeSH, publication types),
+  character offsets and hashes; every shipped dataset carries "Courtesy of the U.S. National Library of
+  Medicine", says NLM does not endorse it, and states that it is a dated snapshot that does not reflect
+  the most current NLM data. This is a reading of published terms, not legal advice.
 - **Credit:** abstracts and metadata come from Europe PMC (EMBL-EBI), which redistributes MEDLINE/PubMed
-  data from the U.S. National Library of Medicine.
+  data from the U.S. National Library of Medicine. Courtesy of the U.S. National Library of Medicine.
 
 ## Consequences
 
@@ -65,4 +78,4 @@ also writes, so they cannot be the guarantee.
 - **Negative (accepted):** the filter is applied after paging, so a page can hold fewer than `limit`
   citable papers. No `cursorMark` paging in S06.
 - **Follow-ups:** throttle for bulk callers (S07); retraction re-check for cited papers on every live
-  run, because the cache freezes retraction status (ADR 0009, S12); NLM terms.
+  run, because the cache freezes retraction status (ADR 0009, S12).

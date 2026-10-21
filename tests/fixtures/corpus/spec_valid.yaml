@@ -1,0 +1,40 @@
+# Fictional corpus spec for tests. Dates are quoted: strict YAML rejects timestamps.
+schema_version: 1
+sieve_version: 1
+pool_hits: 100
+cutoff: "2024-12-31"
+split_salt: bio-claim-check/split/v1
+audit_salt: bio-claim-check/audit/v1
+dev_fraction: 0.5
+audit_n: 50
+trap_kinds:
+  - preclinical_to_clinical
+  - correlation_as_causation
+  - nonsignificant_as_effect
+  - certainty_inflation
+domains:
+  - id: glp1-neuro
+    held_out: false
+    description: Fictional GLP-1 questions
+  - id: statin-neuro
+    held_out: true
+    description: Fictional statin questions (held out)
+questions:
+  - id: glp1-q1
+    domain: glp1-neuro
+    split: dev
+    text: Does OS-912 slow decline?
+    search: OS-912 AND decline
+    answerable: true
+  - id: glp1-q2
+    domain: glp1-neuro
+    split: test
+    text: Does OS-912 protect neurons?
+    search: OS-912 AND neurons
+    answerable: false
+  - id: statin-q1
+    domain: statin-neuro
+    split: test
+    text: Does HX-15 prevent dementia?
+    search: HX-15 AND dementia
+    answerable: true

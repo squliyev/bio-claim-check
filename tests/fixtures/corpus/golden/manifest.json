@@ -1,0 +1,119 @@
+{
+  "candidate_counts": [
+    {
+      "domain": "glp1-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "correlation_as_causation",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "certainty_inflation",
+      "n": 1,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 1,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "correlation_as_causation",
+      "n": 1,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 1,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "certainty_inflation",
+      "n": 0,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "correlation_as_causation",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "certainty_inflation",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 0,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "correlation_as_causation",
+      "n": 0,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 0,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "certainty_inflation",
+      "n": 0,
+      "split": "test"
+    }
+  ],
+  "declared_fetched_on": "2025-01-15",
+  "files": [
+    {
+      "name": "dev/sources.jsonl",
+      "sha256": "f71490244342973a659f555b269441c455628728c1c789765506582707d13ce6"
+    },
+    {
+      "name": "questions.jsonl",
+      "sha256": "5dd012cc98ae543c7d575ee122881c285a871351447766d3e2bc87fc92d08130"
+    },
+    {
+      "name": "test/sources.jsonl",
+      "sha256": "ad4ed17b56045da54b09e341336a35e40b6583d8c0fdc6ebfc224f020dc36bfc"
+    }
+  ],
+  "notice": "Courtesy of the U.S. National Library of Medicine. NLM does not endorse this dataset. Metadata are a dated snapshot (see declared_fetched_on) and are not kept current.",
+  "schema_version": 1,
+  "spec_sha256": "7115102a0529b987fb1d52d88bbdab4b734b3d547b2a3d5f12b9328f64fdee15",
+  "tool_version": "0.0.0-test"
+}

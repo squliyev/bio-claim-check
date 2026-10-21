@@ -24,7 +24,8 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | Story | As a … I want … so that … | Status |
 |---|---|---|
 | B1 | As a user, I want cached Europe PMC retrieval, so that repeated runs make no network calls | ✅ |
-| B2 | As a scientist, I want a held-out test split sealed before any tuning, so that results are not tuned to the test | ⏳ |
+| B2 | As a scientist, I want a held-out test split sealed before any tuning, so that results are not tuned to the test | 🚧 (S07a: build code done; S07b: data, seal, audit) |
+| B2b | As a scientist, I want `surrogate_as_clinical` as a fifth trap kind (biomarker or imaging result stated as a clinical benefit), so that the most common spin type in drug trials is covered | ⏸ (needs sieve v2 + ADR) |
 | B3 | As a user, I want `bio-claim-check run "<question>"` to give a per-claim trust report | ⏳ |
 
 ## Feature C — Measurement

@@ -5,6 +5,8 @@ anything worth testing lives in ``features`` or ``app.usecases`` and is called f
 infrastructure only through ``app.container`` (contract ``driving-adapters-use-the-container``).
 """
 
+import re
+from datetime import date
 from pathlib import Path
 from typing import Annotated, NoReturn
 
@@ -13,15 +15,20 @@ from pydantic import ValidationError
 
 from bio_claim_check import __version__
 from bio_claim_check.app.container import (
+    OutputConflictError,
     build_fake_run_ports,
     build_retrieval,
     default_rulepack,
+    load_corpus_spec,
     load_rulepack,
+    publish_corpus,
     publish_report,
 )
 from bio_claim_check.app.settings import Settings, load_settings
+from bio_claim_check.app.usecases.build_corpus import PoolConflictError, build_corpus
 from bio_claim_check.app.usecases.run import run_question
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
+from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpecError
 from bio_claim_check.features.contracts.labels import AnswerMode
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
@@ -33,6 +40,9 @@ EXIT_INPUT = 2  # bad arguments or configuration
 EXIT_CACHE_MISS = 3  # read-only cache mode and the request is not cached
 EXIT_UPSTREAM = 4  # the literature database failed
 EXIT_LOCAL_CACHE = 5  # the cache file cannot be opened, read or written
+EXIT_OUTPUT = 6  # an output file exists with different bytes or cannot be written (nothing is overwritten)
+
+_ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")  # date.fromisoformat also takes 20250115 and 2025-W03-3
 DEFAULT_RUNS_DIR = Path("var/runs")  # relative to the working directory; --fake never reads settings
 
 app = typer.Typer(
@@ -168,6 +178,64 @@ def retrieve(
     typer.echo("retraction status is as of the first fetch (cached snapshot)")
     for rank, paper in enumerate(papers, start=1):
         _print_paper(rank, paper)
+
+
+corpus_app = typer.Typer(help="Build the evaluation corpus (ADR 0010).", no_args_is_help=True)
+app.add_typer(corpus_app, name="corpus")
+
+
+@corpus_app.command("build")
+def build_corpus_command(
+    spec: Annotated[Path, typer.Option("--spec", help="Corpus spec YAML (questions and constants).")],
+    declared_fetched_on: Annotated[
+        str, typer.Option("--declared-fetched-on", help="Date the pools were fetched, YYYY-MM-DD.")
+    ],
+    out: Annotated[Path, typer.Option(help="Dataset folder (dev/, test/, questions, manifest).")] = Path(
+        "datasets"
+    ),
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Fetch every question's pool through the cache, sieve, cluster, split and publish the dataset.
+
+    Rebuilds with BCC_CACHE_MODE=read-only are byte-identical; existing files are never overwritten.
+    """
+    try:
+        if not _ISO_DAY.fullmatch(declared_fetched_on):
+            raise ValueError(declared_fetched_on)
+        fetched_on = date.fromisoformat(declared_fetched_on)
+    except ValueError:
+        _fail(EXIT_INPUT, f"--declared-fetched-on must be YYYY-MM-DD, got {declared_fetched_on!r}")
+    try:
+        corpus_spec = load_corpus_spec(spec)
+    except CorpusSpecError as err:
+        typer.echo(f"Invalid corpus spec ({len(err.problems)} problem(s)):", err=True)
+        for problem in err.problems:
+            typer.echo(f"  - {problem}", err=True)
+        raise typer.Exit(code=EXIT_INPUT) from None
+    settings = _settings(env_file)
+    try:
+        with build_retrieval(settings) as source:
+            files = build_corpus(
+                corpus_spec, source, declared_fetched_on=fetched_on, tool_version=__version__
+            )
+        paths = publish_corpus(out, files)
+    except ValueError as err:
+        _fail(EXIT_INPUT, str(err))
+    except CacheMissError:
+        _fail(EXIT_CACHE_MISS, "not in the cache and BCC_CACHE_MODE=read-only; run once with read-write")
+    except (RetrievalError, PoolConflictError) as err:
+        _fail(EXIT_UPSTREAM, f"retrieval failed: {err}")
+    except CacheError as err:
+        _fail(EXIT_LOCAL_CACHE, f"cache problem: {err}")
+    except OutputConflictError as err:
+        _fail(EXIT_OUTPUT, str(err))
+    manifest = CorpusManifest.model_validate_json(files.manifest)
+    typer.echo(manifest.notice)
+    for path in paths:
+        typer.echo(f"wrote: {path}")
+    typer.echo("candidates (domain, split, kind: n):")
+    for c in manifest.candidate_counts:
+        typer.echo(f"  {c.domain} {c.split.value} {c.kind.value}: {c.n}")
 
 
 def _fail(code: int, message: str) -> NoReturn:

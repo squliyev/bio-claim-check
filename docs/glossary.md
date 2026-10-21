@@ -1,7 +1,7 @@
 # Glossary
 
 The words this project counts with. Each table below lists the exact values of one enum (`labels` and
-`finding` in `bio_claim_check.features.contracts`, `CacheMode` in `bio_claim_check.engine.cache`); a test
+`finding` and `corpus` in `bio_claim_check.features.contracts`, `CacheMode` in `bio_claim_check.engine.cache`); a test
 fails if a table and its enum drift apart. Meaning and
 counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md).
 
@@ -22,6 +22,14 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
 - **Retracted:** the paper is flagged as retracted by Europe PMC (a `Retracted Publication` type or a
   `Retraction in` notice). Retracted papers are kept and marked, never dropped. The flag is as of the
   first fetch, because cached responses are snapshots ([ADR 0009](./adr/0009-cache-and-replay.md)).
+- **Sieve:** the deterministic eligibility rules (no LLM) that mark a source as a *candidate* for a trap
+  kind, from its MeSH headings, publication types or sentences ([ADR 0010](./adr/0010-evaluation-corpus-and-split.md)).
+  `SIEVE_VERSION` names the rule set.
+- **Candidate:** a source the sieve marks as eligible for one trap kind, with the evidence it used. In the
+  test split, a candidate counts only after the author confirms it in the audit.
+- **Cluster:** sources joined by a shared trial registry id (`NCT…`) or the same normalised title. A
+  cluster is never split across dev and test; its id is its smallest source id, compared numerically.
+- **Split:** `dev` (for tuning prompts and rule packs) or `test` (sealed, for reported numbers only).
 - **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
   report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
 
@@ -115,3 +123,23 @@ How retrieval (and, from S08, model calls) use the local cache (`BCC_CACHE_MODE`
 | `read-write` | Serve a stored response; on a miss, fetch, validate and store it (first write wins) |
 | `read-only` | Serve a stored response; on a miss, stop with an error and never fetch (replay) |
 | `off` | Always fetch; never read or write the cache |
+
+## CorpusSplit
+
+Which half of the evaluation corpus a source or question belongs to (ADR 0010).
+
+| Value | Meaning |
+|---|---|
+| `dev` | Used to tune prompts and rule packs; never reported as a result |
+| `test` | Sealed before any tuning; the only split behind reported numbers. The held-out domain is all test |
+
+## NeverReason
+
+Why a source can never be a trap candidate. The source stays in the pool, so retrieval stays realistic.
+
+| Value | Meaning |
+|---|---|
+| `retracted` | The paper is retracted |
+| `review` | A review, systematic review or meta-analysis: it reports others' findings |
+| `unknown_publication_types` | No publication type is recorded, so the sieve cannot prove what the study is |
+| `mesh_not_indexed` | No MeSH headings yet; only the MeSH-based kinds are blocked |

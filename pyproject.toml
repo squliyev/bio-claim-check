@@ -114,6 +114,7 @@ modules = [
     "bio_claim_check.features.baselines",
     "bio_claim_check.features.bench",
     "bio_claim_check.features.checks",
+    "bio_claim_check.features.corpus",
     "bio_claim_check.features.report",
     "bio_claim_check.features.retrieval",
     "bio_claim_check.features.traps",
@@ -126,6 +127,7 @@ id = "no-llm-in-deterministic-code"
 name = "Deterministic code never calls an LLM (ADR 0003)"
 type = "forbidden"
 source_modules = [
+    "bio_claim_check.app.usecases.build_corpus",
     "bio_claim_check.common",
     "bio_claim_check.engine.cache",
     "bio_claim_check.engine.events",
@@ -135,6 +137,7 @@ source_modules = [
     "bio_claim_check.features.bench.stats",
     "bio_claim_check.features.checks",
     "bio_claim_check.features.contracts",
+    "bio_claim_check.features.corpus",
     "bio_claim_check.features.report",
     "bio_claim_check.features.retrieval.base_literature_source",
     "bio_claim_check.features.retrieval.citable",
@@ -159,6 +162,7 @@ forbidden_modules = [
     "bio_claim_check.features.baselines",
     "bio_claim_check.features.bench",
     "bio_claim_check.features.checks",
+    "bio_claim_check.features.corpus",
     "bio_claim_check.features.report",
     "bio_claim_check.features.retrieval",
     "bio_claim_check.features.traps",
@@ -185,6 +189,7 @@ source_modules = [
     "bio_claim_check.features.bench.stats",
     "bio_claim_check.features.checks",
     "bio_claim_check.features.contracts",
+    "bio_claim_check.features.corpus",
     "bio_claim_check.features.report",
 ]
 forbidden_modules = [

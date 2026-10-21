@@ -6,7 +6,9 @@ content-addressed cache (ADR 0009), so a second identical run, CI and replays ma
 Only a fully validated 200 response is stored: a status error or a malformed body raises inside the
 fetch, before the cache is written.
 Retries are deterministic (1, 2, 4 s, or `Retry-After` capped at 60 s): no randomness, and the sleep is
-injected, so tests take no time. Requests are sequential; one search is one request.
+injected, so tests take no time. Requests are sequential, and consecutive requests are at least
+`MIN_INTERVAL` apart (a bulk corpus build is the first caller that sends many). Cache hits send nothing,
+so they never wait. One search is one request.
 Must not: log request headers (they carry the contact email), rewrite the query, page beyond one request,
 or construct its own HTTP client (the app builds it with the User-Agent and timeouts).
 
@@ -43,6 +45,8 @@ CACHE_VERSION = 1
 """Bump when the request shape or the meaning of a cached response changes; old entries then miss."""
 
 RETRY_DELAYS: tuple[float, ...] = (1.0, 2.0, 4.0)
+MIN_INTERVAL = 1.0
+"""Seconds between consecutive requests, retries included (Europe PMC etiquette; S06 D10, S07 D9)."""
 MAX_RETRY_AFTER = 60.0
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
@@ -108,6 +112,7 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
         self._cache = cache
         self._mode = mode
         self._sleep = sleep
+        self._requested = False
 
     @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
@@ -151,6 +156,9 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
         return body
 
     def _get(self, params: Mapping[str, str]) -> httpx.Response:
+        if self._requested:
+            self._sleep(MIN_INTERVAL)
+        self._requested = True
         attempts = len(RETRY_DELAYS) + 1
         for attempt in range(attempts):
             last = attempt == attempts - 1
@@ -162,7 +170,7 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
                         f"Europe PMC unreachable after {attempts} attempts ({type(exc).__name__})"
                     ) from exc
                 _log.warning("europepmc: %s, retrying", type(exc).__name__)
-                self._sleep(RETRY_DELAYS[attempt])
+                self._sleep(max(RETRY_DELAYS[attempt], MIN_INTERVAL))
                 continue
             except httpx.RequestError as exc:  # e.g. a body that fails to decompress: not transient
                 raise RetrievalError(f"Europe PMC response could not be read ({type(exc).__name__})") from exc
@@ -171,5 +179,5 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
             if response.status_code not in RETRY_STATUSES or last:
                 raise RetrievalError(f"Europe PMC returned HTTP {response.status_code}")
             _log.warning("europepmc: HTTP %d, retrying", response.status_code)
-            self._sleep(_retry_after(response, RETRY_DELAYS[attempt]))
+            self._sleep(max(_retry_after(response, RETRY_DELAYS[attempt]), MIN_INTERVAL))
         raise AssertionError("unreachable")  # the loop always returns or raises

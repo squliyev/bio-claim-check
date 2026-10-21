@@ -36,7 +36,18 @@ pytestmark = pytest.mark.arch
 CONFIG = load_contracts(PYPROJECT)
 ROOT, CONTRACTS = CONFIG.root, CONFIG.contracts
 EXPECTED_RINGS = ("app", "infrastructure", "features", "engine", "common")  # outermost first (ADR 0002)
-SLICES = ("annotate", "answer", "baselines", "bench", "checks", "report", "retrieval", "traps", "verify")
+SLICES = (
+    "annotate",
+    "answer",
+    "baselines",
+    "bench",
+    "checks",
+    "corpus",
+    "report",
+    "retrieval",
+    "traps",
+    "verify",
+)
 PURE = (  # kinds that never import a driver; backends elsewhere are checked by the driver guard
     "common",
     "engine.events",
@@ -44,6 +55,7 @@ PURE = (  # kinds that never import a driver; backends elsewhere are checked by 
     "features.bench.stats",
     "features.checks",
     "features.contracts",
+    "features.corpus",
     "features.report",
 )
 CORE_ALLOWED_EXTERNAL = "pydantic"  # the one third-party library pure modules may use today
