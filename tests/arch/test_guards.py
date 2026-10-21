@@ -12,6 +12,7 @@ from tests.support.guards import (
     check_adr_fields,
     check_no_ancestor_imports,
     check_ring_header,
+    check_suppression_reasons,
     check_test_support_header,
     check_verdict_construction,
     expected_ring,
@@ -243,3 +244,42 @@ def test_no_verdict_is_constructed_outside_its_home() -> None:
         )
     ]
     assert found == []
+
+
+# ---------------------------------------------------------------- suppression reasons
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "x = 1  # noqa: S101 -- fixed input\n",
+        "x = 1  # pyright: ignore[reportCallIssue] pydantic-settings kwarg is untyped\n",
+        "# types stubs leave parse() untyped\nx = f()  # pyright: ignore[reportUnknownMemberType]\n",
+        "x = '# noqa'\n",
+        "x = 1  # an ordinary comment\n",
+    ],
+)
+def test_suppression_reason_guard_accepts(text: str) -> None:
+    assert check_suppression_reasons(Path("x.py"), text) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "x = 1  # noqa\n",
+        "x = 1  # noqa: S101\n",
+        "x = 1  # noqa: S101, E501 --\n",
+        "x = 1  # pyright: ignore\n",
+        "x = 1  # pyright: ignore[reportCallIssue]\n",
+        "y = 0\nx = 1  # pyright: ignore[reportCallIssue]\n",
+    ],
+)
+def test_suppression_reason_guard_rejects(text: str) -> None:
+    assert len(check_suppression_reasons(Path("x.py"), text)) == 1
+
+
+def test_every_suppression_in_the_repo_says_why() -> None:
+    files = sorted(f for d in ("src", "tests", "scripts") for f in (ROOT / d).rglob("*.py"))
+    assert any(f.name == "settings.py" for f in files)
+    found = [v for f in files for v in check_suppression_reasons(f, f.read_text(encoding="utf-8"))]
+    assert found == [], "\n".join(f"{v.path}:{v.line} {v.detail}" for v in found)

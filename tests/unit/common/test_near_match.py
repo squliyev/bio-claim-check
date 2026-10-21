@@ -6,9 +6,9 @@ from bio_claim_check.common.text import (
     NEAR_MATCH_THRESHOLD,
     CleanedText,
     Span,
-    _fold,  # pyright: ignore[reportPrivateUsage]
-    _snap,  # pyright: ignore[reportPrivateUsage]
-    _tokens,  # pyright: ignore[reportPrivateUsage]
+    _fold,  # pyright: ignore[reportPrivateUsage] -- the test pins this helper
+    _snap,  # pyright: ignore[reportPrivateUsage] -- the test pins this helper
+    _tokens,  # pyright: ignore[reportPrivateUsage] -- the test pins this helper
     clean_abstract,
     locate_quote,
     near_match,

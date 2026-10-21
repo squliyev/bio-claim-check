@@ -500,6 +500,10 @@ GUARD_TESTS = {  # every public guard has an accepting and a rejecting synthetic
         "test_test_support_header_accepts_and_rejects",
         "test_test_support_header_accepts_and_rejects",
     ),
+    "check_suppression_reasons": (
+        "test_suppression_reason_guard_accepts",
+        "test_suppression_reason_guard_rejects",
+    ),
     "check_verdict_construction": ("test_verdict_guard_accepts", "test_verdict_guard_rejects"),
 }
 

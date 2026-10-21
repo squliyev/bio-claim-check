@@ -88,4 +88,5 @@ class Settings(BaseSettings):
 
 def load_settings(env_file: Path | None = Path(".env")) -> Settings:
     """Load settings from the environment and, if present, ``env_file``. Pass ``None`` to skip the file."""
+    # `_env_file` is a pydantic-settings init kwarg that its typed signature omits
     return Settings(_env_file=env_file)  # pyright: ignore[reportCallIssue]

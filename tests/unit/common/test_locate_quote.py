@@ -122,4 +122,4 @@ def test_span_of_rejects_text_that_is_too_short() -> None:
 @pytest.mark.parametrize(("start", "end"), [(True, 2), (0, 2.0), ("1", 2)])
 def test_span_rejects_non_int_offsets(start: object, end: object) -> None:
     with pytest.raises(TypeError, match="must be int"):
-        Span(start, end)  # pyright: ignore[reportArgumentType]
+        Span(start, end)  # pyright: ignore[reportArgumentType] -- wrong type on purpose

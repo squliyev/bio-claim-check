@@ -73,6 +73,7 @@ def _container(**changes: object) -> RunPorts:
 @pytest.mark.parametrize("k", [0, -1, True, 2.0])
 def test_k_must_be_a_positive_int(k: object) -> None:
     with pytest.raises(ValueError, match="k must be"):
+        # wrong type on purpose
         run_question(build_fake_run_ports(), Q, AnswerMode.STRICT, k=k)  # pyright: ignore[reportArgumentType]
 
 

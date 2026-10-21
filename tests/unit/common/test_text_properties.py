@@ -11,6 +11,7 @@ import pytest
 from hypothesis import assume, given
 from hypothesis import strategies as st
 
+# the properties pin the private tokeniser
 from bio_claim_check.common.text import CleanedText, _tokens, clean_abstract, locate_quote  # pyright: ignore[reportPrivateUsage]
 
 pytestmark = pytest.mark.unit

@@ -8,8 +8,10 @@ whole text; nothing is stripped, so a violation hidden in a comment or string is
 import ast
 import importlib
 import inspect
+import io
 import pkgutil
 import re
+import tokenize
 from abc import ABC
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
@@ -483,3 +485,30 @@ def _module_scope(body: list[ast.stmt]) -> Iterator[ast.stmt]:
                 yield from _module_scope([*b, *(s for x in h for s in x.body), *o, *f])
             case _:
                 yield stmt
+
+
+_SUPPRESSION = re.compile(
+    r"#\s*(?:noqa(?::\s*[A-Z]+[0-9]+(?:\s*,\s*[A-Z]+[0-9]+)*)?"
+    r"|pyright:\s*ignore(?:\[[^\]]*\])?)"
+)
+_REASON = re.compile(r"[^\W_]")
+
+
+def check_suppression_reasons(path: Path, text: str) -> list[Violation]:
+    """A ``# noqa`` or ``# pyright: ignore`` must say why (AGENTS.md, "Never weaken a check").
+
+    The reason is text after the suppression on the same comment, or a comment-only line directly above.
+    Comments are read with ``tokenize``, so a suppression spelled inside a string is not a suppression.
+    """
+    lines = text.splitlines()
+    found: list[Violation] = []
+    for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+        if tok.type != tokenize.COMMENT or not (m := _SUPPRESSION.search(tok.string)):
+            continue
+        if _REASON.search(tok.string[m.end() :]):
+            continue
+        row = tok.start[0]
+        if row >= 2 and lines[row - 2].lstrip().startswith("#"):
+            continue
+        found.append(Violation("suppression-reason", path, row, f"{m.group(0)!r} without a reason"))
+    return found

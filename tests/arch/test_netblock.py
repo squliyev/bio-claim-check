@@ -32,7 +32,7 @@ for name, attempt in [
     try:
         attempt()
         results.append(f"{name}:open")
-    except Exception as exc:
+    except (OSError, RuntimeError) as exc:  # the block raises NetworkBlockedError(RuntimeError)
         results.append(f"{name}:{type(exc).__name__}")
 a, b = socket.socketpair()
 with a, b:
