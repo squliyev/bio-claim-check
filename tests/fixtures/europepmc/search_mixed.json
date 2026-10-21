@@ -1,0 +1,285 @@
+{
+  "version": "6.9",
+  "hitCount": 10,
+  "nextCursorMark": "AoFICTIONAL",
+  "request": {
+    "queryString": "fictional",
+    "resultType": "core",
+    "cursorMark": "*",
+    "pageSize": 25,
+    "sort": "",
+    "synonym": false
+  },
+  "resultList": {
+    "result": [
+      {
+        "id": "90000001",
+        "source": "MED",
+        "pmid": "90000001",
+        "doi": "10.5555/fictional.90000001",
+        "title": "OS-912 lowers plaque load in a fictional mouse model",
+        "pubYear": "2023",
+        "abstractText": "<h4>Background</h4>OS-912 is a fictional compound.<h4>Results</h4>In <i>APP/PS1</i> mice, plaque load fell by 38% (p &lt; 0.01).",
+        "language": "eng",
+        "isOpenAccess": "Y",
+        "pubTypeList": {
+          "pubType": [
+            "Research Support, Non-U.S. Gov't",
+            "Journal Article"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        },
+        "pmcid": "PMC90000001",
+        "license": "cc by"
+      },
+      {
+        "id": "90000002",
+        "source": "MED",
+        "pmid": "90000002",
+        "doi": "10.5555/fictional.90000002",
+        "title": "HX-15 in early cognitive decline: a fictional trial",
+        "pubYear": "2025",
+        "abstractText": "HX-15 did not change cognitive scores in 120 patients (p = 0.41).",
+        "language": "eng",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article"
+          ]
+        }
+      },
+      {
+        "id": "90000003",
+        "source": "MED",
+        "pmid": "90000003",
+        "doi": "10.5555/fictional.90000003",
+        "title": "A fictional cohort later retracted",
+        "pubYear": "2023",
+        "abstractText": "OS-912 use was associated with lower dementia incidence (HR 0.81).",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        },
+        "commentCorrectionList": {
+          "commentCorrection": [
+            {
+              "source": "MED",
+              "reference": "90000099",
+              "type": "Retraction in",
+              "orderIn": "10001"
+            }
+          ]
+        }
+      },
+      {
+        "id": "90000004",
+        "source": "MED",
+        "pmid": "90000004",
+        "doi": "10.5555/fictional.90000004",
+        "title": "Retracted: a fictional plaque study",
+        "pubYear": "2023",
+        "abstractText": "Plaque load fell in a fictional model.",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article",
+            "Retracted Publication"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        }
+      },
+      {
+        "id": "90000005",
+        "source": "MED",
+        "pmid": "90000005",
+        "doi": "10.5555/fictional.90000005",
+        "title": "Re: a fictional letter about OS-912",
+        "pubYear": "2023",
+        "abstractText": "We write to comment on a fictional study.",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Letter",
+            "Comment"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        }
+      },
+      {
+        "id": "PPR900006",
+        "source": "PPR",
+        "title": "A fictional preprint",
+        "pubYear": "2023",
+        "abstractText": "A preprint abstract.",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Preprint"
+          ]
+        }
+      },
+      {
+        "id": "90000007",
+        "source": "MED",
+        "pmid": "90000007",
+        "doi": "10.5555/fictional.90000007",
+        "title": "A fictional record without an abstract",
+        "pubYear": "2023",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        }
+      },
+      {
+        "id": "90000002",
+        "source": "MED",
+        "pmid": "90000002",
+        "doi": "10.5555/fictional.90000002",
+        "title": "HX-15 in early cognitive decline: a fictional trial (duplicate)",
+        "pubYear": "2023",
+        "abstractText": "Duplicate of 90000002.",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        }
+      },
+      {
+        "id": "90000008",
+        "source": "MED",
+        "pmid": "90000008",
+        "doi": "10.5555/fictional.90000008",
+        "title": "Un essai fictif",
+        "pubYear": "2023",
+        "abstractText": "Un résumé fictif.",
+        "language": "fre",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        }
+      },
+      {
+        "id": "90000009",
+        "source": "MED",
+        "pmid": "90000009",
+        "doi": "10.5555/fictional.90000009",
+        "title": "A fictional review of plaque-targeting compounds",
+        "pubYear": "in press",
+        "abstractText": "Plaque-targeting compounds show mixed results.",
+        "language": "eng",
+        "isOpenAccess": "N",
+        "pubTypeList": {
+          "pubType": [
+            "Journal Article",
+            "Review"
+          ]
+        },
+        "meshHeadingList": {
+          "meshHeading": [
+            {
+              "majorTopic_YN": "N",
+              "descriptorName": "Animals"
+            },
+            {
+              "majorTopic_YN": "Y",
+              "descriptorName": "Alzheimer Disease"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

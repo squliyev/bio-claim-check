@@ -9,12 +9,13 @@ Real values live only in the git-ignored ``.env`` file; ``.env.example`` documen
 """
 
 from pathlib import Path
-from typing import Literal, Self
+from typing import Literal
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, SecretStr, model_validator
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-type CacheMode = Literal["read-write", "read-only", "off"]
+from bio_claim_check.engine.cache.policy import CacheMode
+
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
 
 ENV_PREFIX = "BCC_"
@@ -63,8 +64,8 @@ class Settings(BaseSettings):
     var_dir: Path = Path("var")
     """The single writable root: cache, ledger, runs, annotations."""
 
-    cache_mode: CacheMode = "read-write"
-    """``read-only`` replays from cache and fails closed on a miss (CI and offline demos)."""
+    cache_mode: CacheMode = CacheMode.READ_WRITE
+    """``read-only`` replays from cache and fails closed on a miss (CI and offline demos). ADR 0009."""
 
     log_level: LogLevel = "INFO"
 
@@ -76,15 +77,8 @@ class Settings(BaseSettings):
     verifier_model: str = "claude-opus-4-8"
     trap_model: str = "Kimi-K2.6-1"
 
-    @model_validator(mode="after")
-    def _live_modes_need_a_provider(self) -> Self:
-        if self.cache_mode != "read-only" and not self.configured_providers:
-            msg = (
-                "live cache modes need at least one LLM provider (BCC_FOUNDRY__*, BCC_ANTHROPIC__* or "
-                "BCC_OLLAMA__*); use BCC_CACHE_MODE=read-only to replay from cache"
-            )
-            raise ValueError(msg)
-        return self
+    # No global "a provider must be configured" check: retrieval (S06) needs none. The LLM roles check
+    # their own provider when they are built (S08), so the error names the role that needs it.
 
     @property
     def configured_providers(self) -> tuple[str, ...]:

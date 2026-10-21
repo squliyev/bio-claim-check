@@ -18,6 +18,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "httpx>=0.28",
     "pydantic-settings>=2.6",
     "pydantic[email]>=2.9",
     "pyyaml>=6.0.3",
@@ -126,6 +127,7 @@ name = "Deterministic code never calls an LLM (ADR 0003)"
 type = "forbidden"
 source_modules = [
     "bio_claim_check.common",
+    "bio_claim_check.engine.cache",
     "bio_claim_check.engine.events",
     "bio_claim_check.features.annotate.agreement",
     "bio_claim_check.features.answer.base_answerer",
@@ -135,7 +137,11 @@ source_modules = [
     "bio_claim_check.features.contracts",
     "bio_claim_check.features.report",
     "bio_claim_check.features.retrieval.base_literature_source",
+    "bio_claim_check.features.retrieval.citable",
+    "bio_claim_check.features.retrieval.errors",
+    "bio_claim_check.features.retrieval.europe_pmc_literature_source",
     "bio_claim_check.features.retrieval.in_memory_literature_source",
+    "bio_claim_check.features.retrieval.query",
     "bio_claim_check.features.verify.base_verifier",
     "bio_claim_check.features.verify.scripted_verifier",
     "bio_claim_check.infrastructure",

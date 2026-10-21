@@ -127,25 +127,53 @@
   },
   "papers": [
     {
+      "doi": null,
+      "license": null,
+      "mesh_headings": null,
+      "open_access": null,
+      "pmcid": null,
+      "publication_types": [],
       "raw_abstract": "<h4>Background</h4><p>OS-912 is a fictional plaque-binding compound.</p><h4>Results</h4><p>In <i>APP/PS1</i> mice, OS-912 (10 mg/kg) reduced amyloid plaque load by 38% compared with vehicle (p &lt; 0.01). No cognitive outcomes were measured.</p>",
+      "retracted": false,
       "source_id": "FAKE:1",
       "title": "OS-912 lowers amyloid plaque load in APP/PS1 mice",
       "year": 2021
     },
     {
+      "doi": null,
+      "license": null,
+      "mesh_headings": null,
+      "open_access": null,
+      "pmcid": null,
+      "publication_types": [],
       "raw_abstract": "In a 52-week phase 2 trial of 120 patients, HX-15 did not significantly change cognitive scores (p = 0.41). Serum marker level fell from 4.1 &times; 10<sup>3</sup> to 3.6 &times; 10<sup>3</sup> units.",
+      "retracted": false,
       "source_id": "FAKE:2",
       "title": "HX-15 in early cognitive decline: a fictional phase 2 trial",
       "year": 2022
     },
     {
+      "doi": null,
+      "license": null,
+      "mesh_headings": null,
+      "open_access": null,
+      "pmcid": null,
+      "publication_types": [],
       "raw_abstract": "Among 4,210 adults, OS-912 use was associated with a lower incidence of dementia (hazard ratio 0.81, 95% CI 0.70&ndash;0.94). Residual confounding cannot be excluded.",
+      "retracted": false,
       "source_id": "FAKE:3",
       "title": "OS-912 use and dementia incidence: a fictional retrospective cohort",
       "year": 2023
     },
     {
+      "doi": null,
+      "license": null,
+      "mesh_headings": null,
+      "open_access": null,
+      "pmcid": null,
+      "publication_types": [],
       "raw_abstract": "Plaque-targeting compounds have shown mixed results in human trials.",
+      "retracted": false,
       "source_id": "FAKE:4",
       "title": "Plaque-targeting compounds: a fictional narrative review",
       "year": 2020

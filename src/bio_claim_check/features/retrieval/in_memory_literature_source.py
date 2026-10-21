@@ -13,6 +13,7 @@ from typing import override
 
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.retrieval.query import validate_search
 
 FAKE_CORPUS: tuple[Paper, ...] = (
     Paper(
@@ -62,5 +63,5 @@ class InMemoryLiteratureSource(BaseLiteratureSource):
 
     @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
-        del question  # a fixed corpus: ranking does not depend on the question
+        validate_search(question, limit)  # the same input contract as every backend
         return self._corpus[:limit]

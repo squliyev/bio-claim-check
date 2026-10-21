@@ -27,6 +27,7 @@ from tests.support.guards import (
     PACKAGE_NAME,
     STUB_PREFIXES,
     backend_modules,
+    check_contract_suites,
     check_driver_imports,
     check_internal_imports,
     check_no_registry,
@@ -35,7 +36,9 @@ from tests.support.guards import (
     import_package,
     marked_packages,
 )
-from tests.support.paths import PYPROJECT, SRC
+from tests.support.paths import PYPROJECT, ROOT, SRC
+
+CONTRACT_DIR = ROOT / "tests" / "contract"
 
 pytestmark = pytest.mark.arch
 
@@ -256,6 +259,45 @@ def test_driver_guard_rejects(edges: dict[str, set[str]]) -> None:
     assert len(check_driver_imports(_Graph(edges), "pkg", {"httpx", "sqlite3"}, backends)) == 1
 
 
+# ---------------------------------------------------------------- contract suites: synthetic
+
+
+_STUB_AND_BACKEND = {
+    "features/verify/base_thing.py": _base(),
+    "features/verify/in_memory_thing.py": _impl("InMemoryThing"),
+    "features/verify/remote_thing.py": _impl("RemoteThing"),
+}
+
+
+def _classes(modules: dict[str, ModuleType], *names: str) -> tuple[type, ...]:
+    return tuple(getattr(m, n) for m in modules.values() for n in names if hasattr(m, n))
+
+
+def test_contract_suite_guard_accepts(synth: Synth) -> None:
+    _, modules = synth(_STUB_AND_BACKEND)
+    assert check_contract_suites(modules, {"thing": _classes(modules, "InMemoryThing", "RemoteThing")}) == []
+    _, stubs_only = synth({k: v for k, v in _STUB_AND_BACKEND.items() if "remote" not in k})
+    assert check_contract_suites(stubs_only, {}) == []
+
+
+@pytest.mark.parametrize(
+    ("suite", "fragment"),
+    [
+        pytest.param(None, "no tests/contract/test_thing_contract.py", id="no-suite"),
+        pytest.param(("InMemoryThing",), "missing ['RemoteThing']", id="backend-not-run"),
+        pytest.param(("RemoteThing",), "missing ['InMemoryThing']", id="stub-not-run"),
+        pytest.param(("InMemoryThing", "RemoteThing", "int"), "unexpected ['int']", id="stray-class"),
+    ],
+)
+def test_contract_suite_guard_rejects(synth: Synth, suite: tuple[str, ...] | None, fragment: str) -> None:
+    _, modules = synth(_STUB_AND_BACKEND)
+    suites: dict[str, tuple[type, ...]] = {}
+    if suite is not None:
+        suites["thing"] = tuple(int if n == "int" else _classes(modules, n)[0] for n in suite)
+    (violation,) = check_contract_suites(modules, suites)
+    assert fragment in violation.detail
+
+
 # ---------------------------------------------------------------- internal imports: synthetic
 
 
@@ -376,6 +418,16 @@ def test_only_backends_import_drivers(
     assert check_driver_imports(real_graph, PACKAGE_NAME, _drivers(), backend_modules(real_modules)) == []
 
 
+def test_every_port_with_a_backend_has_a_contract_suite(real_modules: dict[str, ModuleType]) -> None:
+    """I33. Kind-based: a new backend fails here until its port's suite runs it."""
+    suites: dict[str, tuple[type, ...]] = {}
+    for path in sorted(CONTRACT_DIR.glob("test_*_contract.py")):
+        module = importlib.import_module(f"tests.contract.{path.stem}")
+        suites[path.stem.removeprefix("test_").removesuffix("_contract")] = module.IMPLEMENTATIONS
+    assert {"cache", "literature_source"} <= set(suites), "contract suites not found"
+    assert check_contract_suites(real_modules, suites) == []
+
+
 def test_leaf_packages_import_only_common(
     real_modules: dict[str, ModuleType], real_graph: grimp.ImportGraph
 ) -> None:
@@ -434,6 +486,7 @@ def test_importing_every_core_package_loads_no_driver(real_modules: dict[str, Mo
 
 GUARD_TESTS = {  # every public guard has an accepting and a rejecting synthetic test
     "check_adr_fields": ("test_adr_fields_accepts_a_complete_header", "test_adr_fields_rejects"),
+    "check_contract_suites": ("test_contract_suite_guard_accepts", "test_contract_suite_guard_rejects"),
     "check_driver_imports": ("test_driver_guard_accepts", "test_driver_guard_rejects"),
     "check_internal_imports": ("test_internal_imports_guard_accepts", "test_internal_imports_guard_rejects"),
     "check_no_ancestor_imports": ("test_ancestor_guard_accepts", "test_ancestor_guard_rejects"),

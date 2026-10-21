@@ -23,6 +23,7 @@ type Policy = Literal["core", "driver"]
 
 # distribution -> (import root, where it may be imported)
 DIRECT_DEPENDENCIES: dict[str, tuple[str, Policy]] = {
+    "httpx": ("httpx", "driver"),
     "pydantic": ("pydantic", "core"),
     "pydantic-settings": ("pydantic_settings", "driver"),
     "pyyaml": ("yaml", "driver"),

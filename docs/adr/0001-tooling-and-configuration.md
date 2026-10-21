@@ -47,3 +47,7 @@ Secrets and private endpoints must also never reach git.
   - Strict typing slows quick experiments; experiments belong in notebooks outside `src/`.
 - **Follow-ups:**
   - `pip-audit` in S21.
+  - S06 note: the S01 settings check "live modes need at least one LLM provider" was removed. Retrieval
+    needs only `contact_email`, and "any provider" was the wrong test anyway. S08 adds a per-role check
+    when the models are built, before any network call. Validation is not loosened, only moved to where
+    the requirement is known.

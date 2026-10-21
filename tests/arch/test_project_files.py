@@ -10,6 +10,7 @@ from typing import cast
 import pytest
 import yaml
 
+from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.features.contracts.finding import FindingKind
 from bio_claim_check.features.contracts.labels import (
     AnswerMode,
@@ -25,7 +26,9 @@ from tests.support.paths import ADR_DIR, DOCS, PYPROJECT, ROOT, VENV_BIN
 from tests.support.project_files import (
     RefContext,
     ci_jobs,
+    foreign_emails,
     parse_invariants,
+    repo_files,
     resolve,
     ruff_rule_exists,
     ruff_select,
@@ -175,6 +178,7 @@ def _glossary_tables(text: str) -> dict[str, list[str]]:
 
 def test_glossary_matches_the_enums() -> None:
     enums: list[type[StrEnum]] = [
+        CacheMode,
         AnswerMode,
         Label,
         EvidenceStatus,
@@ -188,3 +192,20 @@ def test_glossary_matches_the_enums() -> None:
     assert set(tables) == {e.__name__ for e in enums}
     for enum in enums:
         assert tables[enum.__name__] == [m.value for m in enum], enum.__name__
+
+
+def test_no_real_email_address_is_committed() -> None:
+    found: list[str] = []
+    for path in repo_files(ROOT):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue  # binary files are gitleaks' concern
+        found += [f"{path.relative_to(ROOT)}: {email}" for email in foreign_emails(text)]
+    assert not found, "use someone@example.org in tests and docs:\n" + "\n".join(found)
+
+
+def test_email_check_accepts_placeholders_and_rejects_real_domains() -> None:
+    assert foreign_emails("a@example.org, b@EXAMPLE.com, 1+me@users.noreply.github.com, pkg@1.2.3") == []
+    real = ["@".join(("jane.doe", "uni.ac.uk")), "@".join(("x", "example.org.evil.com"))]  # never in git
+    assert foreign_emails(f"mailto:{real[0]} or {real[1]}") == real

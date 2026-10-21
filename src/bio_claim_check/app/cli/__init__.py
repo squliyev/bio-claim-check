@@ -6,7 +6,7 @@ infrastructure only through ``app.container`` (contract ``driving-adapters-use-t
 """
 
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, NoReturn
 
 import typer
 from pydantic import ValidationError
@@ -14,16 +14,25 @@ from pydantic import ValidationError
 from bio_claim_check import __version__
 from bio_claim_check.app.container import (
     build_fake_run_ports,
+    build_retrieval,
     default_rulepack,
     load_rulepack,
     publish_report,
 )
-from bio_claim_check.app.settings import load_settings
+from bio_claim_check.app.settings import Settings, load_settings
 from bio_claim_check.app.usecases.run import run_question
+from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
 from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
+from bio_claim_check.features.retrieval.errors import RetrievalError
 
 DEFAULT_K = 4
+DEFAULT_RETRIEVE_K = 10
+EXIT_INPUT = 2  # bad arguments or configuration
+EXIT_CACHE_MISS = 3  # read-only cache mode and the request is not cached
+EXIT_UPSTREAM = 4  # the literature database failed
+EXIT_LOCAL_CACHE = 5  # the cache file cannot be opened, read or written
 DEFAULT_RUNS_DIR = Path("var/runs")  # relative to the working directory; --fake never reads settings
 
 app = typer.Typer(
@@ -51,23 +60,30 @@ def main(
     """Root command group."""
 
 
-@app.command("config")
-def show_config(
-    env_file: Annotated[
-        Path, typer.Option(help="Dotenv file to read in addition to the environment.")
-    ] = Path(".env"),
-) -> None:
-    """Validate configuration and print it with secrets redacted."""
+EnvFile = Annotated[Path, typer.Option(help="Dotenv file to read in addition to the environment.")]
+
+
+def _settings(env_file: Path) -> Settings:
+    """Validated settings, or every problem on stderr (never the offending values) and exit 2."""
     try:
-        settings = load_settings(env_file if env_file.exists() else None)
+        return load_settings(env_file if env_file.exists() else None)
     except ValidationError as err:
         typer.echo(f"Invalid configuration ({err.error_count()} problem(s)):", err=True)
         for problem in err.errors(include_input=False, include_url=False):
             location = ".".join(str(part) for part in problem["loc"]) or "settings"
             typer.echo(f"  - {location}: {problem['msg']}", err=True)
-        raise typer.Exit(code=2) from None
+        raise typer.Exit(code=EXIT_INPUT) from None
+    except (OSError, UnicodeDecodeError) as err:
+        typer.echo(f"Cannot read {env_file}: {type(err).__name__}", err=True)
+        raise typer.Exit(code=EXIT_INPUT) from None
+
+
+@app.command("config")
+def show_config(env_file: EnvFile = Path(".env")) -> None:
+    """Validate configuration and print it with secrets redacted."""
+    settings = _settings(env_file)
     typer.echo(settings.model_dump_json(indent=2))
-    typer.echo(f"providers: {', '.join(settings.configured_providers) or 'none (replay only)'}")
+    typer.echo(f"providers: {', '.join(settings.configured_providers) or 'none'}")
 
 
 rulepack_app = typer.Typer(help="Inspect and validate rule packs.", no_args_is_help=True)
@@ -127,3 +143,40 @@ def run(
         typer.echo(f"{name}: " + ", ".join(f"{d.value}={n}" for d, n in counts.items()))
     for note in report.notes:
         typer.echo(f"note: {note}")
+
+
+@app.command("retrieve")
+def retrieve(
+    query: Annotated[str, typer.Argument(help="Europe PMC query, sent verbatim (search syntax allowed).")],
+    k: Annotated[int, typer.Option("--k", help="Maximum number of papers (1-100).")] = DEFAULT_RETRIEVE_K,
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Search Europe PMC for citable MEDLINE abstracts, through the local cache."""
+    settings = _settings(env_file)
+    try:
+        with build_retrieval(settings) as source:
+            papers = source.search(query, limit=k)
+    except ValueError as err:
+        _fail(EXIT_INPUT, str(err))
+    except CacheMissError:
+        _fail(EXIT_CACHE_MISS, "not in the cache and BCC_CACHE_MODE=read-only; run once with read-write")
+    except RetrievalError as err:
+        _fail(EXIT_UPSTREAM, f"retrieval failed: {err}")
+    except CacheError as err:
+        _fail(EXIT_LOCAL_CACHE, f"cache problem: {err}")
+    typer.echo(f"{len(papers)} citable paper(s) from Europe PMC (MEDLINE/PubMed-indexed abstracts)")
+    typer.echo("retraction status is as of the first fetch (cached snapshot)")
+    for rank, paper in enumerate(papers, start=1):
+        _print_paper(rank, paper)
+
+
+def _fail(code: int, message: str) -> NoReturn:
+    typer.echo(message, err=True)
+    raise typer.Exit(code=code)
+
+
+def _print_paper(rank: int, paper: Paper) -> None:
+    flag = " [RETRACTED]" if paper.retracted else ""
+    year = paper.year if paper.year is not None else "n.d."
+    typer.echo(f"\n{rank}. {paper.source_id} ({year}){flag} {paper.title}")
+    typer.echo(f"   {paper.abstract}")

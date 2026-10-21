@@ -1,0 +1,241 @@
+"""Europe PMC backend over MockTransport: request shape, post-filter, retries, cache (ADR 0008/0009)."""
+
+import httpx
+import pytest
+from tests.support.europepmc import envelope, fixture, good_record, harness, mixed_records, ok
+
+from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
+from bio_claim_check.engine.cache.policy import CacheMissError, CacheMode
+from bio_claim_check.features.retrieval.citable import QUERY_FILTERS
+from bio_claim_check.features.retrieval.errors import RetrievalError
+from bio_claim_check.features.retrieval.europe_pmc_literature_source import (
+    MAX_RETRY_AFTER,
+    SEARCH_URL,
+)
+
+pytestmark = pytest.mark.unit
+
+MIXED = envelope(mixed_records())
+
+
+def test_the_post_filter_keeps_only_citable_unique_papers_in_rank_order() -> None:
+    h = harness(ok(MIXED))
+    papers = h.source.search("plaque", limit=25)
+    assert [p.source_id for p in papers] == [
+        "MED:90000001",
+        "MED:90000002",
+        "MED:90000003",
+        "MED:90000004",
+        "MED:90000009",
+    ]
+    assert [p.retracted for p in papers] == [False, False, True, True, False]
+    assert (
+        papers[1].title == "HX-15 in early cognitive decline: a fictional trial"
+    )  # first of a duplicate wins
+
+
+def test_rejections_are_counted_in_the_log(caplog: pytest.LogCaptureFixture) -> None:
+    caplog.set_level("INFO")
+    harness(ok(MIXED)).source.search("plaque", limit=25)
+    assert (
+        "kept 5, rejected duplicate=1, excluded_type=1, no_abstract=1, not_med=1, wrong_language=1"
+        in caplog.text
+    )
+
+
+def test_limit_truncates_after_filtering() -> None:
+    assert len(harness(ok(MIXED)).source.search("plaque", limit=2)) == 2
+
+
+@pytest.mark.parametrize(
+    "question",
+    [
+        '"amyloid beta" AND (mice OR rats)',
+        "a) OR (b",
+        "TITLE:metformin",
+        "β-amyloid \u2013 Ünïcode",
+        "x:y\"z'",
+    ],
+)
+def test_the_query_is_sent_verbatim_with_the_filters(question: str) -> None:
+    h = harness(ok(envelope([])))
+    h.source.search(question, limit=7)
+    (request,) = h.server.requests
+    assert request.method == "GET"
+    assert str(request.url.copy_with(query=None)) == SEARCH_URL
+    assert dict(request.url.params) == {
+        "query": f"({question}) AND {QUERY_FILTERS}",
+        "resultType": "core",
+        "format": "json",
+        "pageSize": "7",
+    }
+
+
+def test_a_hostile_query_cannot_admit_an_uncitable_record() -> None:
+    preprint = mixed_records()[5]
+    assert preprint["source"] == "PPR"
+    assert harness(ok(envelope([preprint]))).source.search("a) OR (b", limit=5) == ()
+
+
+def test_no_hits_is_empty_not_an_error() -> None:
+    assert harness(ok(envelope([]))).source.search("nothing", limit=5) == ()
+
+
+@pytest.mark.parametrize(
+    ("question", "limit"),
+    [("", 5), ("   ", 5), ("ok", 0), ("ok", 101), ("ok", -1), ("tab\there", 5), ("nul\x00", 5), ("ok", True)],
+)
+def test_bad_input_is_a_value_error_before_any_request(question: str, limit: int) -> None:
+    h = harness()
+    with pytest.raises(ValueError, match=r"question|limit"):
+        h.source.search(question, limit=limit)
+    assert h.server.requests == []
+
+
+# ---------------------------------------------------------------- retries
+
+
+def test_retry_after_is_honoured_and_capped() -> None:
+    h = harness(
+        httpx.Response(429, headers={"Retry-After": "2"}),
+        httpx.Response(503, headers={"Retry-After": "9999"}),
+        httpx.Response(503, headers={"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}),
+        ok(envelope([good_record()])),
+    )
+    assert len(h.source.search("q", limit=1)) == 1
+    assert h.sleeps == [2.0, MAX_RETRY_AFTER, 4.0]
+
+
+def test_transient_failures_back_off_deterministically() -> None:
+    h = harness(
+        httpx.ConnectTimeout("slow"),
+        httpx.Response(500),
+        httpx.ReadError("reset"),
+        ok(envelope([good_record()])),
+    )
+    assert len(h.source.search("q", limit=1)) == 1
+    assert h.sleeps == [1.0, 2.0, 4.0]
+    assert len(h.server.requests) == 4
+
+
+@pytest.mark.parametrize(
+    "replies",
+    [
+        [httpx.Response(503)] * 4,
+        [httpx.ConnectError("down")] * 4,
+    ],
+)
+def test_exhausted_retries_raise_and_cache_nothing(replies: list[httpx.Response | Exception]) -> None:
+    h = harness(*replies)
+    with pytest.raises(RetrievalError, match=r"HTTP 503|unreachable after 4 attempts"):
+        h.source.search("q", limit=1)
+    assert len(h.server.requests) == 4
+    h2 = harness(ok(envelope([])), cache=h.cache)
+    h2.source.search("q", limit=1)
+    assert len(h2.server.requests) == 1
+
+
+@pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+def test_client_errors_are_not_retried(status: int) -> None:
+    h = harness(httpx.Response(status))
+    with pytest.raises(RetrievalError, match=f"HTTP {status}"):
+        h.source.search("q", limit=1)
+    assert len(h.server.requests) == 1
+    assert h.sleeps == []
+
+
+# ---------------------------------------------------------------- malformed responses are never cached
+
+
+def _malformed_bodies() -> list[bytes]:
+    good = fixture("search_empty.json")
+    bad_record = good_record()
+    bad_record["pubTypeList"] = {"pubType": "Journal Article"}
+    return [
+        b"<html>maintenance</html>",
+        b"\xff\xfe",
+        b"[]",
+        b'{"hitCount": 1}',
+        b'{"hitCount": "1", "resultList": {"result": []}}',
+        b'{"hitCount": true, "resultList": {"result": []}}',
+        b'{"hitCount": 0, "resultList": {"result": {}}}',
+        b'{"hitCount": 0, "resultList": []}',
+        envelope([], hit_count=3),
+        envelope([good_record()], hit_count=0),  # a total count can never be below the page
+        envelope(mixed_records()[:2], hit_count=1),
+        b'{"hitCount": 0, "resultList": {"result": []}, "x": NaN}',
+        b'{"hitCount": 0, "resultList": {"result": []}, "x": Infinity}',
+        b'{"hitCount": 0, "resultList": {"result": []}, "x": -Infinity}',
+        envelope([bad_record]),
+        b'{"hitCount": 1, "resultList": {"result": ["x"]}}',
+        str(good).encode(),  # a Python repr, not JSON
+    ]
+
+
+@pytest.mark.parametrize("body", _malformed_bodies())
+def test_a_malformed_200_raises_and_leaves_the_cache_empty(body: bytes) -> None:
+    cache = InMemoryCache()
+    h = harness(ok(body), cache=cache)
+    with pytest.raises(RetrievalError, match="Europe PMC"):
+        h.source.search("q", limit=1)
+    h2 = harness(ok(envelope([])), cache=cache)
+    assert h2.source.search("q", limit=1) == ()
+    assert len(h2.server.requests) == 1
+
+
+def test_an_undecodable_body_is_a_retrieval_error_not_retried() -> None:
+    stream = httpx.ByteStream(b"not gzip at all")  # decoded inside the client, as on the wire
+    broken = httpx.Response(200, stream=stream, headers={"Content-Encoding": "gzip"})
+    h = harness(broken)
+    with pytest.raises(RetrievalError, match="could not be read"):
+        h.source.search("q", limit=1)
+    assert (len(h.server.requests), h.sleeps) == (1, [])
+
+
+# ---------------------------------------------------------------- cache
+
+
+def test_a_second_identical_search_makes_no_request() -> None:
+    h = harness(ok(MIXED))
+    first = h.source.search("plaque", limit=25)
+    assert h.source.search("plaque", limit=25) == first
+    assert len(h.server.requests) == 1
+
+
+@pytest.mark.parametrize(("question", "limit"), [("plaque!", 25), ("plaque", 24)])
+def test_any_request_change_misses(question: str, limit: int) -> None:
+    h = harness(ok(MIXED), ok(MIXED))
+    h.source.search("plaque", limit=25)
+    h.source.search(question, limit=limit)
+    assert len(h.server.requests) == 2
+
+
+def test_read_only_never_touches_the_network() -> None:
+    h = harness(mode=CacheMode.READ_ONLY)
+    with pytest.raises(CacheMissError):
+        h.source.search("plaque", limit=5)
+    assert h.server.requests == []
+
+
+def test_read_only_replays_what_read_write_stored() -> None:
+    cache = InMemoryCache()
+    live = harness(ok(MIXED), cache=cache).source.search("plaque", limit=25)
+    replay = harness(cache=cache, mode=CacheMode.READ_ONLY)
+    assert replay.source.search("plaque", limit=25) == live
+
+
+def test_off_always_fetches_and_never_writes() -> None:
+    cache = InMemoryCache()
+    h = harness(ok(MIXED), ok(MIXED), cache=cache, mode=CacheMode.OFF)
+    h.source.search("plaque", limit=25)
+    h.source.search("plaque", limit=25)
+    assert len(h.server.requests) == 2
+    with pytest.raises(CacheMissError):
+        harness(cache=cache, mode=CacheMode.READ_ONLY).source.search("plaque", limit=25)
+
+
+def test_the_cache_key_ignores_request_headers() -> None:
+    """The User-Agent (with the contact email) does not shape the response, so it is not in the key."""
+    cache = InMemoryCache()
+    harness(ok(MIXED), cache=cache).source.search("plaque", limit=25)
+    assert harness(cache=cache, mode=CacheMode.READ_ONLY).source.search("plaque", limit=25)

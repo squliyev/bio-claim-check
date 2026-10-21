@@ -351,6 +351,54 @@ def check_driver_imports(
     return found
 
 
+def implementation_classes(modules: Mapping[str, ModuleType], port: Port) -> set[type]:
+    """The concrete subclasses of a port's base, read from the implementation modules."""
+    return {
+        c
+        for impl in port.implementations
+        for c in _local_classes(modules[impl])
+        if issubclass(c, port.base) and not inspect.isabstract(c)
+    }
+
+
+def check_contract_suites(
+    modules: Mapping[str, ModuleType], suites: Mapping[str, tuple[type, ...]]
+) -> list[Violation]:
+    """Every port with a backend has a shared contract suite run against all its implementations (I33).
+
+    ``suites`` maps a port's ``<x>`` to the ``IMPLEMENTATIONS`` tuple of
+    ``tests/contract/test_<x>_contract.py``
+    (absent = no suite). Comparing classes, not imports, proves each implementation is actually run.
+    """
+    backends = backend_modules(modules)
+    found: list[Violation] = []
+    for base_module, port in find_ports(modules).items():
+        if not set(port.implementations) & backends:
+            continue  # stubs only: nothing real to hold to the contract yet
+        if port.thing not in suites:
+            found.append(
+                _module_violation(
+                    "contract-suites",
+                    base_module,
+                    f"has a backend but no tests/contract/test_{port.thing}_contract.py",
+                )
+            )
+            continue
+        want = implementation_classes(modules, port)
+        got = set(suites[port.thing])
+        if got != want:
+            missing = sorted(c.__name__ for c in want - got)
+            extra = sorted(c.__name__ for c in got - want)
+            found.append(
+                _module_violation(
+                    "contract-suites",
+                    base_module,
+                    f"suite IMPLEMENTATIONS: missing {missing}, unexpected {extra}",
+                )
+            )
+    return found
+
+
 def marked_packages(modules: Mapping[str, ModuleType], tag: str) -> set[str]:
     return {name for name, m in modules.items() if hasattr(m, "__path__") and tag in (m.__doc__ or "")}
 

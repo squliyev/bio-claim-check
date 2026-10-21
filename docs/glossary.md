@@ -1,7 +1,8 @@
 # Glossary
 
-The words this project counts with. Each table below lists the exact values of one enum in
-`bio_claim_check.features.contracts` (`labels`, `finding`); a test fails if a table and its enum drift apart. Meaning and
+The words this project counts with. Each table below lists the exact values of one enum (`labels` and
+`finding` in `bio_claim_check.features.contracts`, `CacheMode` in `bio_claim_check.engine.cache`); a test
+fails if a table and its enum drift apart. Meaning and
 counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md).
 
 ## Terms
@@ -15,6 +16,12 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
 - **Citation not retrieved:** a claim cites a source that retrieval never returned. That pair is
   `flagged` without calling the verifier, and the check records an `invented_citation` finding.
 - **Finding:** what a deterministic check (no LLM) found in an answer, independent of any verdict.
+- **Citable paper:** a MEDLINE record (`MED:<pmid>`) with a title, an abstract in English and no excluded
+  publication type (retraction notice, erratum, comment, editorial, letter, news). Only these are
+  retrieved ([ADR 0008](./adr/0008-citable-sources-medline-abstracts.md)). Reviews are citable.
+- **Retracted:** the paper is flagged as retracted by Europe PMC (a `Retracted Publication` type or a
+  `Retraction in` notice). Retracted papers are kept and marked, never dropped. The flag is as of the
+  first fetch, because cached responses are snapshots ([ADR 0009](./adr/0009-cache-and-replay.md)).
 - **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
   report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
 
@@ -98,3 +105,13 @@ How an `overstated` claim goes beyond its source.
 | Value | Meaning |
 |---|---|
 | `invented_citation` | A claim cites a source that was not among the retrieved papers |
+
+## CacheMode
+
+How retrieval (and, from S08, model calls) use the local cache (`BCC_CACHE_MODE`, ADR 0009).
+
+| Value | Meaning |
+|---|---|
+| `read-write` | Serve a stored response; on a miss, fetch, validate and store it (first write wins) |
+| `read-only` | Serve a stored response; on a miss, stop with an error and never fetch (replay) |
+| `off` | Always fetch; never read or write the cache |

@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from bio_claim_check.app.settings import Settings, load_settings
+from bio_claim_check.engine.cache.policy import CacheMode
 
 pytestmark = pytest.mark.unit
 
@@ -27,13 +28,14 @@ def test_defaults_bind_three_model_roles() -> None:
     assert s.var_dir == Path("var")
 
 
-def test_live_mode_without_any_provider_fails_fast() -> None:
-    with pytest.raises(ValidationError, match="at least one LLM provider"):
-        make(foundry=None)
+def test_retrieval_needs_no_provider() -> None:
+    assert make(foundry=None).configured_providers == ()
 
 
-def test_read_only_replay_needs_no_provider() -> None:
-    assert make(foundry=None, cache_mode="read-only").configured_providers == ()
+def test_cache_mode_is_the_engine_enum() -> None:
+    assert make(cache_mode="read-only").cache_mode is CacheMode.READ_ONLY
+    with pytest.raises(ValidationError, match="cache_mode"):
+        make(cache_mode="readonly")
 
 
 def test_unknown_keys_are_rejected() -> None:

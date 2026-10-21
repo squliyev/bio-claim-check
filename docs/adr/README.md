@@ -31,6 +31,8 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 |---|---|---|---|
 | [0005](./0005-quote-location-fails-closed.md) | Quote location fails closed; no fuzzy pass | Accepted | When quoted evidence counts as found in the abstract |
 | [0006](./0006-two-axis-verdict-and-disposition.md) | Two-axis verdict, one disposition, and the overstatement taxonomy | Accepted | What a verdict means; how pairs and claims are counted; what a rule pack is |
+| [0008](./0008-citable-sources-medline-abstracts.md) | Citable sources: MEDLINE abstracts, identity `MED:<pmid>` | Accepted | Which records a claim may be checked against; how a paper is identified; Europe PMC terms |
+| [0009](./0009-cache-and-replay.md) | Cache and replay: raw responses keyed by request; read-only fails closed | Accepted | How a run is reproduced without the network; what a cache miss means in replay |
 
 ## Superseded / historical
 

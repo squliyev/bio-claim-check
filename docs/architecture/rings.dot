@@ -5,7 +5,9 @@ digraph {
     ".engine" [label=".engine/"]
     ".features" [label=".features/"]
     ".infrastructure" [label=".infrastructure/"]
+    ".app" ->  ".engine"
     ".app" ->  ".features"
     ".app" ->  ".infrastructure"
     ".features" ->  ".common"
+    ".features" ->  ".engine"
 }

@@ -1,7 +1,8 @@
 """Characterisation: the exact CLI output of `rulepack validate` and `run --fake` (pinned before S05b).
 
 S05b moves YAML parsing, file reading and report publishing between rings. These tests pin every
-byte the user sees, so that refactor cannot change a message, an exit code or a run id.
+byte the user sees, so that refactor cannot change a message, an exit code or a run id. The run ids
+changed once, deliberately, in S06: `Paper` gained seven defaulted fields (goldens diffed key by key).
 """
 
 from pathlib import Path
@@ -105,13 +106,13 @@ NOTE = (
     [
         (
             "strict",
-            "1c7d06ff1ec746fe",
+            "b04294ccd9a244cb",
             "0, needs_review=3, failed=0, flagged=1",
             "0, needs_review=2, failed=0, flagged=1",
         ),
         (
             "over_eager",
-            "910862f55b20d7d5",
+            "b3c8cbab00ca88fd",
             "0, needs_review=1, failed=1, flagged=4",
             "0, needs_review=1, failed=1, flagged=4",
         ),

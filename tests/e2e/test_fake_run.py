@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from tests.support.netblock import NETBLOCK_DIR
 from tests.support.paths import ROOT, VENV_BIN
 from typer.testing import CliRunner
 
@@ -100,6 +101,7 @@ def test_installed_script_ignores_hostile_env_and_writes_to_var_runs(tmp_path: P
     )
     env = {
         "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(NETBLOCK_DIR),  # I31: the subprocess blocks the network too
         "BCC_VAR_DIR": str(tmp_path / "elsewhere"),
         "BCC_CONTACT_EMAIL": "also-not-an-email",
         "BCC_FOUNDRY__API_KEY": "should-never-be-read",

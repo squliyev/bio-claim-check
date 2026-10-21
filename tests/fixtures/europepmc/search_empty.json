@@ -1,0 +1,15 @@
+{
+  "version": "6.9",
+  "hitCount": 0,
+  "request": {
+    "queryString": "fictional",
+    "resultType": "core",
+    "cursorMark": "*",
+    "pageSize": 25,
+    "sort": "",
+    "synonym": false
+  },
+  "resultList": {
+    "result": []
+  }
+}

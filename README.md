@@ -45,6 +45,7 @@ make sync            # locked environment
 make hooks           # pre-commit: ruff, pyright, gitleaks
 cp .env.example .env # fill in locally; .env is git-ignored
 make verify          # lint + strict types + offline tests
+BCC_CONTACT_EMAIL=you@example.org make live  # opt-in checks against the real Europe PMC API
 uv run bio-claim-check --version
 uv run bio-claim-check config   # validates settings, secrets redacted
 ```
@@ -60,6 +61,18 @@ This is a **fake run**: fictional papers (`FAKE:1`–`FAKE:4`) and a scripted an
 exercises the real contracts and checks and writes `var/runs/<run_id>/report.json`, but it is a demo of
 the pipeline, not a result. Nothing is `passed` yet, because the negation check arrives in S10. Live runs
 arrive in S12.
+
+Search Europe PMC for citable MEDLINE abstracts (needs `BCC_CONTACT_EMAIL` in `.env`; it is sent in the
+`User-Agent`, as Europe PMC asks). Responses are cached in `var/cache.sqlite`, so a repeated search makes
+no request, and `BCC_CACHE_MODE=read-only` replays without the network:
+
+```bash
+uv run bio-claim-check retrieve "metformin colorectal cancer" --k 5
+BCC_CACHE_MODE=read-only uv run bio-claim-check retrieve "metformin colorectal cancer" --k 5
+```
+
+Exit codes: 2 bad input or configuration, 3 not cached in read-only mode, 4 Europe PMC failed, 5 the
+cache file is unusable. Retraction status is as of the first fetch.
 
 With Docker:
 

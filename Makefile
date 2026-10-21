@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help sync lint format typecheck arch graph test cov cov-core schemas verify hooks secrets up down clean
+.PHONY: help sync lint format typecheck arch graph test cov cov-core live schemas verify hooks secrets up down clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -30,6 +30,9 @@ graph:  ## Regenerate docs/architecture/*.dot (import-linter drawgraph; a test f
 
 test:  ## Offline tests (everything except `live`)
 	$(UV) run pytest -m "not live"
+
+live:  ## Opt-in real-API checks (`live` marker; needs BCC_CONTACT_EMAIL; never in CI)
+	$(UV) run pytest -m live -p no:cacheprovider --log-cli-level=INFO
 
 cov:  ## Offline tests with branch coverage
 	$(UV) run pytest -m "not live" --cov --cov-report=term-missing

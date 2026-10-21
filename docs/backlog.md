@@ -23,7 +23,7 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 
 | Story | As a … I want … so that … | Status |
 |---|---|---|
-| B1 | As a user, I want cached Europe PMC retrieval, so that repeated runs make no network calls | ⏳ |
+| B1 | As a user, I want cached Europe PMC retrieval, so that repeated runs make no network calls | ✅ |
 | B2 | As a scientist, I want a held-out test split sealed before any tuning, so that results are not tuned to the test | ⏳ |
 | B3 | As a user, I want `bio-claim-check run "<question>"` to give a per-claim trust report | ⏳ |
 

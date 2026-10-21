@@ -6,6 +6,7 @@ parity test pass vacuously.
 
 import ast
 import re
+import shutil
 import subprocess
 import tomllib
 from collections.abc import Callable
@@ -99,3 +100,25 @@ def ruff_rule_exists(code: str) -> bool:
         [str(VENV_BIN / "ruff"), "rule", code], capture_output=True, text=True, check=False, timeout=60
     )
     return done.returncode == 0
+
+
+EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@((?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})")
+ALLOWED_EMAIL_DOMAINS = frozenset({"example.org", "example.com", "users.noreply.github.com"})
+
+
+def foreign_emails(text: str) -> list[str]:
+    """Email addresses outside the placeholder and GitHub no-reply domains (a real contact must not leak)."""
+    return [m.group(0) for m in EMAIL.finditer(text) if m.group(1).lower() not in ALLOWED_EMAIL_DOMAINS]
+
+
+def repo_files(root: Path) -> list[Path]:
+    """Tracked files plus untracked files git would add (ignored files such as `.env` excluded)."""
+    git = shutil.which("git")
+    assert git is not None, "git is required to list the repository's files"
+    listed = subprocess.run(  # noqa: S603 — resolved git executable, fixed arguments, no shell
+        [git, "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        capture_output=True,
+        check=True,
+    ).stdout.decode()
+    return [root / name for name in listed.split("\0") if name and (root / name).is_file()]
