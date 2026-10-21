@@ -12,10 +12,10 @@ from typer.testing import CliRunner
 
 from bio_claim_check.app import cli
 from bio_claim_check.app.settings import Settings
-from bio_claim_check.app.usecases.build_corpus import DEV_SOURCES, MANIFEST, QUESTIONS, TEST_SOURCES
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
 from bio_claim_check.features.contracts.corpus import NLM_NOTICE, CorpusManifest
 from bio_claim_check.features.contracts.paper import Paper
+from bio_claim_check.features.corpus.layout import DEV_SOURCES, MANIFEST, QUESTIONS, TEST_SOURCES
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 from bio_claim_check.features.retrieval.errors import RetrievalError
 
@@ -31,6 +31,10 @@ class RaisingSource(BaseLiteratureSource):
     @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
         raise self._error
+
+    def response_sha256(self, question: str, limit: int) -> str:
+        """Never reached: `search` raises first. Present because the CLI reads it like the real source."""
+        raise AssertionError((question, limit))
 
 
 @pytest.fixture(autouse=True)

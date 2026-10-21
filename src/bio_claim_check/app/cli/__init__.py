@@ -6,6 +6,7 @@ infrastructure only through ``app.container`` (contract ``driving-adapters-use-t
 """
 
 import re
+from collections.abc import Sequence
 from datetime import date
 from pathlib import Path
 from typing import Annotated, NoReturn
@@ -15,23 +16,39 @@ from pydantic import ValidationError
 
 from bio_claim_check import __version__
 from bio_claim_check.app.container import (
+    DatasetReadError,
     OutputConflictError,
     build_fake_run_ports,
+    build_replay,
     build_retrieval,
     default_rulepack,
+    file_sha256,
     load_corpus_spec,
     load_rulepack,
+    publish_audit,
     publish_corpus,
     publish_report,
+    publish_sheet,
+    read_dataset,
+    write_seal,
 )
 from bio_claim_check.app.settings import Settings, load_settings
 from bio_claim_check.app.usecases.build_corpus import PoolConflictError, build_corpus
+from bio_claim_check.app.usecases.corpus_audit import (
+    AUDIT_SPLIT,
+    AuditInputError,
+    apply_decisions,
+    export_sheet,
+)
 from bio_claim_check.app.usecases.run import run_question
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
-from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpecError
-from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpec, CorpusSpecError
+from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
+from bio_claim_check.features.corpus.audit_sheet import AuditSheetError
+from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, SPEC
+from bio_claim_check.features.corpus.seal import dataset_problems
 from bio_claim_check.features.retrieval.errors import RetrievalError
 
 DEFAULT_K = 4
@@ -41,6 +58,7 @@ EXIT_CACHE_MISS = 3  # read-only cache mode and the request is not cached
 EXIT_UPSTREAM = 4  # the literature database failed
 EXIT_LOCAL_CACHE = 5  # the cache file cannot be opened, read or written
 EXIT_OUTPUT = 6  # an output file exists with different bytes or cannot be written (nothing is overwritten)
+EXIT_DATASET = 7  # the dataset folder is not intact (seal, hashes, splits, counts or audits)
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")  # date.fromisoformat also takes 20250115 and 2025-W03-3
 DEFAULT_RUNS_DIR = Path("var/runs")  # relative to the working directory; --fake never reads settings
@@ -207,6 +225,7 @@ def build_corpus_command(
         _fail(EXIT_INPUT, f"--declared-fetched-on must be YYYY-MM-DD, got {declared_fetched_on!r}")
     try:
         corpus_spec = load_corpus_spec(spec)
+        spec_sha = file_sha256(spec)
     except CorpusSpecError as err:
         typer.echo(f"Invalid corpus spec ({len(err.problems)} problem(s)):", err=True)
         for problem in err.problems:
@@ -216,7 +235,12 @@ def build_corpus_command(
     try:
         with build_retrieval(settings) as source:
             files = build_corpus(
-                corpus_spec, source, declared_fetched_on=fetched_on, tool_version=__version__
+                corpus_spec,
+                source,
+                declared_fetched_on=fetched_on,
+                tool_version=__version__,
+                spec_file_sha256=spec_sha,
+                response_sha256=source.response_sha256,
             )
         paths = publish_corpus(out, files)
     except ValueError as err:
@@ -236,6 +260,121 @@ def build_corpus_command(
     typer.echo("candidates (domain, split, kind: n):")
     for c in manifest.candidate_counts:
         typer.echo(f"  {c.domain} {c.split.value} {c.kind.value}: {c.n}")
+
+
+DatasetDir = Annotated[Path, typer.Option("--dataset", help="Dataset folder holding corpus.yaml.")]
+
+
+def _dataset(folder: Path) -> tuple[dict[str, bytes], CorpusSpec]:
+    try:
+        files = read_dataset(folder)
+        spec = load_corpus_spec(folder / SPEC)
+    except DatasetReadError as err:
+        _fail(EXIT_INPUT, str(err))
+    except CorpusSpecError as err:
+        _print_problems("Invalid corpus spec", err.problems)
+        raise typer.Exit(code=EXIT_INPUT) from None
+    return files, spec
+
+
+def _print_problems(title: str, problems: Sequence[str]) -> None:
+    typer.echo(f"{title} ({len(problems)} problem(s)):", err=True)
+    for problem in problems:
+        typer.echo(f"  - {problem}", err=True)
+
+
+@corpus_app.command("verify")
+def verify_corpus_command(dataset: DatasetDir = Path("datasets")) -> None:
+    """Check the sealed dataset: seal, file hashes, splits, questions, counts and any audit records."""
+    files, spec = _dataset(dataset)
+    if problems := dataset_problems(files, spec):
+        _print_problems(f"{dataset} is not intact", problems)
+        raise typer.Exit(code=EXIT_DATASET)
+    typer.echo(f"{dataset} is intact and sealed ({files[SEALED].decode().strip()}).")
+
+
+@corpus_app.command("seal")
+def seal_corpus_command(dataset: DatasetDir = Path("datasets")) -> None:
+    """Write SEALED (the manifest hash) once, only if every other check passes; never replaces a seal."""
+    files, spec = _dataset(dataset)
+    if problems := dataset_problems(files, spec, require_seal=False):
+        _print_problems(f"{dataset} cannot be sealed", problems)
+        raise typer.Exit(code=EXIT_DATASET)
+    try:
+        path = write_seal(dataset, files[MANIFEST])
+    except OutputConflictError as err:
+        _fail(EXIT_OUTPUT, str(err))
+    typer.echo(f"sealed: {path}")
+
+
+KindOption = Annotated[OverstatedReason, typer.Option("--kind", help="Trap kind to audit.")]
+DEFAULT_AUDIT_DIR = Path("var/audit")  # git-ignored: sheets hold abstract text (publisher copyright)
+
+
+@corpus_app.command("audit-sheet")
+def audit_sheet_command(
+    kind: KindOption,
+    dataset: DatasetDir = Path("datasets"),
+    out: Annotated[
+        Path, typer.Option(help="Folder for the sheet (keep it git-ignored).")
+    ] = DEFAULT_AUDIT_DIR,
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Export the dev audit sheet of one kind, replaying abstracts from the cache (never the network).
+
+    Dev only until the prompt freeze (S12): a test sheet would show test abstracts before tuning ends.
+    """
+    files, spec = _dataset(dataset)
+    settings = _settings(env_file)
+    try:
+        with build_replay(settings) as source:
+            sheet = export_sheet(files, spec, kind, source)
+        path = publish_sheet(out, AUDIT_SPLIT, kind, sheet)
+    except AuditInputError as err:
+        _print_problems("Cannot export the audit sheet", err.problems)
+        raise typer.Exit(code=EXIT_DATASET) from None
+    except CacheMissError:
+        _fail(EXIT_CACHE_MISS, "an abstract is not in the cache; the sheet is built from the cache only")
+    except CacheError as err:
+        _fail(EXIT_LOCAL_CACHE, f"cache problem: {err}")
+    except OutputConflictError as err:
+        _fail(EXIT_OUTPUT, str(err))
+    typer.echo(f"wrote: {path}")
+    typer.echo("fill in decision (confirm/reject) and a reason for every reject, then run apply-audit")
+
+
+@corpus_app.command("apply-audit")
+def apply_audit_command(
+    kind: KindOption,
+    sheet: Annotated[Path, typer.Option("--sheet", help="The filled-in audit sheet (CSV).")],
+    prompts_sha256: Annotated[
+        str, typer.Option("--prompts-sha256", help="sha256 of the prompts and rule packs in force.")
+    ],
+    dataset: DatasetDir = Path("datasets"),
+) -> None:
+    """Record a filled-in dev audit sheet in the dataset, once, bound to the seal; print the precision."""
+    files, spec = _dataset(dataset)
+    try:
+        text = sheet.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as err:
+        _fail(EXIT_INPUT, f"cannot read {sheet}: {type(err).__name__}")
+    try:
+        summary = apply_decisions(files, spec, kind, text, prompts_sha256=prompts_sha256)
+        path = publish_audit(dataset, AUDIT_SPLIT, kind, summary.record)
+    except AuditSheetError as err:
+        _print_problems(f"{sheet} is not a valid audit", err.problems)
+        raise typer.Exit(code=EXIT_INPUT) from None
+    except AuditInputError as err:
+        _print_problems("Cannot apply the audit", err.problems)
+        raise typer.Exit(code=EXIT_DATASET) from None
+    except OutputConflictError as err:
+        _fail(EXIT_OUTPUT, str(err))
+    low, high = summary.interval
+    typer.echo(f"wrote: {path}")
+    typer.echo(
+        f"precision {summary.confirmed}/{summary.reviewed} confirmed "
+        f"(95% Wilson {low:.2f}-{high:.2f}); author-confirmed, single rater"
+    )
 
 
 def _fail(code: int, message: str) -> NoReturn:

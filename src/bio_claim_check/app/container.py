@@ -9,6 +9,7 @@ Must not: hold logic. It builds objects, composes infrastructure with pure parse
 infrastructure errors into the domain's error types.
 """
 
+import hashlib
 import time
 from collections.abc import Callable, Generator
 from contextlib import ExitStack, contextmanager
@@ -18,18 +19,25 @@ import httpx
 
 from bio_claim_check import __version__
 from bio_claim_check.app.settings import Settings
-from bio_claim_check.app.usecases.build_corpus import MANIFEST, CorpusFiles
+from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
 from bio_claim_check.engine.cache.base_cache import BaseCache
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
-from bio_claim_check.features.contracts.corpus import CorpusSpec, CorpusSpecError, parse_corpus_spec
+from bio_claim_check.features.contracts.corpus import (
+    CorpusSpec,
+    CorpusSpecError,
+    CorpusSplit,
+    parse_corpus_spec,
+)
+from bio_claim_check.features.contracts.labels import OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError, parse_rulepack
+from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, audit_file
+from bio_claim_check.features.corpus.seal import sealed_bytes
 from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes, run_id
 from bio_claim_check.features.report.models import Report
-from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import InMemoryLiteratureSource
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
@@ -85,6 +93,14 @@ def load_corpus_spec(path: Path) -> CorpusSpec:
     return parse_corpus_spec(data, str(path))
 
 
+def file_sha256(path: Path) -> str:
+    """sha256 of a file's raw bytes (the spec as committed); a read failure is a `CorpusSpecError`."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError as err:
+        raise CorpusSpecError([f"{path}: cannot read: {err.strerror}"]) from None
+
+
 class OutputConflictError(Exception):
     """An output file exists with different bytes, or cannot be written; nothing is overwritten."""
 
@@ -108,6 +124,63 @@ def publish_corpus(out: Path, files: CorpusFiles) -> list[Path]:
         raise OutputConflictError(str(err)) from None
     except OSError as err:
         raise OutputConflictError(f"cannot write the dataset under {out}: {err}") from None
+
+
+class DatasetReadError(Exception):
+    """The dataset folder, or a file in it, cannot be read."""
+
+
+def read_dataset(folder: Path) -> dict[str, bytes]:
+    """Every file under `folder`, keyed by its POSIX path relative to it, so the seal check sees extras too.
+
+    Hidden files (`.DS_Store` and the like) are skipped: they are OS metadata, ignored by git, never data.
+    """
+    if not folder.is_dir():
+        raise DatasetReadError(f"{folder} is not a folder")
+    try:
+        paths = [p for p in sorted(folder.rglob("*")) if p.is_file()]
+        visible = [p for p in paths if not any(part.startswith(".") for part in p.relative_to(folder).parts)]
+        return {p.relative_to(folder).as_posix(): p.read_bytes() for p in visible}
+    except OSError as err:
+        raise DatasetReadError(f"cannot read the dataset under {folder}: {err}") from None
+
+
+def write_seal(folder: Path, manifest: bytes) -> Path:
+    """Write `SEALED` once; the same seal again is a no-op, a different one is an `OutputConflictError`."""
+    try:
+        return publish_once(folder, SEALED, sealed_bytes(manifest))
+    except PublishError as err:
+        raise OutputConflictError(str(err)) from None
+    except OSError as err:
+        raise OutputConflictError(f"cannot write {folder / SEALED}: {err}") from None
+
+
+def publish_audit(folder: Path, split: CorpusSplit, kind: OverstatedReason, record: bytes) -> Path:
+    """Publish one audit record into the dataset once; a different existing record is refused."""
+    name = Path(audit_file(split, kind))
+    try:
+        return publish_once(folder.joinpath(*name.parts[:-1]), name.name, record)
+    except PublishError as err:
+        raise OutputConflictError(str(err)) from None
+    except OSError as err:
+        raise OutputConflictError(f"cannot write {folder / name}: {err}") from None
+
+
+def publish_sheet(out: Path, split: CorpusSplit, kind: OverstatedReason, sheet: str) -> Path:
+    """Write an audit sheet (abstract text, so under the git-ignored `var/`) once; never overwrites."""
+    try:
+        return publish_once(out, f"{split.value}-{kind.value}.csv", sheet.encode())
+    except PublishError as err:
+        raise OutputConflictError(str(err)) from None
+    except OSError as err:
+        raise OutputConflictError(f"cannot write the sheet under {out}: {err}") from None
+
+
+@contextmanager
+def build_replay(settings: Settings) -> Generator[EuropePmcLiteratureSource]:
+    """`build_retrieval` forced to a read-only cache: a replay never reaches the network."""
+    with build_retrieval(settings.model_copy(update={"cache_mode": CacheMode.READ_ONLY})) as source:
+        yield source
 
 
 def publish_report(out: Path, report: Report) -> Path:
@@ -140,7 +213,7 @@ def build_retrieval(
     *,
     transport: httpx.BaseTransport | None = None,
     sleep: Callable[[float], None] = time.sleep,
-) -> Generator[BaseLiteratureSource]:
+) -> Generator[EuropePmcLiteratureSource]:
     """Europe PMC through the cache at `<var_dir>/cache.sqlite`. Closes the client and the cache on exit.
 
     `transport` is for tests (an `httpx.MockTransport`); production uses httpx's default.

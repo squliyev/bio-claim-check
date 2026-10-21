@@ -29,6 +29,13 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   test split, a candidate counts only after the author confirms it in the audit.
 - **Cluster:** sources joined by a shared trial registry id (`NCT…`) or the same normalised title. A
   cluster is never split across dev and test; its id is its smallest source id, compared numerically.
+- **Seal:** `datasets/SEALED` holds the sha256 of `manifest.json`, which hashes every data file and the
+  spec as written. Any later edit to the dataset breaks the seal; `corpus verify` and CI check it.
+- **Audit:** the author's review of the first `audit_n` candidates of one kind in one split, in a public
+  hash order. Each decision is `confirm` or `reject` (with a reason). The record is bound to the seal and
+  the prompts hash, and its precision is labelled "author-confirmed, single rater".
+- **Prior finding:** the sieve rule for `background_as_result`: an early sentence reports prior evidence
+  with an effect verb, and a later sentence reports this study's results.
 - **Split:** `dev` (for tuning prompts and rule packs) or `test` (sealed, for reported numbers only).
 - **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
   report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
@@ -143,3 +150,4 @@ Why a source can never be a trap candidate. The source stays in the pool, so ret
 | `review` | A review, systematic review or meta-analysis: it reports others' findings |
 | `unknown_publication_types` | No publication type is recorded, so the sieve cannot prove what the study is |
 | `mesh_not_indexed` | No MeSH headings yet; only the MeSH-based kinds are blocked |
+| `protocol` | A trial protocol: it has no results to overstate |

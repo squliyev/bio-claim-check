@@ -1,6 +1,6 @@
 # Fictional corpus spec for tests. Dates are quoted: strict YAML rejects timestamps.
 schema_version: 1
-sieve_version: 1
+sieve_version: 2
 pool_hits: 100
 cutoff: "2024-12-31"
 split_salt: bio-claim-check/split/v1

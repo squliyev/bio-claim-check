@@ -1,5 +1,7 @@
 """Europe PMC backend over MockTransport: request shape, post-filter, retries, cache (ADR 0008/0009)."""
 
+import hashlib
+
 import httpx
 import pytest
 from tests.support.europepmc import envelope, fixture, good_record, harness, mixed_records, ok
@@ -266,3 +268,29 @@ def test_the_cache_key_ignores_request_headers() -> None:
     cache = InMemoryCache()
     harness(ok(MIXED), cache=cache).source.search("plaque", limit=25)
     assert harness(cache=cache, mode=CacheMode.READ_ONLY).source.search("plaque", limit=25)
+
+
+# ---------------------------------------------------------------- response hash
+
+
+def test_the_response_hash_is_the_sha256_of_the_served_body() -> None:
+    h = harness(ok(MIXED))
+    h.source.search("plaque", limit=25)
+    assert h.source.response_sha256("plaque", 25) == hashlib.sha256(MIXED).hexdigest()
+
+
+@pytest.mark.parametrize("mode", [CacheMode.READ_ONLY, CacheMode.OFF])
+def test_the_response_hash_is_recorded_on_a_cache_hit_and_with_the_cache_off(mode: CacheMode) -> None:
+    cache = InMemoryCache()
+    harness(ok(MIXED), cache=cache).source.search("plaque", limit=25)
+    h = harness(*([ok(MIXED)] if mode is CacheMode.OFF else []), cache=cache, mode=mode)
+    h.source.search("plaque", limit=25)
+    assert h.source.response_sha256("plaque", 25) == hashlib.sha256(MIXED).hexdigest()
+
+
+@pytest.mark.parametrize(("question", "limit"), [("never searched", 25), ("plaque", 24)])
+def test_the_response_hash_of_an_unmade_search_is_a_key_error(question: str, limit: int) -> None:
+    h = harness(ok(MIXED))
+    h.source.search("plaque", limit=25)
+    with pytest.raises(KeyError):
+        h.source.response_sha256(question, limit)

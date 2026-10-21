@@ -105,7 +105,7 @@
     },
     {
       "name": "questions.jsonl",
-      "sha256": "5dd012cc98ae543c7d575ee122881c285a871351447766d3e2bc87fc92d08130"
+      "sha256": "138f54af2c715b7970309d37a3becda8cbb32458b750d64609619db8dbfe8a37"
     },
     {
       "name": "test/sources.jsonl",
@@ -114,6 +114,7 @@
   ],
   "notice": "Courtesy of the U.S. National Library of Medicine. NLM does not endorse this dataset. Metadata are a dated snapshot (see declared_fetched_on) and are not kept current.",
   "schema_version": 1,
-  "spec_sha256": "7115102a0529b987fb1d52d88bbdab4b734b3d547b2a3d5f12b9328f64fdee15",
+  "spec_file_sha256": "14a85344f4eb960476301264367c1658d4e7749f61f0577a718e21de2ed30c8c",
+  "spec_sha256": "94c1985baf58336d3d0d55be32dd214d405f8440f02a5b69fed055717735417c",
   "tool_version": "0.0.0-test"
 }

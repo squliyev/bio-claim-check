@@ -1,4 +1,4 @@
-"""Sieve v1 (ADR 0010): one accepting and one rejecting row per rule and exclusion."""
+"""Sieve v2 (ADR 0010): one accepting and one rejecting row per rule and exclusion."""
 
 import pytest
 from tests.support.papers import paper
@@ -13,6 +13,7 @@ PRE = OverstatedReason.PRECLINICAL_TO_CLINICAL
 OBS = OverstatedReason.CORRELATION_AS_CAUSATION
 NULL = OverstatedReason.NONSIGNIFICANT_AS_EFFECT
 HEDGE = OverstatedReason.CERTAINTY_INFLATION
+PRIOR = OverstatedReason.BACKGROUND_AS_RESULT
 
 
 def kinds_of(p: Paper) -> dict[OverstatedReason, str]:
@@ -139,6 +140,7 @@ def test_empty_abstract_has_no_text_candidates() -> None:
         (paper(types=("Journal Article", "Meta-Analysis")), (NeverReason.REVIEW,)),
         (paper(types=()), (NeverReason.UNKNOWN_PUBLICATION_TYPES,)),
         (paper(mesh=None), (NeverReason.MESH_NOT_INDEXED,)),
+        (paper(types=("Clinical Trial Protocol",)), (NeverReason.PROTOCOL,)),
         (
             paper(retracted=True, mesh=None, types=()),
             (NeverReason.RETRACTED, NeverReason.UNKNOWN_PUBLICATION_TYPES, NeverReason.MESH_NOT_INDEXED),
@@ -158,6 +160,7 @@ _HITS = "No significant change was seen (p = 0.3). These results may help."
         paper(mesh=("Animals",), abstract=_HITS, retracted=True),
         paper(mesh=("Animals",), abstract=_HITS, types=("Review",)),
         paper(mesh=("Animals",), abstract=_HITS, types=()),
+        paper(mesh=("Animals",), abstract=_HITS, types=("Clinical Trial Protocol", "Journal Article")),
     ],
 )
 def test_excluded_papers_are_never_candidates(p: Paper) -> None:
@@ -175,3 +178,69 @@ def test_candidates_follow_kinds_order_and_reject_unknown_kinds() -> None:
     assert [c.kind for c in candidates(p, (NULL, PRE))] == [NULL, PRE]
     with pytest.raises(ValueError, match="surrogate_as_clinical"):
         candidates(p, (OverstatedReason.SURROGATE_AS_CLINICAL,))
+
+
+# ---------------------------------------------------------------- baseline balance (null rule)
+
+
+@pytest.mark.parametrize(
+    ("abstract", "hit"),
+    [
+        ("Groups did not differ in baseline characteristics.", None),
+        ("The arms were not significantly different in demographics at baseline.", None),
+        ("Patients did not differ with respect to age.", None),
+        # a real null result that mentions one balance or group word is still caught
+        ("Change from baseline did not differ from placebo.", 0),
+        ("The groups did not differ in decline at 12 months.", 0),
+        ("Demographic factors did not reduce the effect.", 0),
+        # balance first, then a real null: the candidate is the later sentence
+        ("Groups did not differ in baseline characteristics. Decline was not significantly reduced.", 1),
+    ],
+)
+def test_baseline_balance_is_not_a_null_result(abstract: str, hit: int | None) -> None:
+    found = candidates(paper(abstract=abstract), (NULL,))
+    if hit is None:
+        assert found == ()
+    else:
+        (c,) = found
+        assert c.span == sentences(CleanedText(abstract))[hit]
+
+
+# ---------------------------------------------------------------- prior_finding (background_as_result)
+
+_RESULT = "We found lower decline in treated patients (p < 0.05)."
+
+
+@pytest.mark.parametrize(
+    ("abstract", "hit"),
+    [
+        (f"Previous studies have shown that OS-912 reduces decline. Patients were enrolled. {_RESULT}", 0),
+        (f"Patients have dementia. Growing evidence suggests benefits of HX-15. {_RESULT}", 1),
+        (f"Observational data link HX-15 to lower risk and it is associated with protection. {_RESULT}", 0),
+        ("Preclinical studies have reported that OS-912 protects neurons. Risk was higher (OR 1.4).", 0),
+        ("Prior research suggests OS-912 is beneficial. Mortality fell (HR = 0.8).", 0),
+        ("Prior research suggests OS-912 is beneficial. Mortality fell (RR (95% CI 0.7-0.9)).", 0),
+        ("Prior research suggests OS-912 is beneficial. Mortality fell (RR (95 % CI 0.7-0.9)).", 0),
+        # cue only in sentence 4
+        (f"A. B is here. C is here. Previous studies have shown OS-912 reduces decline. {_RESULT}", None),
+        # cue without an effect verb
+        (f"Previous studies have examined OS-912 in mice. {_RESULT}", None),
+        # effect verb without a prior-evidence cue
+        (f"OS-912 reduces decline. {_RESULT}", None),
+        # no later results sentence
+        ("Previous studies have shown OS-912 reduces decline. We designed a trial.", None),
+        # cue in the only (last) sentence
+        ("Previous studies have shown OS-912 reduces decline and p < 0.05 was reached.", None),
+        # the word "or" / lowercase "hr" never counts as a result
+        ("Previous studies have shown OS-912 reduces decline. Patients or carers took part.", None),
+        ("Previous studies have shown OS-912 reduces decline. Dosing was 2 hr or 4 hr.", None),
+        ("Previous studies have shown OS-912 reduces decline. Choose A OR B in the survey.", None),
+    ],
+)
+def test_prior_finding(abstract: str, hit: int | None) -> None:
+    found = candidates(paper(abstract=abstract), (PRIOR,))
+    if hit is None:
+        assert found == ()
+    else:
+        (c,) = found
+        assert (c.rule, c.span) == ("prior_finding", sentences(CleanedText(abstract))[hit])

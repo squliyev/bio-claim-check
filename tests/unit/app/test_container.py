@@ -17,11 +17,12 @@ from bio_claim_check.app.container import (
     publish_corpus,
     publish_report,
 )
-from bio_claim_check.app.usecases.build_corpus import MANIFEST, CorpusFiles
+from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import run_question
 from bio_claim_check.features.contracts.corpus import CorpusSpecError
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePackError
+from bio_claim_check.features.corpus.layout import MANIFEST
 from bio_claim_check.features.report.canonical import canonical_bytes, run_id
 
 pytestmark = pytest.mark.unit

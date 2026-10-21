@@ -5,30 +5,27 @@ update can never silently bless a broken rule.
 """
 
 import json
-from datetime import date
 from pathlib import Path
 
 import pytest
 from tests.support.corpus import (
     ANIMAL,
     CUTOFF,
+    FETCHED,
     HEDGED,
     LINKED,
     SPEC_FILE,
     STATIN_TRIAL,
     QueryLiteratureSource,
+    build,
     world,
 )
 from tests.support.papers import paper
 
 from bio_claim_check.app.container import load_corpus_spec
 from bio_claim_check.app.usecases.build_corpus import (
-    DEV_SOURCES,
-    QUESTIONS,
-    TEST_SOURCES,
     CorpusFiles,
     PoolConflictError,
-    build_corpus,
     pool_query,
 )
 from bio_claim_check.features.contracts.corpus import (
@@ -40,20 +37,11 @@ from bio_claim_check.features.contracts.corpus import (
     SourceEntry,
 )
 from bio_claim_check.features.corpus.clusters import hash_fraction
+from bio_claim_check.features.corpus.layout import DEV_SOURCES, QUESTIONS, TEST_SOURCES
 from bio_claim_check.features.corpus.serialise import model_sha256, sha256_hex
 
 pytestmark = pytest.mark.unit
 GOLDEN = Path(__file__).parents[2] / "fixtures" / "corpus" / "golden"
-FETCHED = date(2025, 1, 15)
-
-
-def build(spec: CorpusSpec | None = None, source: QueryLiteratureSource | None = None) -> CorpusFiles:
-    return build_corpus(
-        spec or load_corpus_spec(SPEC_FILE),
-        source or QueryLiteratureSource(world()),
-        declared_fetched_on=FETCHED,
-        tool_version="0.0.0-test",
-    )
 
 
 def rows(data: bytes) -> list[SourceEntry]:
@@ -159,6 +147,40 @@ def test_an_empty_pool_is_recorded_not_topped_up() -> None:
     files = build(source=QueryLiteratureSource(pools))
     questions = [json.loads(line) for line in files.data[QUESTIONS].splitlines()]
     assert {q["id"]: q["pool_size"] for q in questions}["statin-q1"] == 0
+
+
+def questions_by_id(files: CorpusFiles) -> dict[str, dict[str, object]]:
+    return {q["id"]: q for q in map(json.loads, files.data[QUESTIONS].splitlines())}
+
+
+def test_each_question_counts_only_the_pool_sources_in_its_own_split() -> None:
+    pools = world()
+    neurons = pool_query("OS-912 AND neurons", CUTOFF)
+    pools[neurons] = (HEDGED, *pools[neurons])  # HEDGED is a dev source; glp1-q2 is a test question
+    by_id = questions_by_id(build(source=QueryLiteratureSource(pools)))
+    assert (by_id["glp1-q2"]["pool_size"], by_id["glp1-q2"]["split_pool_size"]) == (3, 2)
+    assert (by_id["glp1-q1"]["pool_size"], by_id["glp1-q1"]["split_pool_size"]) == (5, 2)
+
+
+def test_response_hash_comes_from_the_source_for_the_exact_query() -> None:
+    source = QueryLiteratureSource(world())
+    by_id = questions_by_id(build(source=source))
+    query = pool_query("OS-912 AND decline", CUTOFF)
+    assert by_id["glp1-q1"]["response_sha256"] == source.response_sha256(query, 100)
+
+
+def test_a_changed_response_changes_its_hash_and_no_other() -> None:
+    before = questions_by_id(build())
+    pools = world()
+    pools[pool_query("HX-15 AND dementia", CUTOFF)] = ()
+    after = questions_by_id(build(source=QueryLiteratureSource(pools)))
+    changed = {q for q in before if before[q]["response_sha256"] != after[q]["response_sha256"]}
+    assert changed == {"statin-q1"}
+
+
+def test_manifest_records_the_raw_spec_file_hash() -> None:
+    manifest = CorpusManifest.model_validate_json(build().manifest)
+    assert manifest.spec_file_sha256 == sha256_hex(SPEC_FILE.read_bytes())
 
 
 def test_manifest_hashes_every_data_file_and_the_spec() -> None:

@@ -8,11 +8,14 @@ from pydantic import ValidationError
 from bio_claim_check.features.contracts.corpus import (
     NLM_NOTICE,
     TRAP_KINDS,
+    AuditDecision,
+    AuditRecord,
     CorpusManifest,
     CorpusSpec,
     CorpusSpecError,
     CorpusSplit,
     NeverReason,
+    QuestionEntry,
     SourceEntry,
     parse_corpus_spec,
 )
@@ -24,7 +27,7 @@ SHA = "0" * 64
 def spec_data() -> dict[str, Any]:
     return {
         "schema_version": 1,
-        "sieve_version": 1,
+        "sieve_version": 2,
         "pool_hits": 100,
         "cutoff": "2024-12-31",
         "split_salt": "bio-claim-check/split/v1",
@@ -154,7 +157,7 @@ def mutate(change: str) -> dict[str, Any]:
         ("unknown_domain", "question glp1-q1: unknown domain 'nowhere'"),
         ("held_out_in_dev", "question statin-q1: a held-out domain's questions must be in test"),
         ("duplicate_kind", "trap_kinds must be unique"),
-        ("unsupported_kind", "trap_kinds not supported by sieve v1: surrogate_as_clinical, other"),
+        ("unsupported_kind", "trap_kinds not supported by sieve v2: surrogate_as_clinical, other"),
     ],
 )
 def test_inconsistent_spec_is_rejected(change: str, message: str) -> None:
@@ -244,12 +247,34 @@ def test_review_and_unknown_types_are_derived() -> None:
     assert SourceEntry.model_validate(row).never_because == (NeverReason.UNKNOWN_PUBLICATION_TYPES,)
 
 
+def question_entry(pool_size: int, split_pool_size: int) -> dict[str, Any]:
+    question = spec_data()["questions"][0]
+    return {
+        **question,
+        "query": "(exenatide) AND FIRST_PDATE",
+        "response_sha256": SHA,
+        "pool_size": pool_size,
+        "split_pool_size": split_pool_size,
+        "pool_sha256": SHA,
+    }
+
+
+def test_split_pool_may_equal_the_pool() -> None:
+    assert QuestionEntry.model_validate(question_entry(3, 3)).split_pool_size == 3
+
+
+def test_split_pool_cannot_exceed_the_pool() -> None:
+    with pytest.raises(ValidationError, match="split_pool_size cannot exceed pool_size"):
+        QuestionEntry.model_validate(question_entry(2, 3))
+
+
 def manifest(**overrides: Any) -> dict[str, Any]:
     data: dict[str, Any] = {
         "schema_version": 1,
         "tool_version": "0.1.0",
         "declared_fetched_on": "2026-10-21",
         "spec_sha256": SHA,
+        "spec_file_sha256": SHA,
         "notice": NLM_NOTICE,
         "files": [{"name": "dev/sources.jsonl", "sha256": SHA}, {"name": "questions.jsonl", "sha256": SHA}],
         "candidate_counts": [{"domain": "glp1-neuro", "split": "dev", "kind": "certainty_inflation", "n": 0}],
@@ -286,3 +311,47 @@ def test_inconsistent_manifest_is_rejected(overrides: dict[str, Any], message: s
     with pytest.raises(ValidationError) as err:
         CorpusManifest.model_validate(manifest(**overrides))
     assert message in str(err.value)
+
+
+def decision(source_id: str = "MED:1", verdict: str = "confirm", reason: str | None = None) -> dict[str, Any]:
+    return {"source_id": source_id, "decision": verdict, "reason": reason}
+
+
+def test_a_confirm_has_no_reason_and_a_reject_needs_one() -> None:
+    assert AuditDecision.model_validate(decision()).reason is None
+    assert AuditDecision.model_validate(decision(verdict="reject", reason="human cells")).reason
+    for bad in (decision(verdict="reject"), decision(reason="why"), decision(verdict="reject", reason=" ")):
+        with pytest.raises(ValidationError):
+            AuditDecision.model_validate(bad)
+    with pytest.raises(ValidationError):
+        AuditDecision.model_validate(decision(verdict="maybe"))
+
+
+def record(**overrides: Any) -> dict[str, Any]:
+    return {
+        "split": "dev",
+        "kind": "preclinical_to_clinical",
+        "corpus_seal": SHA,
+        "prompts_sha256": SHA,
+        "decisions": [decision("MED:1"), decision("MED:2", "reject", "cells are human")],
+    } | overrides
+
+
+def test_valid_audit_record() -> None:
+    assert len(AuditRecord.model_validate(record()).decisions) == 2
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"decisions": []},
+        {"decisions": [decision("MED:1"), decision("MED:1")]},
+        {"corpus_seal": "abc"},
+        {"prompts_sha256": "G" * 64},
+        {"split": "train"},
+        {"extra": 1},
+    ],
+)
+def test_inconsistent_audit_record_is_rejected(overrides: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        AuditRecord.model_validate(record(**overrides))

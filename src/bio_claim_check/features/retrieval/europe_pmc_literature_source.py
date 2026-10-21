@@ -15,6 +15,7 @@ or construct its own HTTP client (the app builds it with the User-Agent and time
 No LLM is involved in this module.
 """
 
+import hashlib
 import json
 import logging
 import time
@@ -113,6 +114,7 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
         self._mode = mode
         self._sleep = sleep
         self._requested = False
+        self._response_sha256: dict[tuple[str, int], str] = {}
 
     @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
@@ -128,6 +130,7 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
         body = fetch_through(
             self._cache, self._mode, key, lambda: self._fetch(params), namespace=CACHE_NAMESPACE
         )
+        self._response_sha256[(question, limit)] = hashlib.sha256(body).hexdigest()
         papers: list[Paper] = []
         seen: set[str] = set()
         rejected: Counter[RejectReason] = Counter()
@@ -148,6 +151,14 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
                 ", ".join(f"{r.value}={n}" for r, n in sorted(rejected.items())),
             )
         return tuple(papers[:limit])
+
+    def response_sha256(self, question: str, limit: int) -> str:
+        """sha256 of the raw response body behind an earlier `search(question, limit=limit)` call.
+
+        Lets a dataset record exactly which bytes it was built from, without redistributing them.
+        Raises KeyError if that search was not made by this instance.
+        """
+        return self._response_sha256[(question, limit)]
 
     def _fetch(self, params: Mapping[str, str]) -> bytes:
         """One validated 200 body. Raises before returning, so nothing bad reaches the cache."""

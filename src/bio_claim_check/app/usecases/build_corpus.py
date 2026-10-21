@@ -13,13 +13,12 @@ No LLM is involved in this module.
 """
 
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 
 from bio_claim_check.features.contracts.corpus import (
     NLM_NOTICE,
-    CandidateCount,
     CorpusManifest,
     CorpusSpec,
     CorpusSplit,
@@ -32,6 +31,12 @@ from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.corpus.clusters import assign_splits, clusters, id_order
 from bio_claim_check.features.corpus.eligibility import candidates, exclusions
+from bio_claim_check.features.corpus.layout import (
+    DEV_SOURCES,
+    QUESTIONS,
+    TEST_SOURCES,
+    candidate_counts,
+)
 from bio_claim_check.features.corpus.serialise import (
     abstract_sha256,
     document_bytes,
@@ -41,11 +46,6 @@ from bio_claim_check.features.corpus.serialise import (
     sha256_hex,
 )
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
-
-DEV_SOURCES = "dev/sources.jsonl"
-TEST_SOURCES = "test/sources.jsonl"
-QUESTIONS = "questions.jsonl"
-MANIFEST = "manifest.json"
 
 
 class PoolConflictError(Exception):
@@ -66,9 +66,19 @@ def pool_query(search: str, cutoff: date) -> str:
 
 
 def build_corpus(
-    spec: CorpusSpec, source: BaseLiteratureSource, *, declared_fetched_on: date, tool_version: str
+    spec: CorpusSpec,
+    source: BaseLiteratureSource,
+    *,
+    declared_fetched_on: date,
+    tool_version: str,
+    spec_file_sha256: str,
+    response_sha256: Callable[[str, int], str],
 ) -> CorpusFiles:
-    """Fetch every question's pool (in spec order, so cache keys are stable) and build the dataset bytes."""
+    """Fetch every question's pool (in spec order, so cache keys are stable) and build the dataset bytes.
+
+    `spec_file_sha256` hashes the spec file as committed; `response_sha256(query, limit)` gives the hash of
+    the raw response behind a search already made, so others can check they fetched the same bytes.
+    """
     pools = {
         q.id: source.search(pool_query(q.search, spec.cutoff), limit=spec.pool_hits) for q in spec.questions
     }
@@ -109,7 +119,9 @@ def build_corpus(
             {
                 **q.model_dump(),
                 "query": pool_query(q.search, spec.cutoff),
+                "response_sha256": response_sha256(pool_query(q.search, spec.cutoff), spec.pool_hits),
                 "pool_size": len(pools[q.id]),
+                "split_pool_size": sum(split_of[p.source_id] is q.split for p in pools[q.id]),
                 "pool_sha256": pool_sha256([(p.source_id, abstract_sha256(p)) for p in pools[q.id]]),
             }
         )
@@ -125,27 +137,9 @@ def build_corpus(
         tool_version=tool_version,
         declared_fetched_on=declared_fetched_on,
         spec_sha256=model_sha256(spec),
+        spec_file_sha256=spec_file_sha256,
         notice=NLM_NOTICE,
         files=tuple(FileHash(name=n, sha256=sha256_hex(b)) for n, b in sorted(data.items())),
-        candidate_counts=_counts(spec, entries),
+        candidate_counts=candidate_counts(spec, entries),
     )
     return CorpusFiles(data=data, manifest=document_bytes(manifest))
-
-
-def _counts(spec: CorpusSpec, entries: list[SourceEntry]) -> tuple[CandidateCount, ...]:
-    """Candidates per domain, split and kind, zeros included, so a shortfall is visible, not missing.
-
-    A source retrieved by questions from two domains counts once in each domain.
-    """
-    domain_of_question = {q.id: q.domain for q in spec.questions}
-    n: defaultdict[tuple[str, CorpusSplit, str], int] = defaultdict(int)
-    for e in entries:
-        for domain in {domain_of_question[r.question_id] for r in e.ranks}:
-            for c in e.candidates:
-                n[(domain, e.split, c.kind)] += 1
-    return tuple(
-        CandidateCount(domain=d.id, split=split, kind=kind, n=n[(d.id, split, kind)])
-        for d in sorted(spec.domains, key=lambda d: d.id)
-        for split in CorpusSplit
-        for kind in spec.trap_kinds
-    )

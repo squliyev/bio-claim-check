@@ -25,8 +25,9 @@ TRAP_KINDS: Final = (
     OverstatedReason.CORRELATION_AS_CAUSATION,
     OverstatedReason.NONSIGNIFICANT_AS_EFFECT,
     OverstatedReason.CERTAINTY_INFLATION,
+    OverstatedReason.BACKGROUND_AS_RESULT,
 )
-"""The overstatement kinds the corpus can supply candidates for (sieve v1)."""
+"""The overstatement kinds the corpus can supply candidates for (sieve v2)."""
 
 MESH_KINDS: Final = frozenset(
     {OverstatedReason.PRECLINICAL_TO_CLINICAL, OverstatedReason.CORRELATION_AS_CAUSATION}
@@ -35,6 +36,9 @@ MESH_KINDS: Final = frozenset(
 
 REVIEW_TYPES: Final = frozenset({"Review", "Systematic Review", "Meta-Analysis"})
 """Publication types that summarise other work; their abstracts are never trap candidates."""
+
+PROTOCOL_TYPES: Final = frozenset({"Clinical Trial Protocol"})
+"""Publication types that describe a planned study; there are no results to overstate."""
 
 NLM_NOTICE: Final = (
     "Courtesy of the U.S. National Library of Medicine. NLM does not endorse this dataset. "
@@ -81,11 +85,29 @@ class NeverReason(StrEnum):
     REVIEW = "review"
     UNKNOWN_PUBLICATION_TYPES = "unknown_publication_types"
     MESH_NOT_INDEXED = "mesh_not_indexed"
+    PROTOCOL = "protocol"
 
 
 _BLOCKS_ALL_KINDS: Final = frozenset(
-    {NeverReason.RETRACTED, NeverReason.REVIEW, NeverReason.UNKNOWN_PUBLICATION_TYPES}
+    {NeverReason.RETRACTED, NeverReason.REVIEW, NeverReason.UNKNOWN_PUBLICATION_TYPES, NeverReason.PROTOCOL}
 )
+
+
+def never_reasons(
+    *, retracted: bool, publication_types: tuple[str, ...], mesh_headings: tuple[str, ...] | None
+) -> tuple[NeverReason, ...]:
+    """Why a source with this metadata can never be a candidate, in `NeverReason` order; () if it may be.
+
+    The one definition: the sieve applies it and `SourceEntry` re-checks a stored entry against it.
+    """
+    checks = (
+        (NeverReason.RETRACTED, retracted),
+        (NeverReason.REVIEW, bool(REVIEW_TYPES.intersection(publication_types))),
+        (NeverReason.UNKNOWN_PUBLICATION_TYPES, not publication_types),
+        (NeverReason.MESH_NOT_INDEXED, mesh_headings is None),
+        (NeverReason.PROTOCOL, bool(PROTOCOL_TYPES.intersection(publication_types))),
+    )
+    return tuple(reason for reason, applies in checks if applies)
 
 
 class Domain(ValidatedModel):
@@ -109,7 +131,7 @@ class CorpusSpec(ValidatedModel):
     """Everything the build reads besides the cache. Committed before any fetch (pre-registration)."""
 
     schema_version: Annotated[Literal[1], BeforeValidator(_exact_int)]
-    sieve_version: Annotated[Literal[1], BeforeValidator(_exact_int)]
+    sieve_version: Annotated[Literal[2], BeforeValidator(_exact_int)]
     pool_hits: Annotated[Literal[100], BeforeValidator(_exact_int)]
     cutoff: IsoDate
     split_salt: NonBlankStr
@@ -139,7 +161,7 @@ class CorpusSpec(ValidatedModel):
         if len(set(self.trap_kinds)) != len(self.trap_kinds):
             raise ValueError("trap_kinds must be unique")
         if unknown := [k.value for k in self.trap_kinds if k not in TRAP_KINDS]:
-            raise ValueError(f"trap_kinds not supported by sieve v1: {', '.join(unknown)}")
+            raise ValueError(f"trap_kinds not supported by sieve v2: {', '.join(unknown)}")
         return self
 
     def held_out_domain(self) -> DomainId:
@@ -150,7 +172,9 @@ class Candidate(ValidatedModel):
     """Why the sieve made a source a candidate for one kind. A candidate is not yet confirmed (S07b audit)."""
 
     kind: OverstatedReason
-    rule: Literal["animals_not_humans", "in_vitro", "observational", "null_result", "closing_hedge"]
+    rule: Literal[
+        "animals_not_humans", "in_vitro", "observational", "null_result", "closing_hedge", "prior_finding"
+    ]
     mesh: tuple[str, ...] = ()
     publication_types: tuple[str, ...] = ()
     span: StrictSpan | None = None
@@ -182,15 +206,10 @@ class SourceEntry(ValidatedModel):
         questions = [r.question_id for r in self.ranks]
         if questions != sorted(set(questions)):
             raise ValueError("ranks must be sorted by question id, one per question")
-        expected = tuple(
-            reason
-            for reason, applies in (
-                (NeverReason.RETRACTED, self.retracted),
-                (NeverReason.REVIEW, bool(REVIEW_TYPES.intersection(self.publication_types))),
-                (NeverReason.UNKNOWN_PUBLICATION_TYPES, not self.publication_types),
-                (NeverReason.MESH_NOT_INDEXED, self.mesh_headings is None),
-            )
-            if applies
+        expected = never_reasons(
+            retracted=self.retracted,
+            publication_types=self.publication_types,
+            mesh_headings=self.mesh_headings,
         )
         if self.never_because != expected:
             raise ValueError(f"never_because must be {[r.value for r in expected]} for this metadata")
@@ -205,11 +224,23 @@ class SourceEntry(ValidatedModel):
 
 
 class QuestionEntry(Question):
-    """A question as built: the exact query sent and a hash of its ranked pool, so drift is detectable."""
+    """A question as built: the exact query sent, a hash of the raw response and of its ranked pool.
+
+    `split_pool_size` counts the pool sources in the question's own split: that filtered pool is the one
+    an answerer sees during tuning (dev) or evaluation (test), and "unanswerable" refers to its top 10.
+    """
 
     query: NonBlankStr
+    response_sha256: Sha256Hex
     pool_size: int = Field(strict=True, ge=0)
+    split_pool_size: int = Field(strict=True, ge=0)
     pool_sha256: Sha256Hex
+
+    @model_validator(mode="after")
+    def _pool_sizes(self) -> Self:
+        if self.split_pool_size > self.pool_size:
+            raise ValueError("split_pool_size cannot exceed pool_size")
+        return self
 
 
 class FileHash(ValidatedModel):
@@ -231,6 +262,8 @@ class CorpusManifest(ValidatedModel):
     tool_version: NonBlankStr
     declared_fetched_on: IsoDate
     spec_sha256: Sha256Hex
+    spec_file_sha256: Sha256Hex
+    """Of the spec file's bytes, comments included, so an edited pre-registration breaks the seal."""
     notice: NonBlankStr
     files: tuple[FileHash, ...]
     candidate_counts: tuple[CandidateCount, ...]
@@ -265,3 +298,40 @@ def parse_corpus_spec(data: object, source: str) -> CorpusSpec:
             location = ".".join(str(part) for part in problem["loc"]) or "(root)"
             problems.append(f"{source}: {location}: {problem['msg']}")
         raise CorpusSpecError(problems) from None
+
+
+AuditVerdict = Literal["confirm", "reject"]
+
+
+class AuditDecision(ValidatedModel):
+    """The author's call on one candidate: a rejection must say why."""
+
+    source_id: SourceId
+    decision: AuditVerdict
+    reason: NonBlankStr | None
+
+    @model_validator(mode="after")
+    def _reasoned(self) -> Self:
+        if (self.decision == "reject") != (self.reason is not None):
+            raise ValueError("a rejection needs a reason, and only a rejection has one")
+        return self
+
+
+class AuditRecord(ValidatedModel):
+    """One completed audit of one kind in one split: exactly the first `n` candidates in the public order.
+
+    `corpus_seal` ties it to the sealed dataset; `prompts_sha256` records what was frozen when it was done.
+    """
+
+    split: CorpusSplit
+    kind: OverstatedReason
+    corpus_seal: Sha256Hex
+    prompts_sha256: Sha256Hex
+    decisions: tuple[AuditDecision, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _unique(self) -> Self:
+        ids = [d.source_id for d in self.decisions]
+        if len(set(ids)) != len(ids):
+            raise ValueError("each source is decided once")
+        return self

@@ -17,7 +17,7 @@ from types import ModuleType
 import grimp
 import pytest
 
-from tests.arch import test_guards
+from tests.arch import test_dataset_seal, test_guards
 from tests.support import guards
 from tests.support.fixture_pkg import ForbiddenContract, load_contracts
 from tests.support.guards import (
@@ -490,6 +490,7 @@ GUARD_TESTS = {  # every public guard has an accepting and a rejecting synthetic
     "check_driver_imports": ("test_driver_guard_accepts", "test_driver_guard_rejects"),
     "check_internal_imports": ("test_internal_imports_guard_accepts", "test_internal_imports_guard_rejects"),
     "check_no_ancestor_imports": ("test_ancestor_guard_accepts", "test_ancestor_guard_rejects"),
+    "check_no_test_ids": ("test_no_test_ids_guard_accepts", "test_no_test_ids_guard_rejects"),
     "check_no_registry": ("test_no_registry_guard_accepts", "test_no_registry_guard_rejects"),
     "check_port_shape": (
         "test_port_shape_accepts_a_base_with_named_implementations",
@@ -511,6 +512,6 @@ GUARD_TESTS = {  # every public guard has an accepting and a rejecting synthetic
 def test_every_guard_has_an_accepting_and_a_rejecting_test() -> None:
     public = {n for n, _ in inspect.getmembers(guards, inspect.isfunction) if n.startswith("check_")}
     assert public == set(GUARD_TESTS)
-    here = {**vars(test_guards), **globals()}
+    here = {**vars(test_guards), **vars(test_dataset_seal), **globals()}
     missing = [t for pair in GUARD_TESTS.values() for t in pair if not callable(here.get(t))]
     assert not missing, missing

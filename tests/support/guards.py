@@ -512,3 +512,30 @@ def check_suppression_reasons(path: Path, text: str) -> list[Violation]:
             continue
         found.append(Violation("suppression-reason", path, row, f"{m.group(0)!r} without a reason"))
     return found
+
+
+_NUMBER = re.compile(r"(?<!\w)(?<!\d\.)(?:MED:)?(\d+)(?!\w|\.\d)")
+_ID_WORD = re.compile(r"[\w-]+")
+
+
+def check_no_test_ids(
+    path: Path, text: str, *, test_pmids: frozenset[str], test_question_ids: frozenset[str]
+) -> list[Violation]:
+    """No sealed-test PMID or test question id may appear outside `datasets/` (I41, ADR 0010).
+
+    PMIDs are matched by exact membership, as `MED:<n>` or a bare `<n>`, so an unrelated number (a date, a
+    constant) never fires unless it *is* a test PMID. Question ids match as whole hyphenated words.
+    """
+    found: list[Violation] = []
+    for row, line in enumerate(text.splitlines(), start=1):
+        found += [
+            Violation("no-test-ids", path, row, f"test PMID {m.group(1)}")
+            for m in _NUMBER.finditer(line)
+            if m.group(1) in test_pmids
+        ]
+        found += [
+            Violation("no-test-ids", path, row, f"test question id {m.group(0)}")
+            for m in _ID_WORD.finditer(line)
+            if m.group(0) in test_question_ids
+        ]
+    return found

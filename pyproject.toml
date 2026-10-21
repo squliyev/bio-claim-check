@@ -128,6 +128,7 @@ name = "Deterministic code never calls an LLM (ADR 0003)"
 type = "forbidden"
 source_modules = [
     "bio_claim_check.app.usecases.build_corpus",
+    "bio_claim_check.app.usecases.corpus_audit",
     "bio_claim_check.common",
     "bio_claim_check.engine.cache",
     "bio_claim_check.engine.events",

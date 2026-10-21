@@ -85,6 +85,19 @@ uv run bio-claim-check corpus build --spec datasets/corpus.yaml --declared-fetch
 
 Same exit codes as `retrieve`, plus 6: an existing dataset file differs from the new build.
 
+Check and seal the dataset, then audit dev candidates (the sheet holds abstract text, so it goes to the
+git-ignored `var/audit/` and is rebuilt from the cache only):
+
+```bash
+uv run bio-claim-check corpus verify
+uv run bio-claim-check corpus seal
+uv run bio-claim-check corpus audit-sheet --kind certainty_inflation
+uv run bio-claim-check corpus apply-audit --kind certainty_inflation \
+  --sheet var/audit/dev-certainty_inflation.csv --prompts-sha256 <sha256>
+```
+
+Exit code 7: the dataset is not intact or sealed, or the audit input does not fit it.
+
 With Docker:
 
 ```bash
