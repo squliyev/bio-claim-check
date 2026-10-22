@@ -1,0 +1,204 @@
+{
+  "candidate_counts": [
+    {
+      "domain": "glp1-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 39,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "correlation_as_causation",
+      "n": 5,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 12,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "certainty_inflation",
+      "n": 67,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "background_as_result",
+      "n": 4,
+      "split": "dev"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 32,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "correlation_as_causation",
+      "n": 5,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 9,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "certainty_inflation",
+      "n": 53,
+      "split": "test"
+    },
+    {
+      "domain": "glp1-neuro",
+      "kind": "background_as_result",
+      "n": 3,
+      "split": "test"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "preclinical_to_clinical",
+      "n": 64,
+      "split": "dev"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "correlation_as_causation",
+      "n": 48,
+      "split": "dev"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "nonsignificant_as_effect",
+      "n": 56,
+      "split": "dev"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "certainty_inflation",
+      "n": 162,
+      "split": "dev"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "background_as_result",
+      "n": 14,
+      "split": "dev"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "preclinical_to_clinical",
+      "n": 91,
+      "split": "test"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "correlation_as_causation",
+      "n": 53,
+      "split": "test"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "nonsignificant_as_effect",
+      "n": 65,
+      "split": "test"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "certainty_inflation",
+      "n": 174,
+      "split": "test"
+    },
+    {
+      "domain": "metformin-onc",
+      "kind": "background_as_result",
+      "n": 20,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "correlation_as_causation",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "certainty_inflation",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "background_as_result",
+      "n": 0,
+      "split": "dev"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "preclinical_to_clinical",
+      "n": 64,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "correlation_as_causation",
+      "n": 84,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "nonsignificant_as_effect",
+      "n": 67,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "certainty_inflation",
+      "n": 195,
+      "split": "test"
+    },
+    {
+      "domain": "statin-neuro",
+      "kind": "background_as_result",
+      "n": 18,
+      "split": "test"
+    }
+  ],
+  "declared_fetched_on": "2026-10-21",
+  "files": [
+    {
+      "name": "dev/sources.jsonl",
+      "sha256": "18a7ca48392b87b500018626017cac1493b1337ce377ee30b4fe2c7bde63b4f7"
+    },
+    {
+      "name": "questions.jsonl",
+      "sha256": "81a6600bc7f14eafd3a4e01c352c38e847a7024531910d8b314bc24aefb410c2"
+    },
+    {
+      "name": "test/sources.jsonl",
+      "sha256": "bfc52aed56c0ac16234d408818cee115c9a3c99d140563cd4836b043d2366e67"
+    }
+  ],
+  "notice": "Courtesy of the U.S. National Library of Medicine. NLM does not endorse this dataset. Metadata are a dated snapshot (see declared_fetched_on) and are not kept current.",
+  "schema_version": 1,
+  "spec_file_sha256": "af5ed49a6a4f166138d26e7f0a282043d3304935a2f0eca113a3ed14fe01a0ec",
+  "spec_sha256": "1dc0b2ef0f7b9ae5299cd47e1193166ab4175046531a9614e9d29c5c6b8d178b",
+  "tool_version": "0.0.1"
+}

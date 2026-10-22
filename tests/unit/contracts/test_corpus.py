@@ -41,7 +41,7 @@ def spec_data() -> dict[str, Any]:
         ],
         "questions": [
             {
-                "id": "glp1-q1",
+                "id": "fx-glp1-q1",
                 "domain": "glp1-neuro",
                 "split": "dev",
                 "text": "Does exenatide slow PD?",
@@ -49,7 +49,7 @@ def spec_data() -> dict[str, Any]:
                 "answerable": True,
             },
             {
-                "id": "statin-q1",
+                "id": "fx-statin-q1",
                 "domain": "statin-neuro",
                 "split": "test",
                 "text": "Do statins prevent dementia?",
@@ -133,7 +133,7 @@ def mutate(change: str) -> dict[str, Any]:
             domains[0]["held_out"] = True
             questions[0]["split"] = "test"
         case "duplicate_question":
-            questions[1]["id"] = "glp1-q1"
+            questions[1]["id"] = "fx-glp1-q1"
         case "unknown_domain":
             questions[0]["domain"] = "nowhere"
         case "held_out_in_dev":
@@ -154,8 +154,8 @@ def mutate(change: str) -> dict[str, Any]:
         ("no_held_out", "exactly one domain must be held out"),
         ("two_held_out", "exactly one domain must be held out"),
         ("duplicate_question", "question ids must be unique"),
-        ("unknown_domain", "question glp1-q1: unknown domain 'nowhere'"),
-        ("held_out_in_dev", "question statin-q1: a held-out domain's questions must be in test"),
+        ("unknown_domain", "question fx-glp1-q1: unknown domain 'nowhere'"),
+        ("held_out_in_dev", "question fx-statin-q1: a held-out domain's questions must be in test"),
         ("duplicate_kind", "trap_kinds must be unique"),
         ("unsupported_kind", "trap_kinds not supported by sieve v2: surrogate_as_clinical, other"),
     ],

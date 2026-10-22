@@ -20,19 +20,19 @@ domains:
     held_out: true
     description: Fictional statin questions (held out)
 questions:
-  - id: glp1-q1
+  - id: fx-glp1-q1
     domain: glp1-neuro
     split: dev
     text: Does OS-912 slow decline?
     search: OS-912 AND decline
     answerable: true
-  - id: glp1-q2
+  - id: fx-glp1-q2
     domain: glp1-neuro
     split: test
     text: Does OS-912 protect neurons?
     search: OS-912 AND neurons
     answerable: false
-  - id: statin-q1
+  - id: fx-statin-q1
     domain: statin-neuro
     split: test
     text: Does HX-15 prevent dementia?

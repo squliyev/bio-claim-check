@@ -6,6 +6,8 @@ repos:
     hooks:
       - id: check-added-large-files
         args: ["--maxkb=500"]
+        # Sealed split files: SEALED hashes their exact bytes, so they cannot be split or compressed (ADR 0010).
+        exclude: ^datasets/(dev|test)/sources\.jsonl$
       - id: check-merge-conflict
       - id: check-toml
       - id: check-yaml

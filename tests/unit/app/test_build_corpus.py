@@ -93,7 +93,7 @@ def test_each_question_is_searched_once_with_its_cutoff_and_pool_size() -> None:
 
 def test_a_source_retrieved_by_two_questions_is_one_row_with_both_ranks() -> None:
     entry = all_rows(build())[ANIMAL.source_id]
-    assert [(r.question_id, r.rank) for r in entry.ranks] == [("glp1-q1", 1), ("glp1-q2", 2)]
+    assert [(r.question_id, r.rank) for r in entry.ranks] == [("fx-glp1-q1", 1), ("fx-glp1-q2", 2)]
 
 
 def test_held_out_sources_and_their_cluster_are_in_test() -> None:
@@ -128,9 +128,9 @@ def test_rows_are_in_numeric_id_order() -> None:
 
 def test_questions_record_their_query_and_pool() -> None:
     questions = [json.loads(line) for line in build().data[QUESTIONS].splitlines()]
-    assert [q["id"] for q in questions] == ["glp1-q1", "glp1-q2", "statin-q1"]
+    assert [q["id"] for q in questions] == ["fx-glp1-q1", "fx-glp1-q2", "fx-statin-q1"]
     by_id = {q["id"]: q for q in questions}
-    assert by_id["glp1-q1"]["query"] == pool_query("OS-912 AND decline", CUTOFF)
+    assert by_id["fx-glp1-q1"]["query"] == pool_query("OS-912 AND decline", CUTOFF)
     assert [q["pool_size"] for q in questions] == [5, 2, 1]
 
 
@@ -146,7 +146,7 @@ def test_an_empty_pool_is_recorded_not_topped_up() -> None:
     pools[pool_query("HX-15 AND dementia", CUTOFF)] = ()
     files = build(source=QueryLiteratureSource(pools))
     questions = [json.loads(line) for line in files.data[QUESTIONS].splitlines()]
-    assert {q["id"]: q["pool_size"] for q in questions}["statin-q1"] == 0
+    assert {q["id"]: q["pool_size"] for q in questions}["fx-statin-q1"] == 0
 
 
 def questions_by_id(files: CorpusFiles) -> dict[str, dict[str, object]]:
@@ -156,17 +156,17 @@ def questions_by_id(files: CorpusFiles) -> dict[str, dict[str, object]]:
 def test_each_question_counts_only_the_pool_sources_in_its_own_split() -> None:
     pools = world()
     neurons = pool_query("OS-912 AND neurons", CUTOFF)
-    pools[neurons] = (HEDGED, *pools[neurons])  # HEDGED is a dev source; glp1-q2 is a test question
+    pools[neurons] = (HEDGED, *pools[neurons])  # HEDGED is a dev source; fx-glp1-q2 is a test question
     by_id = questions_by_id(build(source=QueryLiteratureSource(pools)))
-    assert (by_id["glp1-q2"]["pool_size"], by_id["glp1-q2"]["split_pool_size"]) == (3, 2)
-    assert (by_id["glp1-q1"]["pool_size"], by_id["glp1-q1"]["split_pool_size"]) == (5, 2)
+    assert (by_id["fx-glp1-q2"]["pool_size"], by_id["fx-glp1-q2"]["split_pool_size"]) == (3, 2)
+    assert (by_id["fx-glp1-q1"]["pool_size"], by_id["fx-glp1-q1"]["split_pool_size"]) == (5, 2)
 
 
 def test_response_hash_comes_from_the_source_for_the_exact_query() -> None:
     source = QueryLiteratureSource(world())
     by_id = questions_by_id(build(source=source))
     query = pool_query("OS-912 AND decline", CUTOFF)
-    assert by_id["glp1-q1"]["response_sha256"] == source.response_sha256(query, 100)
+    assert by_id["fx-glp1-q1"]["response_sha256"] == source.response_sha256(query, 100)
 
 
 def test_a_changed_response_changes_its_hash_and_no_other() -> None:
@@ -175,7 +175,7 @@ def test_a_changed_response_changes_its_hash_and_no_other() -> None:
     pools[pool_query("HX-15 AND dementia", CUTOFF)] = ()
     after = questions_by_id(build(source=QueryLiteratureSource(pools)))
     changed = {q for q in before if before[q]["response_sha256"] != after[q]["response_sha256"]}
-    assert changed == {"statin-q1"}
+    assert changed == {"fx-statin-q1"}
 
 
 def test_manifest_records_the_raw_spec_file_hash() -> None:
