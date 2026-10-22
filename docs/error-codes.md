@@ -15,6 +15,7 @@ stays listed as retired.
 | 5 | `LOCAL_CACHE` | The cache file cannot be opened, read or written |
 | 6 | `OUTPUT` | An output file exists with different bytes or cannot be written; nothing is overwritten |
 | 7 | `DATASET` | The dataset folder is not intact (seal, hashes, splits, counts or audits) |
+| 8 | `PROVIDER` | An LLM provider call failed (`llm ping`; the error code is printed per deployment) |
 
 ## Error codes
 
@@ -24,9 +25,11 @@ stable code. Which exit code a command uses for an error depends on the command 
 
 | Code | Class | Raised when |
 |---|---|---|
+| `agent.declaration` | `AgentDeclarationError` | An LLM agent class misdeclares `name`, `prompt` or `output`, or overrides `run` (a bug) |
 | `app.dataset_read` | `DatasetReadError` | The dataset folder, or a file in it, cannot be read |
 | `app.missing_provider` | `MissingProviderError` | A live LLM role has no provider settings |
 | `app.output_conflict` | `OutputConflictError` | An output file exists with different bytes, or cannot be written |
+| `app.unsupported_provider` | `UnsupportedProviderError` | A deployment whose provider has no adapter yet (Anthropic direct, Ollama) |
 | `cache.failed` | `CacheError` | The cache cannot be opened or written |
 | `cache.miss` | `CacheMissError` | Read-only cache mode and the key is absent |
 | `config.strict_yaml` | `StrictYamlError` | A YAML file is ambiguous (duplicate keys, merges, implicit types) |

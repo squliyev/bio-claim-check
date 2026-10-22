@@ -18,14 +18,18 @@ from pydantic import ValidationError
 from bio_claim_check import __version__
 from bio_claim_check.app.container import (
     DatasetReadError,
+    MissingProviderError,
     OutputConflictError,
+    UnsupportedProviderError,
     build_fake_run_ports,
+    build_llm_clients,
     build_replay,
     build_retrieval,
     default_rulepack,
     file_sha256,
     load_corpus_spec,
     load_rulepack,
+    logging_emitter,
     publish_audit,
     publish_corpus,
     publish_report,
@@ -34,6 +38,7 @@ from bio_claim_check.app.container import (
     write_seal,
 )
 from bio_claim_check.app.logging_setup import configure_logging
+from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.settings import Settings, load_settings
 from bio_claim_check.app.usecases.build_corpus import PoolConflictError, build_corpus
 from bio_claim_check.app.usecases.corpus_audit import (
@@ -42,8 +47,10 @@ from bio_claim_check.app.usecases.corpus_audit import (
     apply_decisions,
     export_sheet,
 )
+from bio_claim_check.app.usecases.llm_ping import PingResult, ping
 from bio_claim_check.app.usecases.run import run_question
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
+from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
 from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpec, CorpusSpecError
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
@@ -66,6 +73,7 @@ class ExitCode(IntEnum):
     LOCAL_CACHE = 5  # the cache file cannot be opened, read or written
     OUTPUT = 6  # an output file exists with different bytes or cannot be written (nothing is overwritten)
     DATASET = 7  # the dataset folder is not intact (seal, hashes, splits, counts or audits)
+    PROVIDER = 8  # an LLM provider call failed (see the error code printed per deployment)
 
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")  # date.fromisoformat also takes 20250115 and 2025-W03-3
@@ -211,6 +219,51 @@ def retrieve(
     typer.echo("retraction status is as of the first fetch (cached snapshot)")
     for rank, paper in enumerate(papers, start=1):
         _print_paper(rank, paper)
+
+
+llm_app = typer.Typer(help="Check the LLM providers (S09).", no_args_is_help=True)
+app.add_typer(llm_app, name="llm")
+
+
+@llm_app.command("ping")
+def llm_ping(
+    deployments: Annotated[
+        list[str] | None,
+        typer.Argument(help="Deployments to ping. Defaults to the answer and verifier role deployments."),
+    ] = None,
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """One tiny fictional structured call per deployment, bypassing the cache. Costs a few tokens."""
+    settings = _settings(env_file)
+    names = list(dict.fromkeys(deployments or [settings.answer_model, settings.verifier_model]))
+    try:
+        specs = [model_catalog().lookup(name) for name in names]
+        with build_llm_clients(settings, specs) as clients:
+            results = ping(clients, specs, emitter=logging_emitter())
+    except (UnknownDeploymentError, MissingProviderError, UnsupportedProviderError) as err:
+        _fail(ExitCode.INPUT, str(err))
+    for result in results:
+        _print_ping(result)
+    if not all(r.ok for r in results):
+        raise typer.Exit(code=ExitCode.PROVIDER)
+
+
+def _print_ping(result: PingResult) -> None:
+    head = f"{result.deployment} (pinned {result.model_version})"
+    if not result.ok:
+        typer.echo(f"FAIL {head}: {result.error_code}")
+        return
+    usage = result.usage
+    tokens = (
+        "usage unknown"
+        if usage is None
+        else f"in={usage.input_tokens} out={usage.output_tokens} reasoning={usage.reasoning_tokens} "
+        f"cached={usage.cached_input_tokens}"
+    )
+    finish = result.finish.value if result.finish else "?"
+    typer.echo(
+        f"ok   {head}: served={result.served_model} finish={finish} attempts={result.attempts} {tokens}"
+    )
 
 
 corpus_app = typer.Typer(help="Build the evaluation corpus (ADR 0010).", no_args_is_help=True)

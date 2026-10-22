@@ -5,30 +5,40 @@ only `app` may (ADR 0002). It is also the only app module that imports infrastru
 adapters (CLI, UI) call the composers below instead (contract `driving-adapters-use-the-container`).
 The fake run wiring is S05; retrieval (S06) is the first live wiring: an httpx client with the
 User-Agent and timeouts, and the SQLite cache under `var_dir` in the configured mode (ADR 0009).
-`build_models` (S08) resolves each LLM role through the catalogue and checks its provider settings.
+`build_models` (S08) resolves each LLM role through the catalogue and checks its provider settings;
+`build_llm_clients` (S09) builds the live provider backends: one SDK client per Foundry API, SDK retries
+off (our `transport_policy` retries), URLs derived from the one Foundry resource endpoint.
 Must not: hold logic. It builds objects, composes infrastructure with pure parsers, and normalises
 infrastructure errors into the domain's error types.
 """
 
 import hashlib
 import time
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+import anthropic
 import httpx
+import openai
 
 from bio_claim_check import __version__
 from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
 from bio_claim_check.common.errors import BccError
+from bio_claim_check.common.system_clock import SystemClock
 from bio_claim_check.engine.cache.base_cache import BaseCache
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
+from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.engine.events.logging_event_sink import LoggingEventSink
+from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
+from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
 from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider
+from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
 from bio_claim_check.features.contracts.corpus import (
     CorpusSpec,
@@ -53,6 +63,8 @@ DEFAULT_RULEPACK = ("data", "rulepacks", "default.yaml")
 REPO_URL = "https://github.com/squliyev/bio-claim-check"
 CACHE_FILE = "cache.sqlite"
 HTTP_TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+LLM_TIMEOUT_S = 300.0  # a long structured answer may take minutes; connecting may not
+LLM_CONNECT_TIMEOUT_S = 10.0
 
 
 def user_agent(settings: Settings) -> str:
@@ -284,3 +296,78 @@ def build_models(settings: Settings, catalog: ModelCatalog) -> RoleModels:
                     f"({ENV_PREFIX}{needed.upper()}__*); use {ENV_PREFIX}CACHE_MODE=read-only to replay"
                 )
     return RoleModels(answer=roles["answer"], verifier=roles["verifier"], trap=roles["trap"])
+
+
+class UnsupportedProviderError(BccError):
+    """A deployment whose provider has no adapter yet (S09 adapts Foundry's OpenAI and Anthropic APIs)."""
+
+    code = "app.unsupported_provider"
+
+
+def logging_emitter() -> EventEmitter:
+    """Pipeline events to the log (stderr), stamped by the wall clock: the live default until S11's jsonl."""
+    return EventEmitter(LoggingEventSink(), SystemClock())
+
+
+def foundry_urls(base_url: str) -> tuple[str, str]:
+    """The `/openai/v1/` and `/anthropic` endpoints of one Foundry resource (same endpoint and key)."""
+    root = base_url.rstrip("/")
+    return f"{root}/openai/v1/", f"{root}/anthropic"
+
+
+@contextmanager
+def build_llm_clients(
+    settings: Settings,
+    specs: Iterable[ModelSpec],
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    emitter: EventEmitter | None = None,
+    openai_http: openai.DefaultHttpxClient | None = None,
+    anthropic_http: anthropic.DefaultHttpxClient | None = None,
+) -> Generator[dict[str, BaseLlmClient]]:
+    """A live backend per deployment in `specs`. Closes the SDK clients on exit.
+
+    Raises `MissingProviderError` without Foundry settings and `UnsupportedProviderError` for a provider
+    with no adapter, both before any client is built. `openai_http`/`anthropic_http` are for tests (the
+    SDKs' own client class over a mock transport); production uses the SDKs' defaults.
+    """
+    specs = tuple(specs)
+    for spec in specs:
+        if spec.provider not in {Provider.FOUNDRY_OPENAI, Provider.FOUNDRY_ANTHROPIC}:
+            raise UnsupportedProviderError(
+                f"deployment {spec.deployment!r} uses provider {spec.provider.value}, which has no adapter"
+            )
+    if specs and settings.foundry is None:
+        raise MissingProviderError(
+            f"deployments {[s.deployment for s in specs]} need foundry settings ({ENV_PREFIX}FOUNDRY__*)"
+        )
+    with ExitStack() as stack:
+        if settings.foundry is None or not specs:
+            yield {}
+            return
+        openai_url, anthropic_url = foundry_urls(str(settings.foundry.base_url))
+        key = settings.foundry.api_key.get_secret_value()
+        timeout = LLM_TIMEOUT_S, LLM_CONNECT_TIMEOUT_S
+        providers = {spec.provider for spec in specs}
+        backends: dict[Provider, BaseLlmClient] = {}
+        if Provider.FOUNDRY_OPENAI in providers:
+            gpt = openai.OpenAI(
+                base_url=openai_url,
+                api_key=key,
+                max_retries=0,
+                timeout=openai.Timeout(timeout[0], connect=timeout[1]),
+                http_client=openai_http,
+            )
+            stack.callback(gpt.close)
+            backends[Provider.FOUNDRY_OPENAI] = OpenAiLlmClient(gpt, sleep=sleep, emitter=emitter)
+        if Provider.FOUNDRY_ANTHROPIC in providers:
+            claude = anthropic.AnthropicFoundry(
+                base_url=anthropic_url,
+                api_key=key,
+                max_retries=0,
+                timeout=anthropic.Timeout(timeout[0], connect=timeout[1]),
+                http_client=anthropic_http,
+            )
+            stack.callback(claude.close)
+            backends[Provider.FOUNDRY_ANTHROPIC] = AnthropicLlmClient(claude, sleep=sleep, emitter=emitter)
+        yield {spec.deployment: backends[spec.provider] for spec in specs}
