@@ -1,0 +1,120 @@
+{
+  "exchanges": [
+    {
+      "request": {
+        "body": {
+          "max_tokens": 256,
+          "messages": [
+            {
+              "content": "Reply with ok set to true.",
+              "role": "user"
+            }
+          ],
+          "model": "claude-opus-4-8",
+          "system": "You are a connectivity check. Answer with the requested JSON only.",
+          "tool_choice": {
+            "name": "PingReply",
+            "type": "tool"
+          },
+          "tools": [
+            {
+              "description": "Record the answer as PingReply.",
+              "input_schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ok": {
+                    "title": "Ok",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "title": "PingReply",
+                "type": "object"
+              },
+              "name": "PingReply"
+            }
+          ]
+        },
+        "path": "/anthropic/v1/messages"
+      },
+      "response": {
+        "body": {
+          "content": [],
+          "id": "msg_000000000000000000000000",
+          "model": "claude-opus-4-8",
+          "role": "assistant",
+          "stop_reason": "refusal",
+          "stop_sequence": null,
+          "type": "message",
+          "usage": {
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "input_tokens": 620,
+            "output_tokens": 2,
+            "service_tier": "standard"
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "expected": {
+    "response": {
+      "deployment": "claude-opus-4-8",
+      "finish_reason": "content_filter",
+      "served_model": "claude-opus-4-8",
+      "text": "",
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 620,
+        "output_tokens": 2,
+        "reasoning_tokens": null
+      }
+    }
+  },
+  "llm_request": {
+    "messages": [
+      {
+        "content": "You are a connectivity check. Answer with the requested JSON only.",
+        "role": "system"
+      },
+      {
+        "content": "Reply with ok set to true.",
+        "role": "user"
+      }
+    ],
+    "model": {
+      "deployment": "claude-opus-4-8",
+      "model_version": "synthetic",
+      "provider": "foundry_anthropic"
+    },
+    "params": {
+      "max_output_tokens": 256
+    },
+    "prompt": null,
+    "repeat_idx": 0,
+    "response_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "title": "PingReply",
+      "type": "object"
+    },
+    "schema_name": "PingReply",
+    "seed": null
+  },
+  "note": "stop_reason refusal (cannot be provoked honestly with fictional text).",
+  "provenance": "synthetic"
+}

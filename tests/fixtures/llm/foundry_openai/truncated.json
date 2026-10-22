@@ -1,0 +1,131 @@
+{
+  "exchanges": [
+    {
+      "request": {
+        "body": {
+          "input": [
+            {
+              "content": "Reply with ok set to true.",
+              "role": "user"
+            }
+          ],
+          "instructions": "You are a connectivity check. Answer with the requested JSON only.",
+          "max_output_tokens": 16,
+          "model": "gpt-6.1-sol",
+          "store": false,
+          "text": {
+            "format": {
+              "name": "PingReply",
+              "schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ok": {
+                    "title": "Ok",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "title": "PingReply",
+                "type": "object"
+              },
+              "strict": true,
+              "type": "json_schema"
+            }
+          }
+        },
+        "path": "/openai/v1/responses"
+      },
+      "response": {
+        "body": {
+          "created_at": 0,
+          "id": "resp_0000000000000000000000000000000000000000000000000",
+          "incomplete_details": {
+            "reason": "max_output_tokens"
+          },
+          "model": "gpt-6.1-sol",
+          "object": "response",
+          "output": [
+            {
+              "id": "rs_0000000000000000000000000000000000000000000000000",
+              "summary": [],
+              "type": "reasoning"
+            }
+          ],
+          "status": "incomplete",
+          "store": false,
+          "usage": {
+            "input_tokens": 41,
+            "input_tokens_details": {
+              "cached_tokens": 0
+            },
+            "output_tokens": 16,
+            "output_tokens_details": {
+              "reasoning_tokens": 16
+            },
+            "total_tokens": 57
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "expected": {
+    "response": {
+      "deployment": "gpt-6.1-sol",
+      "finish_reason": "length",
+      "served_model": "gpt-6.1-sol",
+      "text": "",
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 41,
+        "output_tokens": 16,
+        "reasoning_tokens": 16
+      }
+    }
+  },
+  "llm_request": {
+    "messages": [
+      {
+        "content": "You are a connectivity check. Answer with the requested JSON only.",
+        "role": "system"
+      },
+      {
+        "content": "Reply with ok set to true.",
+        "role": "user"
+      }
+    ],
+    "model": {
+      "deployment": "gpt-6.1-sol",
+      "model_version": "2026-09-29",
+      "provider": "foundry_openai"
+    },
+    "params": {
+      "max_output_tokens": 16
+    },
+    "prompt": null,
+    "repeat_idx": 0,
+    "response_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "title": "PingReply",
+      "type": "object"
+    },
+    "schema_name": "PingReply",
+    "seed": null
+  },
+  "note": "The token cap was spent on reasoning: incomplete, LENGTH, empty text.",
+  "provenance": "synthetic"
+}

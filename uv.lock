@@ -70,6 +70,7 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "grimp" },
+    { name = "httpx2" },
     { name = "hypothesis" },
     { name = "import-linter" },
     { name = "packaging" },
@@ -96,6 +97,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "grimp", specifier = ">=3.17" },
+    { name = "httpx2", specifier = ">=2.16.0" },
     { name = "hypothesis", specifier = ">=6.170.5" },
     { name = "import-linter", specifier = "==2.15.*" },
     { name = "packaging", specifier = ">=26.0" },

@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta, timezone
 import pytest
 
 from bio_claim_check.common.scripted_clock import ScriptedClock
+from bio_claim_check.common.system_clock import SystemClock
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -32,3 +33,10 @@ def test_scripted_clock_normalises_to_utc_tzinfo() -> None:
 def test_scripted_clock_rejects_bad_input(start: datetime, step: timedelta) -> None:
     with pytest.raises(ValueError, match=r"UTC|backwards"):
         ScriptedClock(start, step)
+
+
+def test_system_clock_is_utc_aware_and_does_not_go_backwards() -> None:
+    clock = SystemClock()
+    first, second = clock.now(), clock.now()
+    assert first.tzinfo is UTC
+    assert second >= first
