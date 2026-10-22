@@ -21,8 +21,9 @@ from bio_claim_check.app.container import build_llm_clients
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.settings import Settings, load_settings
 from bio_claim_check.common.errors import BccError
+from bio_claim_check.common.models import ValidatedModel
 from bio_claim_check.engine.agent.ping_llm_agent import PING_PROMPT, PingReply
-from bio_claim_check.engine.llm.messages import LlmRequest, LlmResponse, Message, request_for
+from bio_claim_check.engine.llm.messages import FinishReason, LlmRequest, LlmResponse, Message, request_for
 from bio_claim_check.engine.llm.model_spec import ModelSpec
 from bio_claim_check.engine.pipeline.llm_runner import REPAIR_INSTRUCTION
 from bio_claim_check.engine.prompts.prompt_template import render
@@ -42,6 +43,25 @@ def _ping(spec: ModelSpec, params: dict[str, int] | None = None) -> LlmRequest:
     return request.with_schema(PingReply.__name__, PingReply.model_json_schema(mode="validation"))
 
 
+class CountReply(ValidatedModel):
+    """A deliberately long, fictional reply: the ping reply fits inside the Responses minimum budget."""
+
+    numbers: str
+
+
+COUNT_TO_200 = 'Write the numbers from 1 to 200 in words, separated by commas, in the field "numbers".'
+
+
+def _truncated(provider: ProviderDir, spec: ModelSpec) -> LlmRequest:
+    system, _ = render(PING_PROMPT, {})
+    request = request_for(
+        spec,
+        (system, Message(role="user", content=COUNT_TO_200)),
+        params={"max_output_tokens": TRUNCATING_BUDGET[provider]},
+    )
+    return request.with_schema(CountReply.__name__, CountReply.model_json_schema(mode="validation"))
+
+
 def _repair_turn(spec: ModelSpec) -> LlmRequest:
     first = _ping(spec)
     fix = REPAIR_INSTRUCTION.format(problems="ok [bool_parsing]")
@@ -53,8 +73,8 @@ type Case = tuple[str, Callable[[ProviderDir, ModelSpec], LlmRequest]]
 CASES: tuple[Case, ...] = (
     ("The ping request answered normally (structured output, usage).", lambda _, s: _ping(s)),
     (
-        "The ping request with a tiny output budget: the provider stops for length.",
-        lambda p, s: _ping(s, {"max_output_tokens": TRUNCATING_BUDGET[p]}),
+        "A fictional long reply with a tiny output budget: the provider stops for length.",
+        _truncated,
     ),
     (
         "A repair turn: the earlier reply and the runner's correction go back as plain messages, no ids.",
@@ -106,3 +126,6 @@ def test_record(record_llm: bool, settings: Settings, provider: ProviderDir, ind
     log.info("recorded %s/%s: %d exchange(s)", provider, NAMES[index], len(transport.exchanges))
     if error is not None:
         pytest.fail(f"{provider}/{NAMES[index]} failed live with {error.code}; fixture written, review it")
+    if NAMES[index] == "truncated":
+        assert response is not None
+        assert response.finish_reason is FinishReason.LENGTH, "the truncated case must record a length stop"

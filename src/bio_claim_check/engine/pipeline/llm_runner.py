@@ -26,7 +26,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import datetime
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, JsonValue, ValidationError
 
 from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.events.emitter import EventEmitter
@@ -61,8 +61,31 @@ class ProcessorContractError(BccError, RuntimeError):
     code = "llm.processor_contract"
 
 
-def _problems(error: ValidationError) -> tuple[tuple[str, str], ...]:
-    return tuple((".".join(str(part) for part in e["loc"]) or "<root>", e["type"]) for e in error.errors())
+UNDECLARED = "<undeclared>"
+
+
+def declared_names(schema: JsonValue) -> frozenset[str]:
+    """Every property name the output schema declares, at any depth."""
+    names: set[str] = set()
+    if isinstance(schema, list):
+        for item in schema:
+            names |= declared_names(item)
+    elif isinstance(schema, dict):
+        for key, value in schema.items():
+            if key == "properties" and isinstance(value, dict):
+                names.update(value)
+            names |= declared_names(value)
+    return frozenset(names)
+
+
+def _problems(error: ValidationError, declared: frozenset[str]) -> tuple[tuple[str, str], ...]:
+    """(location, error type) pairs. A segment the schema does not declare (a key the model invented, a
+    dict key) is model output, so it becomes `<undeclared>`: problems reach events and error text (I59)."""
+
+    def segment(part: str | int) -> str:
+        return str(part) if isinstance(part, int) or part in declared else UNDECLARED
+
+    return tuple((".".join(segment(p) for p in e["loc"]) or "<root>", e["type"]) for e in error.errors())
 
 
 class LlmRunner[P, T: BaseModel]:
@@ -114,6 +137,7 @@ class LlmRunner[P, T: BaseModel]:
                     f"{type(processor).__name__} changed the model, responses or spend"
                 )
         schema = self._output.model_json_schema(mode="validation")
+        declared = declared_names(schema)
         inv = replace(inv, request=inv.request.with_schema(self._output.__name__, schema))
         for attempt in range(1, MAX_ATTEMPTS + 1):
             attempts[0] = attempt
@@ -132,7 +156,7 @@ class LlmRunner[P, T: BaseModel]:
             try:
                 output = self._output.model_validate_json(response.text)
             except ValidationError as error:
-                problems = _problems(error)
+                problems = _problems(error, declared)
                 if attempt == MAX_ATTEMPTS:
                     raise self._error(
                         LlmFailureKind.INVALID_OUTPUT,

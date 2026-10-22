@@ -20,7 +20,7 @@ MODEL_SPECS: Final = (
     ModelSpec(
         deployment="claude-opus-4-8",
         provider=Provider.FOUNDRY_ANTHROPIC,
-        model_version="claude-opus-4-8",  # BLOCKING (S09): pin from the Foundry portal before the S09 commit
+        model_version="claude-opus-4-8",  # Foundry shows no separate Claude version: the id is the pin
         params={"max_output_tokens": 8192},
         price=None,
     ),

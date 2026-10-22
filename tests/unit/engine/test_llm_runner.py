@@ -23,8 +23,10 @@ from bio_claim_check.engine.pipeline.invocation import Invocation
 from bio_claim_check.engine.pipeline.llm_runner import (
     EMPTY_REPLY,
     MAX_ATTEMPTS,
+    UNDECLARED,
     LlmRunner,
     ProcessorContractError,
+    declared_names,
 )
 
 pytestmark = pytest.mark.unit
@@ -107,8 +109,8 @@ def test_invalid_twice_raises_with_the_spend_of_both_attempts() -> None:
     assert error.attempts == MAX_ATTEMPTS
     assert error.spend.calls == 2
     assert error.spend.cost == 2 * CALL_COST
-    assert set(error.validation) == {("ok", "missing"), ("nope", "extra_forbidden")}
-    assert "nope" not in str(error.validation[0][1])  # types only, never input values
+    assert set(error.validation) == {("ok", "missing"), (UNDECLARED, "extra_forbidden")}
+    assert "nope" not in str(error)  # a model-invented key is model output (I59)
 
 
 @pytest.mark.parametrize("text", ["not json", "", "   "])
@@ -276,3 +278,31 @@ def test_a_response_processor_may_change_only_the_payload(processor: BaseRespons
     client = ScriptedLlmClient([response('{"ok": true}', usage=USAGE)])
     with pytest.raises(ProcessorContractError):
         LlmRunner[str, Out](client, spec(), Out, response_processors=[processor]).run(start())
+
+
+class Inner(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    score: int
+
+
+class Nested(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    items: list[Inner]
+    tags: dict[str, int]
+
+
+def test_declared_names_cover_nested_models() -> None:
+    assert declared_names(Nested.model_json_schema(mode="validation")) == {"items", "tags", "score"}
+
+
+def test_locations_keep_declared_fields_and_indices_and_redact_model_invented_keys() -> None:
+    bad = '{"items": [{"score": "x", "SECRETKEY": 1}], "tags": {"OTHERSECRET": "y"}, "INVENTED": 0}'
+    client = ScriptedLlmClient([response(bad), response(bad)])
+    with pytest.raises(LlmCallError) as raised:
+        LlmRunner[str, Nested](client, spec(), Nested).run(start())
+    text = str(raised.value) + client.requests[1].messages[-1].content  # [-2] echoes the reply by design
+    for secret in ("SECRETKEY", "OTHERSECRET", "INVENTED"):
+        assert secret not in text
+    assert "items.0.score [int_parsing]" in text
+    assert f"items.0.{UNDECLARED} [extra_forbidden]" in text
+    assert f"tags.{UNDECLARED} [int_parsing]" in text

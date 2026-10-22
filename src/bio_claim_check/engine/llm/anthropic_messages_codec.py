@@ -95,11 +95,18 @@ def decode_usage(raw_usage: Mapping[str, JsonValue], deployment: str) -> Usage:
         raw_usage.get("cache_creation_input_tokens"), "usage.cache_creation_input_tokens", deployment
     )
     uncached = count(raw_usage.get("input_tokens"), "usage.input_tokens", deployment)
+    output_details = raw_usage.get("output_tokens_details")
+    thinking = (
+        obj(output_details, "usage.output_tokens_details", deployment).get("thinking_tokens")
+        if output_details is not None
+        else None
+    )
     return usage(
         deployment,
         input_tokens=uncached + (read or 0) + (written or 0),
         output_tokens=count(raw_usage.get("output_tokens"), "usage.output_tokens", deployment),
-        reasoning_tokens=None,  # thinking is never enabled, and the API reports no separate count for it
+        # Thinking is never enabled; a count is passed through only when the API reports one.
+        reasoning_tokens=optional_count(thinking, "usage.output_tokens_details.thinking_tokens", deployment),
         cached_input_tokens=read or 0,
     )
 

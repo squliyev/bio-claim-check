@@ -5,29 +5,30 @@
         "body": {
           "input": [
             {
-              "content": "Reply with ok set to true.",
+              "content": "Write the numbers from 1 to 200 in words, separated by commas, in the field \"numbers\".",
               "role": "user"
             }
           ],
-          "instructions": "You are a connectivity check. Answer with the requested JSON only.",
+          "instructions": "You are a connectivity check. Reply only in the requested structured form.",
           "max_output_tokens": 16,
           "model": "gpt-6.1-sol",
           "store": false,
           "text": {
             "format": {
-              "name": "PingReply",
+              "name": "CountReply",
               "schema": {
                 "additionalProperties": false,
+                "description": "A deliberately long, fictional reply: the ping reply fits inside the Responses minimum budget.",
                 "properties": {
-                  "ok": {
-                    "title": "Ok",
-                    "type": "boolean"
+                  "numbers": {
+                    "title": "Numbers",
+                    "type": "string"
                   }
                 },
                 "required": [
-                  "ok"
+                  "numbers"
                 ],
-                "title": "PingReply",
+                "title": "CountReply",
                 "type": "object"
               },
               "strict": true,
@@ -39,33 +40,193 @@
       },
       "response": {
         "body": {
+          "background": false,
+          "completed_at": null,
+          "content_filters": [
+            {
+              "blocked": false,
+              "content_filter_offsets": {
+                "check_offset": 0,
+                "end_offset": 1143,
+                "start_offset": 0
+              },
+              "content_filter_raw": [],
+              "content_filter_results": {
+                "defender_for_ai": {
+                  "details": {
+                    "evaluation": "unavailable",
+                    "evaluationReason": "missing_or_unknown_provider_evaluation_status"
+                  },
+                  "detected": false,
+                  "filtered": false
+                },
+                "hate": {
+                  "filtered": false,
+                  "severity": "safe"
+                },
+                "jailbreak": {
+                  "detected": false,
+                  "filtered": false
+                },
+                "self_harm": {
+                  "filtered": false,
+                  "severity": "safe"
+                },
+                "sexual": {
+                  "filtered": false,
+                  "severity": "safe"
+                },
+                "violence": {
+                  "filtered": false,
+                  "severity": "safe"
+                }
+              },
+              "source_type": "prompt"
+            },
+            {
+              "blocked": false,
+              "content_filter_offsets": {
+                "check_offset": 0,
+                "end_offset": 49,
+                "start_offset": 0
+              },
+              "content_filter_raw": [],
+              "content_filter_results": {
+                "defender_for_ai": {
+                  "details": {
+                    "evaluation": "unavailable",
+                    "evaluationReason": "missing_or_unknown_provider_evaluation_status"
+                  },
+                  "detected": false,
+                  "filtered": false
+                },
+                "hate": {
+                  "filtered": false,
+                  "severity": "safe"
+                },
+                "protected_material_code": {
+                  "detected": false,
+                  "filtered": false
+                },
+                "protected_material_text": {
+                  "detected": false,
+                  "filtered": false
+                },
+                "self_harm": {
+                  "filtered": false,
+                  "severity": "safe"
+                },
+                "sexual": {
+                  "filtered": false,
+                  "severity": "safe"
+                },
+                "violence": {
+                  "filtered": false,
+                  "severity": "safe"
+                }
+              },
+              "source_type": "completion"
+            }
+          ],
           "created_at": 0,
-          "id": "resp_0000000000000000000000000000000000000000000000000",
+          "error": null,
+          "frequency_penalty": 0.0,
+          "id": "resp_00000000000000000000000000000000000000000000000000",
           "incomplete_details": {
             "reason": "max_output_tokens"
           },
+          "instructions": "You are a connectivity check. Reply only in the requested structured form.",
+          "max_output_tokens": 16,
+          "max_tool_calls": null,
+          "metadata": {},
           "model": "gpt-6.1-sol",
+          "moderation": null,
           "object": "response",
           "output": [
             {
-              "id": "rs_0000000000000000000000000000000000000000000000000",
+              "content": [],
+              "encrypted_content": "gAAAAABq2njDipvIPagO2OrlCkru7EnOithcqve6R8gY6O21bwTpyp0_4YbDeOavB_PbmXtpcLz9Mo5xEHWp5xJu5_2xowDz2M3tVAWu2SxV_qYg13tL5K3cCqOnS4INMPY_Xav78lSEPYKi-DDsVkG5Ve222NFtAbjq7AUn_C0sUnE6CiqSQbF9Aa0YffF2P-wG9SyiAXcBlSUZCkT_ilRElD_4LUhGUHvaAOUI3JsEvFotpqcDzv8NXSWZCUf7TnWpbbVNHDb2LpXJtBF3GVE4VCRdyMUuH_OsUw6PJTjqHcGfYyGOB10Z9z7YvQuh7whHGbEb1NueTOWkS9p2xvAKNyNwOZsV0OGVOm2Ie0BDP35o0R5FzyecNs9KmLDRTM4Zr8_aHKiAzOOjSOOy1m-aVp4KgRIxok1z3-wTNLv0nDdfwFwCI1DgUohF9xT-7ehUzA4TC3TfppKMqmcsIam7VWxCJio23uZp8v5-kl9D8m_fGvXF_pI3BmeRrZFY-J1oGaoKj4-9giJ59UykLEQQZ9bevXlkFDjTjJFZOvRtpcjz_lwTLcj30ES7j8_oDyTpZu5iry91mzsvViBgIn8Rr8fAqJ99hlAir-uw4hIK42CB4u7jhvFMpvlkXU8yqiP_h9KAJzI7QDLAQEIBEXoxTLEgMQ8YZZ-BNCQ5X-Pfd9ddw8vIfUCxdpWa2x_92aPMtopqzFYu0Qte0xKzcp8j3Ix9kDgMSu78mj9t5JxSNUhCuObCP9OSsMH_9FEzuX4Wu_SKy8Uy5OJRH9_2NmTDkcPzwZWZCq2PdmSwYsIWzDN2bIwYMrxBMj4r-U1DEOvJvtjuQCu__IZJlPf1ETapmHscavFU5XrUcOY2ql3I8pdaVQRRwiZMhhu4hYuSdK6iI3GSbBZ8rWJFbmRc7E17GxOuBPaPMBCqLGh48nMyz92fqu7EP-HjMCrjlqPVX5uta5WjCkRmUSDCdEI1NhmyQ8fml9UzR0iIipYiwanCDnMZQ9qWpxhnWN6gsOHWKUAkSaBnStGetU3JhlY_z88xKM6UnneJ4vPFe9R9y69sDLU-3tDOwD41kh28wz2uNZ6swIbp94rLb01p2CTsH9rDphvaL35papD5OKKWrCn18WlKByt9NuqvKEio8icLF7_DaMidivjcTiCLWV8WJdivitHOWvNFjkbUGvquhBsVCtV-AmKNBtg=",
+              "id": "rs_00000000000000000000000000000000000000000000000000",
               "summary": [],
               "type": "reasoning"
             }
           ],
+          "parallel_tool_calls": true,
+          "presence_penalty": 0.0,
+          "previous_response_id": null,
+          "prompt_cache_key": null,
+          "prompt_cache_retention": "24h",
+          "reasoning": {
+            "context": "all_turns",
+            "effort": "medium",
+            "mode": "standard",
+            "summary": null
+          },
+          "safety_identifier": null,
+          "service_tier": "default",
           "status": "incomplete",
           "store": false,
+          "temperature": 1.0,
+          "text": {
+            "format": {
+              "description": null,
+              "name": "CountReply",
+              "schema": {
+                "additionalProperties": false,
+                "description": "A deliberately long, fictional reply: the ping reply fits inside the Responses minimum budget.",
+                "properties": {
+                  "numbers": {
+                    "title": "Numbers",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "numbers"
+                ],
+                "title": "CountReply",
+                "type": "object"
+              },
+              "strict": true,
+              "type": "json_schema"
+            },
+            "verbosity": "medium"
+          },
+          "tool_choice": "auto",
+          "tool_usage": {
+            "image_gen": {
+              "input_tokens": 0,
+              "input_tokens_details": {
+                "image_tokens": 0,
+                "text_tokens": 0
+              },
+              "output_tokens": 0,
+              "output_tokens_details": {
+                "image_tokens": 0,
+                "text_tokens": 0
+              },
+              "total_tokens": 0
+            },
+            "web_search": {
+              "num_requests": 0
+            }
+          },
+          "tools": [],
+          "top_logprobs": 0,
+          "top_p": 0.98,
+          "truncation": "disabled",
           "usage": {
-            "input_tokens": 41,
+            "input_tokens": 96,
             "input_tokens_details": {
+              "cache_write_tokens": 0,
               "cached_tokens": 0
             },
             "output_tokens": 16,
             "output_tokens_details": {
               "reasoning_tokens": 16
             },
-            "total_tokens": 57
-          }
+            "total_tokens": 112
+          },
+          "user": null
         },
         "headers": {
           "content-type": "application/json"
@@ -76,13 +237,15 @@
   ],
   "expected": {
     "response": {
+      "billed_usage": null,
+      "cache_hit": false,
       "deployment": "gpt-6.1-sol",
       "finish_reason": "length",
       "served_model": "gpt-6.1-sol",
       "text": "",
       "usage": {
         "cached_input_tokens": 0,
-        "input_tokens": 41,
+        "input_tokens": 96,
         "output_tokens": 16,
         "reasoning_tokens": 16
       }
@@ -91,11 +254,11 @@
   "llm_request": {
     "messages": [
       {
-        "content": "You are a connectivity check. Answer with the requested JSON only.",
+        "content": "You are a connectivity check. Reply only in the requested structured form.",
         "role": "system"
       },
       {
-        "content": "Reply with ok set to true.",
+        "content": "Write the numbers from 1 to 200 in words, separated by commas, in the field \"numbers\".",
         "role": "user"
       }
     ],
@@ -111,21 +274,22 @@
     "repeat_idx": 0,
     "response_schema": {
       "additionalProperties": false,
+      "description": "A deliberately long, fictional reply: the ping reply fits inside the Responses minimum budget.",
       "properties": {
-        "ok": {
-          "title": "Ok",
-          "type": "boolean"
+        "numbers": {
+          "title": "Numbers",
+          "type": "string"
         }
       },
       "required": [
-        "ok"
+        "numbers"
       ],
-      "title": "PingReply",
+      "title": "CountReply",
       "type": "object"
     },
-    "schema_name": "PingReply",
+    "schema_name": "CountReply",
     "seed": null
   },
-  "note": "The token cap was spent on reasoning: incomplete, LENGTH, empty text.",
-  "provenance": "synthetic"
+  "note": "A fictional long reply with a tiny output budget: the provider stops for length.",
+  "provenance": "recorded"
 }

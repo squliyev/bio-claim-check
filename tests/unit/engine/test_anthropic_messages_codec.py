@@ -136,9 +136,24 @@ def test_usage_adds_cache_reads_and_writes_back_into_input(
 
 
 @pytest.mark.parametrize(
+    ("details", "expected"),
+    [(None, None), ({}, None), ({"thinking_tokens": 0}, 0), ({"thinking_tokens": 4}, 4)],
+)
+def test_reasoning_is_the_reported_thinking_count_and_none_when_unreported(
+    details: dict[str, Any] | None, expected: int | None
+) -> None:
+    raw: dict[str, Any] = {"input_tokens": 3, "output_tokens": 5}
+    if details is not None:
+        raw["output_tokens_details"] = details
+    assert decode_usage(raw, "claude-x").reasoning_tokens == expected
+
+
+@pytest.mark.parametrize(
     "raw_usage",
     [
         {"output_tokens": 5},
+        {"input_tokens": 1, "output_tokens": 1, "output_tokens_details": {"thinking_tokens": 2}},
+        {"input_tokens": 1, "output_tokens": 1, "output_tokens_details": []},
         {"input_tokens": 1, "output_tokens": "5"},
         {"input_tokens": 1, "output_tokens": 1, "cache_read_input_tokens": -1},
     ],

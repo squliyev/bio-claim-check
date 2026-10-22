@@ -11,7 +11,7 @@ import httpx2
 import openai
 import pytest
 from tests.support.llm import response, spec
-from tests.support.llm_fixtures import LLM_FIXTURES
+from tests.support.llm_fixtures import LLM_FIXTURES, load_fixture
 from typer.testing import CliRunner
 
 from bio_claim_check.app import cli
@@ -121,9 +121,15 @@ def test_default_pings_the_answer_and_verifier_deployments(
     assert lines[0].startswith(
         "ok   gpt-6.1-sol (pinned 2026-09-29): served=gpt-6.1-sol finish=stop attempts=1"
     )
-    assert "in=41 out=18 reasoning=10 cached=0" in lines[0]
-    assert lines[1].startswith("ok   claude-opus-4-8 (pinned ")
-    assert "reasoning=None" in lines[1]
+    for line, provider in zip(lines, ("foundry_openai", "foundry_anthropic"), strict=True):
+        expected = load_fixture(LLM_FIXTURES / provider / "ok.json").expected
+        assert expected is not None
+        u = expected.usage
+        assert line.endswith(
+            f"in={u.input_tokens} out={u.output_tokens} reasoning={u.reasoning_tokens} "
+            f"cached={u.cached_input_tokens}"
+        )
+    assert lines[1].startswith("ok   claude-opus-4-8 (pinned claude-opus-4-8)")
 
 
 def test_a_provider_failure_exits_provider_and_names_the_code(

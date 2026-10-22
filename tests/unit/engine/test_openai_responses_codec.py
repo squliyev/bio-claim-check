@@ -180,6 +180,8 @@ def test_usage_shapes_normalise_and_unreported_reasoning_stays_none(
         {"input_tokens": 1, "output_tokens": 5, "input_tokens_details": {"cached_tokens": 2}},
         {"input_tokens": 1, "output_tokens": 1, "output_tokens_details": {"reasoning_tokens": 2}},
         {"input_tokens": 1, "output_tokens": 1, "output_tokens_details": "x"},
+        {"input_tokens": 10, "output_tokens": 5, "total_tokens": 16},
+        {"input_tokens": 10, "output_tokens": 5, "total_tokens": -15},
     ],
 )
 def test_impossible_usage_is_an_unexpected_response(raw_usage: dict[str, Any]) -> None:

@@ -3,15 +3,15 @@
     {
       "request": {
         "body": {
-          "max_tokens": 256,
+          "max_tokens": 8192,
           "messages": [
             {
-              "content": "Reply with ok set to true.",
+              "content": "This is a test message. Set \"ok\" to true.",
               "role": "user"
             }
           ],
           "model": "claude-opus-4-8",
-          "system": "You are a connectivity check. Answer with the requested JSON only.",
+          "system": "You are a connectivity check. Reply only in the requested structured form.",
           "tool_choice": {
             "name": "PingReply",
             "type": "tool"
@@ -41,8 +41,12 @@
       },
       "response": {
         "body": {
+          "container": null,
           "content": [
             {
+              "caller": {
+                "type": "direct"
+              },
               "id": "toolu_000000000000000000000000",
               "input": {
                 "ok": true
@@ -51,18 +55,29 @@
               "type": "tool_use"
             }
           ],
+          "diagnostics": null,
           "id": "msg_000000000000000000000000",
           "model": "claude-opus-4-8",
           "role": "assistant",
+          "stop_details": null,
           "stop_reason": "tool_use",
           "stop_sequence": null,
           "type": "message",
           "usage": {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 0
+            },
             "cache_creation_input_tokens": 0,
             "cache_read_input_tokens": 0,
-            "input_tokens": 620,
-            "output_tokens": 38,
-            "service_tier": "standard"
+            "inference_geo": "global",
+            "input_tokens": 563,
+            "output_tokens": 33,
+            "output_tokens_details": {
+              "thinking_tokens": 0
+            },
+            "service_tier": "standard",
+            "speed": "standard"
           }
         },
         "headers": {
@@ -74,38 +89,44 @@
   ],
   "expected": {
     "response": {
+      "billed_usage": null,
+      "cache_hit": false,
       "deployment": "claude-opus-4-8",
       "finish_reason": "stop",
       "served_model": "claude-opus-4-8",
       "text": "{\"ok\":true}",
       "usage": {
         "cached_input_tokens": 0,
-        "input_tokens": 620,
-        "output_tokens": 38,
-        "reasoning_tokens": null
+        "input_tokens": 563,
+        "output_tokens": 33,
+        "reasoning_tokens": 0
       }
     }
   },
   "llm_request": {
     "messages": [
       {
-        "content": "You are a connectivity check. Answer with the requested JSON only.",
+        "content": "You are a connectivity check. Reply only in the requested structured form.",
         "role": "system"
       },
       {
-        "content": "Reply with ok set to true.",
+        "content": "This is a test message. Set \"ok\" to true.",
         "role": "user"
       }
     ],
     "model": {
       "deployment": "claude-opus-4-8",
-      "model_version": "synthetic",
+      "model_version": "claude-opus-4-8",
       "provider": "foundry_anthropic"
     },
     "params": {
-      "max_output_tokens": 256
+      "max_output_tokens": 8192
     },
-    "prompt": null,
+    "prompt": {
+      "name": "ping",
+      "sha256": "e4049a889063ff18bc0ecf03955ca7dcd480a6c838c17a8c31a476f15278f388",
+      "version": 1
+    },
     "repeat_idx": 0,
     "response_schema": {
       "additionalProperties": false,
@@ -124,6 +145,6 @@
     "schema_name": "PingReply",
     "seed": null
   },
-  "note": "Forced tool call carrying the structured answer.",
-  "provenance": "synthetic"
+  "note": "The ping request answered normally (structured output, usage).",
+  "provenance": "recorded"
 }

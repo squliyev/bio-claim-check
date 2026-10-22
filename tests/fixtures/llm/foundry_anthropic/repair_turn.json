@@ -1,0 +1,166 @@
+{
+  "exchanges": [
+    {
+      "request": {
+        "body": {
+          "max_tokens": 8192,
+          "messages": [
+            {
+              "content": "This is a test message. Set \"ok\" to true.",
+              "role": "user"
+            },
+            {
+              "content": "{\"ok\": \"maybe\"}",
+              "role": "assistant"
+            },
+            {
+              "content": "Your previous reply did not match the required JSON schema. Problems: ok [bool_parsing]. Reply again with only the corrected JSON object.",
+              "role": "user"
+            }
+          ],
+          "model": "claude-opus-4-8",
+          "system": "You are a connectivity check. Reply only in the requested structured form.",
+          "tool_choice": {
+            "name": "PingReply",
+            "type": "tool"
+          },
+          "tools": [
+            {
+              "description": "Record the answer as PingReply.",
+              "input_schema": {
+                "additionalProperties": false,
+                "properties": {
+                  "ok": {
+                    "title": "Ok",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ok"
+                ],
+                "title": "PingReply",
+                "type": "object"
+              },
+              "name": "PingReply"
+            }
+          ]
+        },
+        "path": "/anthropic/v1/messages"
+      },
+      "response": {
+        "body": {
+          "container": null,
+          "content": [
+            {
+              "caller": {
+                "type": "direct"
+              },
+              "id": "toolu_000000000000000000000000",
+              "input": {
+                "ok": true
+              },
+              "name": "PingReply",
+              "type": "tool_use"
+            }
+          ],
+          "diagnostics": null,
+          "id": "msg_000000000000000000000000",
+          "model": "claude-opus-4-8",
+          "role": "assistant",
+          "stop_details": null,
+          "stop_reason": "tool_use",
+          "stop_sequence": null,
+          "type": "message",
+          "usage": {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 0
+            },
+            "cache_creation_input_tokens": 0,
+            "cache_read_input_tokens": 0,
+            "inference_geo": "global",
+            "input_tokens": 625,
+            "output_tokens": 33,
+            "output_tokens_details": {
+              "thinking_tokens": 0
+            },
+            "service_tier": "standard",
+            "speed": "standard"
+          }
+        },
+        "headers": {
+          "content-type": "application/json"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "expected": {
+    "response": {
+      "billed_usage": null,
+      "cache_hit": false,
+      "deployment": "claude-opus-4-8",
+      "finish_reason": "stop",
+      "served_model": "claude-opus-4-8",
+      "text": "{\"ok\":true}",
+      "usage": {
+        "cached_input_tokens": 0,
+        "input_tokens": 625,
+        "output_tokens": 33,
+        "reasoning_tokens": 0
+      }
+    }
+  },
+  "llm_request": {
+    "messages": [
+      {
+        "content": "You are a connectivity check. Reply only in the requested structured form.",
+        "role": "system"
+      },
+      {
+        "content": "This is a test message. Set \"ok\" to true.",
+        "role": "user"
+      },
+      {
+        "content": "{\"ok\": \"maybe\"}",
+        "role": "assistant"
+      },
+      {
+        "content": "Your previous reply did not match the required JSON schema. Problems: ok [bool_parsing]. Reply again with only the corrected JSON object.",
+        "role": "user"
+      }
+    ],
+    "model": {
+      "deployment": "claude-opus-4-8",
+      "model_version": "claude-opus-4-8",
+      "provider": "foundry_anthropic"
+    },
+    "params": {
+      "max_output_tokens": 8192
+    },
+    "prompt": {
+      "name": "ping",
+      "sha256": "e4049a889063ff18bc0ecf03955ca7dcd480a6c838c17a8c31a476f15278f388",
+      "version": 1
+    },
+    "repeat_idx": 0,
+    "response_schema": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "title": "PingReply",
+      "type": "object"
+    },
+    "schema_name": "PingReply",
+    "seed": null
+  },
+  "note": "A repair turn: the earlier reply and the runner's correction go back as plain messages, no ids.",
+  "provenance": "recorded"
+}

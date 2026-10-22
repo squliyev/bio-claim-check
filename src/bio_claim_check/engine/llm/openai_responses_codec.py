@@ -82,10 +82,15 @@ def decode_usage(raw_usage: Mapping[str, JsonValue], deployment: str) -> Usage:
         if output_details is not None
         else None
     )
+    input_tokens = count(raw_usage.get("input_tokens"), "usage.input_tokens", deployment)
+    output_tokens = count(raw_usage.get("output_tokens"), "usage.output_tokens", deployment)
+    total = optional_count(raw_usage.get("total_tokens"), "usage.total_tokens", deployment)
+    if total is not None and total != input_tokens + output_tokens:
+        raise unexpected(deployment, "usage.total_tokens", "is not input_tokens + output_tokens")
     return usage(
         deployment,
-        input_tokens=count(raw_usage.get("input_tokens"), "usage.input_tokens", deployment),
-        output_tokens=count(raw_usage.get("output_tokens"), "usage.output_tokens", deployment),
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
         reasoning_tokens=optional_count(
             reasoning, "usage.output_tokens_details.reasoning_tokens", deployment
         ),
