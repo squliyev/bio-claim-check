@@ -5,6 +5,9 @@ subprocess (I31, ``tests/support/netblock``). ``live`` tests keep only ``BCC_CON
 environment, because Europe PMC asks for a contact address.
 
 ``--update-golden`` rewrites golden files and fails the test on purpose; it is refused when ``CI`` is set.
+``--record-llm`` lets ``tests/live/test_llm_record.py`` rewrite the recorded LLM fixtures (``make
+record-llm``); also refused in CI. Live LLM tests read the repository's ``.env`` by explicit path
+(``live_env_file``), because every test runs in a temporary working directory.
 
 Hypothesis profiles: ``dev`` (default) and ``ci`` (derandomized, more examples), chosen with
 ``HYPOTHESIS_PROFILE``. An unknown name raises, so a typo cannot silently fall back to ``dev``.
@@ -13,6 +16,7 @@ Hypothesis profiles: ``dev`` (default) and ``ci`` (derandomized, more examples),
 import logging
 import os
 from collections.abc import Iterable, Iterator, Mapping
+from pathlib import Path
 
 import pytest
 from hypothesis import settings
@@ -34,6 +38,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         help="Rewrite golden files, then fail on purpose so a regenerated file is never a silent pass.",
     )
+    parser.addoption(
+        "--record-llm",
+        action="store_true",
+        help="Record real Foundry exchanges into tests/fixtures/llm (live, costs tokens; refused in CI).",
+    )
 
 
 @pytest.fixture
@@ -43,6 +52,21 @@ def update_golden(request: pytest.FixtureRequest) -> bool:
     if os.environ.get("CI"):
         pytest.fail("--update-golden is refused in CI; regenerate locally and review the diff")
     return True
+
+
+@pytest.fixture
+def record_llm(request: pytest.FixtureRequest) -> bool:
+    if not request.config.getoption("--record-llm"):
+        return False
+    if os.environ.get("CI"):
+        pytest.fail("--record-llm is refused in CI; record locally and review the diff")
+    return True
+
+
+@pytest.fixture
+def live_env_file(request: pytest.FixtureRequest) -> Path:
+    """The repository's `.env`: live LLM tests need the Foundry settings the maintainer keeps there."""
+    return request.config.rootpath / ".env"
 
 
 def is_live(keywords: Mapping[str, object]) -> bool:

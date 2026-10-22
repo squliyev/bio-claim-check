@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 UV ?= uv
 
-.PHONY: help sync lint format typecheck arch graph test cov cov-core live schemas verify hooks secrets up down clean
+.PHONY: help sync lint format typecheck arch graph test cov cov-core live record-llm schemas verify hooks secrets up down clean
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-10s %s\n", $$1, $$2}'
@@ -33,6 +33,9 @@ test:  ## Offline tests (everything except `live`)
 
 live:  ## Opt-in real-API checks (`live` marker; needs BCC_CONTACT_EMAIL; never in CI)
 	$(UV) run pytest -m live -p no:cacheprovider --log-cli-level=INFO
+
+record-llm:  ## Rewrite the recorded LLM fixtures from real Foundry calls (needs .env; costs tokens; never in CI)
+	$(UV) run pytest tests/live/test_llm_record.py -m live -p no:cacheprovider --record-llm --log-cli-level=INFO
 
 cov:  ## Offline tests with branch coverage
 	$(UV) run pytest -m "not live" --cov --cov-report=term-missing
