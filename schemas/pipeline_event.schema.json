@@ -1,0 +1,487 @@
+{
+  "$defs": {
+    "LlmCallFailed": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "attempts": {
+          "minimum": 0,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "error_code": {
+          "title": "Error Code",
+          "type": "string"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Kind"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "type": {
+          "const": "llm.call_failed",
+          "default": "llm.call_failed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "agent",
+        "model",
+        "error_code",
+        "kind",
+        "attempts"
+      ],
+      "title": "LlmCallFailed",
+      "type": "object"
+    },
+    "LlmCallFinished": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "cache_hit": {
+          "title": "Cache Hit",
+          "type": "boolean"
+        },
+        "cached_input_tokens": {
+          "minimum": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "finish_reason": {
+          "title": "Finish Reason",
+          "type": "string"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        },
+        "reasoning_tokens": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reasoning Tokens"
+        },
+        "served_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Served Model"
+        },
+        "type": {
+          "const": "llm.call_finished",
+          "default": "llm.call_finished",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "agent",
+        "model",
+        "attempt",
+        "finish_reason",
+        "cache_hit",
+        "served_model",
+        "input_tokens",
+        "output_tokens",
+        "reasoning_tokens",
+        "cached_input_tokens"
+      ],
+      "title": "LlmCallFinished",
+      "type": "object"
+    },
+    "LlmCallStarted": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "prompt_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prompt Sha256"
+        },
+        "repeat_idx": {
+          "minimum": 0,
+          "title": "Repeat Idx",
+          "type": "integer"
+        },
+        "request_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Request Hash",
+          "type": "string"
+        },
+        "type": {
+          "const": "llm.call_started",
+          "default": "llm.call_started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "agent",
+        "model",
+        "attempt",
+        "repeat_idx",
+        "request_hash",
+        "prompt_sha256"
+      ],
+      "title": "LlmCallStarted",
+      "type": "object"
+    },
+    "LlmRepairRequested": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent"
+        },
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "attempt": {
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "problems": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Problems",
+          "type": "array"
+        },
+        "type": {
+          "const": "llm.repair_requested",
+          "default": "llm.repair_requested",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "agent",
+        "model",
+        "attempt",
+        "problems"
+      ],
+      "title": "LlmRepairRequested",
+      "type": "object"
+    },
+    "LlmRetryScheduled": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "delay_s": {
+          "minimum": 0,
+          "title": "Delay S",
+          "type": "number"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "maximum": 599,
+              "minimum": 100,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Status"
+        },
+        "transport_attempt": {
+          "minimum": 1,
+          "title": "Transport Attempt",
+          "type": "integer"
+        },
+        "type": {
+          "const": "llm.retry_scheduled",
+          "default": "llm.retry_scheduled",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "model",
+        "transport_attempt",
+        "status",
+        "delay_s"
+      ],
+      "title": "LlmRetryScheduled",
+      "type": "object"
+    },
+    "ModelRef": {
+      "additionalProperties": false,
+      "description": "Which model an LLM event is about: provider, deployment and pinned version (primitives only).",
+      "properties": {
+        "deployment": {
+          "title": "Deployment",
+          "type": "string"
+        },
+        "model_version": {
+          "title": "Model Version",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "deployment",
+        "model_version"
+      ],
+      "title": "ModelRef",
+      "type": "object"
+    },
+    "StageFailed": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "error_code": {
+          "title": "Error Code",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "type": {
+          "const": "stage.failed",
+          "default": "stage.failed",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "stage",
+        "error_code"
+      ],
+      "title": "StageFailed",
+      "type": "object"
+    },
+    "StageFinished": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "type": {
+          "const": "stage.finished",
+          "default": "stage.finished",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "stage"
+      ],
+      "title": "StageFinished",
+      "type": "object"
+    },
+    "StageStarted": {
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "type": {
+          "const": "stage.started",
+          "default": "stage.started",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "stage"
+      ],
+      "title": "StageStarted",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "llm.call_failed": "#/$defs/LlmCallFailed",
+      "llm.call_finished": "#/$defs/LlmCallFinished",
+      "llm.call_started": "#/$defs/LlmCallStarted",
+      "llm.repair_requested": "#/$defs/LlmRepairRequested",
+      "llm.retry_scheduled": "#/$defs/LlmRetryScheduled",
+      "stage.failed": "#/$defs/StageFailed",
+      "stage.finished": "#/$defs/StageFinished",
+      "stage.started": "#/$defs/StageStarted"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/StageStarted"
+    },
+    {
+      "$ref": "#/$defs/StageFinished"
+    },
+    {
+      "$ref": "#/$defs/StageFailed"
+    },
+    {
+      "$ref": "#/$defs/LlmCallStarted"
+    },
+    {
+      "$ref": "#/$defs/LlmCallFinished"
+    },
+    {
+      "$ref": "#/$defs/LlmRepairRequested"
+    },
+    {
+      "$ref": "#/$defs/LlmCallFailed"
+    },
+    {
+      "$ref": "#/$defs/LlmRetryScheduled"
+    }
+  ]
+}

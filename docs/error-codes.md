@@ -39,7 +39,12 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `files.read` | `ReadError` | A file cannot be read as UTF-8 text |
 | `llm.call_failed` | `LlmCallError` | A structured LLM call produced no usable output |
 | `llm.processor_contract` | `ProcessorContractError` | A pipeline processor changed a field the runner owns (a bug) |
+| `llm.prompt_filtered` | `LlmPromptFilteredError` | The provider's content filter rejected the prompt (HTTP 400); recorded as an unmeasured, content-filtered call |
+| `llm.provider_rejected` | `LlmProviderError` | The provider refused the request permanently (auth, not found, bad request); never retried |
+| `llm.transport` | `LlmTransportError` | The provider could not be reached, or kept failing transiently, after the bounded retries |
+| `llm.unexpected_response` | `LlmUnexpectedResponseError` | A provider response in a shape the codec does not know (fail closed) |
 | `llm.unknown_deployment` | `UnknownDeploymentError` | A deployment name is not in the model catalogue |
+| `llm.unsupported_request` | `LlmRequestError` | A request the backend cannot send faithfully (unknown param, a seed, a non-strict schema, an invalid tool name) |
 | `prompts.render` | `PromptRenderError` | Template placeholders and variables differ |
 | `retrieval.failed` | `RetrievalError` | The literature database failed or sent a malformed response |
 | `retrieval.malformed_record` | `MalformedRecordError` | A record field has a type the API was not seen to return |

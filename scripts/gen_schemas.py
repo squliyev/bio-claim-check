@@ -8,6 +8,7 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
+from bio_claim_check.app.events import pipeline_event_json_schema
 from bio_claim_check.common.canonical_json import pretty_json
 from bio_claim_check.features.contracts.rulepack import rulepack_json_schema
 from bio_claim_check.features.contracts.verdict import verifier_output_json_schema
@@ -15,6 +16,7 @@ from bio_claim_check.features.contracts.verdict import verifier_output_json_sche
 SCHEMAS: dict[str, Callable[[], dict[str, JsonValue]]] = {
     "verifier_output.schema.json": verifier_output_json_schema,
     "rulepack.schema.json": rulepack_json_schema,
+    "pipeline_event.schema.json": pipeline_event_json_schema,
 }
 
 

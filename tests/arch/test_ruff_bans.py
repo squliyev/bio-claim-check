@@ -1,6 +1,7 @@
 """The ruff TID251 bans behave as documented: active in src/, relaxed only where intended."""
 
 import subprocess
+import tomllib
 
 import pytest
 
@@ -88,3 +89,19 @@ def test_json_serialisation_banned_outside_canonical_json(source: str) -> None:
     assert _tid251("src/bio_claim_check/features/report/x.py", source)
     assert not _tid251("src/bio_claim_check/common/canonical_json.py", source)
     assert not _tid251("src/bio_claim_check/common/x.py", "import json\njson.loads('{}')\n")
+
+
+def test_ban_exemptions_in_src_are_exactly_the_named_modules() -> None:
+    """Each src exemption is one named module with an ADR (json.dumps: ADR 0013; wall clock: ADR 0016)."""
+    lint = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["ruff"]["lint"]
+    exempt = {path for path, rules in lint["per-file-ignores"].items() if "TID251" in rules}
+    assert {p for p in exempt if p.startswith("src/")} == {
+        "src/bio_claim_check/common/canonical_json.py",
+        "src/bio_claim_check/common/system_clock.py",
+    }
+
+
+def test_the_system_clock_is_the_one_wall_clock_exemption() -> None:
+    source = "from datetime import UTC, datetime\ndatetime.now(UTC)\n"
+    assert not _tid251("src/bio_claim_check/common/system_clock.py", source)
+    assert _tid251("src/bio_claim_check/common/scripted_clock.py", source)

@@ -84,12 +84,14 @@ class LlmResponse(ValidatedModel):
     `cache_hit` and `billed_usage` are set by the caching client and never stored in the cache:
     a hit was not paid for by this run; `billed_usage` is set only when this run paid for a live call but
     another writer stored its answer first (first write wins), so the text is theirs and the bill is ours.
+    `served_model` is the model name the provider reported (provenance only; not in the cache key).
     """
 
     text: str
     usage: Usage
     finish_reason: FinishReason
     deployment: NonBlankStr
+    served_model: NonBlankStr | None = None
     cache_hit: bool = False
     billed_usage: Usage | None = None
 

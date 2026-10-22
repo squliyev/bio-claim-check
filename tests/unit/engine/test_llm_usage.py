@@ -124,3 +124,12 @@ def test_one_unpriced_live_call_makes_the_whole_cost_unknown_for_good() -> None:
     spend = spend.record(paid=used, usage=used, price=PRICE).record(paid=None, usage=used, price=PRICE)
     assert spend.cost is None
     assert spend.calls == 2
+
+
+def test_an_unmeasured_call_adds_no_tokens_and_makes_cost_unknown() -> None:
+    spent = Spend().record_unmeasured()
+    assert (spent.calls, spent.unmeasured_calls, spent.cost, spent.usage) == (0, 1, None, Usage.zero())
+    after = spent.record(paid=Usage(input_tokens=1), usage=Usage(input_tokens=1), price=None)
+    assert after.unmeasured_calls == 1
+    hit = spent.record(paid=None, usage=Usage(input_tokens=1), price=None)
+    assert (hit.unmeasured_calls, hit.cache_hits) == (1, 1)

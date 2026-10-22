@@ -8,7 +8,8 @@ from tests.support.llm import IDENTITY, request, response, user
 
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError, CacheMode
-from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient, llm_cache_key
+from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient
+from bio_claim_check.engine.llm.llm_cache_key import llm_cache_key
 from bio_claim_check.engine.llm.messages import LlmRequest, LlmResponse, PromptRef
 from bio_claim_check.engine.llm.model_spec import Provider
 from bio_claim_check.engine.llm.scripted_llm_client import ScriptedLlmClient

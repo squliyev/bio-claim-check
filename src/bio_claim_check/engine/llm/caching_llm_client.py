@@ -13,17 +13,12 @@ from typing import override
 from pydantic import ValidationError
 
 from bio_claim_check.engine.cache.base_cache import BaseCache
-from bio_claim_check.engine.cache.policy import CacheError, CacheMode, cache_key, fetch_through_result
+from bio_claim_check.engine.cache.policy import CacheError, CacheMode, fetch_through_result
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
+from bio_claim_check.engine.llm.llm_cache_key import NAMESPACE, llm_cache_key
 from bio_claim_check.engine.llm.messages import LlmRequest, LlmResponse
 
-NAMESPACE = "llm.complete"
-KEY_VERSION = 1
 _NOT_STORED = frozenset({"cache_hit", "billed_usage"})
-
-
-def llm_cache_key(request: LlmRequest) -> str:
-    return cache_key(NAMESPACE, KEY_VERSION, request.cache_payload())
 
 
 class CachingLlmClient(BaseLlmClient):

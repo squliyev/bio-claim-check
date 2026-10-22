@@ -105,7 +105,9 @@ class Spend(ValidatedModel):
     """What a run paid for: live calls only. Replayed (cache-hit) calls are counted, but cost nothing.
 
     `cost` becomes None as soon as one live call is unpriced and stays None: a partial sum would read
-    as the full cost.
+    as the full cost. An *unmeasured* call reached the provider but returned no usage (e.g. a prompt
+    rejected by a content filter with HTTP 400): it is counted in `unmeasured_calls`, adds nothing to
+    `usage` (never an invented 0), and makes `cost` None, because what it was billed is unknown.
     """
 
     calls: NonNegInt = 0
@@ -113,6 +115,7 @@ class Spend(ValidatedModel):
     cost: Money | None = Decimal(0)
     cache_hits: NonNegInt = 0
     replayed_usage: Usage = Field(default_factory=Usage.zero)
+    unmeasured_calls: NonNegInt = 0
 
     def record(self, *, paid: Usage | None, usage: Usage, price: Price | None) -> Self:
         """Add one call: `paid` is what this run was billed for, None for a cache hit.
@@ -126,6 +129,7 @@ class Spend(ValidatedModel):
                 cost=self.cost,
                 cache_hits=self.cache_hits + 1,
                 replayed_usage=self.replayed_usage + usage,
+                unmeasured_calls=self.unmeasured_calls,
             )
         added = cost(paid, price)
         return type(self)(
@@ -134,4 +138,16 @@ class Spend(ValidatedModel):
             cost=None if self.cost is None or added is None else self.cost + added,
             cache_hits=self.cache_hits,
             replayed_usage=self.replayed_usage,
+            unmeasured_calls=self.unmeasured_calls,
+        )
+
+    def record_unmeasured(self) -> Self:
+        """Add one live call whose usage the provider did not report; its cost is unknown."""
+        return type(self)(
+            calls=self.calls,
+            usage=self.usage,
+            cost=None,
+            cache_hits=self.cache_hits,
+            replayed_usage=self.replayed_usage,
+            unmeasured_calls=self.unmeasured_calls + 1,
         )
