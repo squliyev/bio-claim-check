@@ -46,6 +46,21 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   calls and their cost. A cache hit adds no cost.
 - **Unpriced:** a model has no price on record, so the cost is unknown (`None`), never shown as 0.
   Prices are entered by hand, with the date and the page they came from.
+- **Served model:** the model name the provider reports in its reply (`LlmResponse.served_model`).
+  Provenance only: it is not in the cache key; the pinned `model_version` is.
+- **Forced tool use:** how Claude returns structured output here: one tool whose input schema is the
+  output schema, and `tool_choice` naming it. Its input becomes the reply text. Thinking is off
+  ([ADR 0014](./adr/0014-provider-adapters-and-pinned-models.md)).
+- **Structured-output matrix:** the table in ADR 0014 of how each deployment returns structured output
+  and whether that was probed live.
+- **Recorded / synthetic fixture:** a recorded fixture is a scrubbed live exchange with fictional text; a
+  synthetic one is built by hand from the documented shape, for states that cannot be provoked honestly
+  (filters, refusals, throttling). Every fixture says which it is.
+- **Agent:** a subclass of `BaseLlmAgent`: a name, a prompt, an output model and one `variables` method.
+  It runs through the one `LlmRunner` ([ADR 0015](./adr/0015-llm-agent-base.md)).
+- **Pipeline event:** a typed, timestamped record of what a run did (a stage started, an LLM attempt
+  finished with its usage, a retry was scheduled). It carries ids, counts and codes, never text, and is
+  never part of a canonical artifact ([ADR 0016](./adr/0016-pipeline-events-and-clock.md)).
 - **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
   report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
 

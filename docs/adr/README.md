@@ -42,6 +42,9 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | ADR | Title | Status | Resolves |
 |---|---|---|---|
 | [0012](./0012-llm-engine-runner-and-cost.md) | LLM engine: one runner, one repair, a complete cache key and honest cost | Accepted | What every model call does, in which order; how repeats, failures and money are counted |
+| [0014](./0014-provider-adapters-and-pinned-models.md) | Provider adapters: pure codecs, pinned models, deterministic retries | Accepted | How a request reaches Foundry; how usage, finish states and failures are read; which models are pinned |
+| [0015](./0015-llm-agent-base.md) | One base for every LLM agent | Accepted | How an LLM agent is declared and run; what provenance every agent request carries |
+| [0016](./0016-pipeline-events-and-clock.md) | Pipeline events without content, and one injected clock | Accepted | What a run reports while it works; what an event may never contain; where time comes from |
 
 ## Superseded / historical
 

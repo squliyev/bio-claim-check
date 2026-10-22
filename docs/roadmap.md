@@ -5,7 +5,7 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S08b done):** S01–S08b are done. Next is **S09**, provider adapters.
+**Status (S09 done):** S01–S09 are done. Next is **S10**, the answer agent.
 
 ## Product
 
@@ -80,9 +80,9 @@ can be contributed here as their own credited rule pack. No results from this re
 | S07b | Sieve v2, pre-registration tag, frozen and sealed dataset, dev audit tooling | ✅ |
 | S08 | LLM engine core: runner, processors, one repair, cache key with repeat index and model identity, honest cost | ✅ |
 | S08b | Retrofit: canonical JSON, typed errors with codes, exit-code enum, redacted logging, unreported reasoning = `None` | ✅ |
-| S09 | Provider adapters (see below) | ⏳ next |
-| S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | |
-| S11 | Events, manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | |
+| S09 | Provider adapters, the LLM agent base and the pipeline event vocabulary (see below) | ✅ |
+| S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | ⏳ next |
+| S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | |
 | S12 | Verifier prompt, context isolation, dev smoke gold set in CI, model-family independence, first live `run`, retraction re-check; tag `prompts-frozen-v1` | |
 
 ### Phase C — Measurement
@@ -110,7 +110,7 @@ can be contributed here as their own credited rule pack. No results from this re
 | S24 | 1.0 release: public repo, DOI, credits |
 | H1 | Hackathon prep: trap papers, offline demo, pitch, disclosure |
 
-### S09 — provider adapters (next)
+### S09 — provider adapters (done)
 
 - An OpenAI-compatible client for the Azure AI Foundry `/openai/v1` surface (strict `json_schema`
   structured output) and an Anthropic client via `AnthropicFoundry` (forced tool use). Ollama pinned by
@@ -129,6 +129,10 @@ can be contributed here as their own credited rule pack. No results from this re
   structured-output support matrix.
 - **Exit:** live ping passes for every deployment; the shared LLM client contract suite passes offline on
   recorded fixtures for each provider.
+- **Done (see [dev-log S09](dev-log/S09.md)):** gpt-6.1-sol and claude-opus-4-8 pass live ping; Kimi
+  deferred (backlog A10). Pulled forward by the maintainer: the `BaseLlmAgent` base (ADR 0015) and the
+  pipeline event vocabulary with its emitters and an injected clock (ADR 0016). S11 keeps the
+  `events.jsonl` sink, run events, manifest, ledger and budgets.
 
 ## Dependencies
 

@@ -25,6 +25,7 @@ type Policy = Literal["core", "driver"]
 DIRECT_DEPENDENCIES: dict[str, tuple[str, Policy]] = {
     "anthropic": ("anthropic", "driver"),
     "httpx": ("httpx", "driver"),
+    "httpx2": ("httpx2", "driver"),
     "openai": ("openai", "driver"),
     "pydantic": ("pydantic", "core"),
     "pydantic-settings": ("pydantic_settings", "driver"),

@@ -18,7 +18,12 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | A5b | As a researcher, I want a validated rule-pack format with a shipped seed pack, so that I can propose how papers in my field get misread without writing code | ✅ |
 | A6 | As a reviewer, I want an end-to-end run on fakes, so that the structure is proven before any provider exists | ✅ |
 | A7 | As a contributor, I want one obvious shape for ports and backends and rules that describe kinds, so that a new slice or backend passes the architecture checks without anyone editing them | ✅ |
-| A8 | As a scientist, I want every model call to take one readable path with distinct repeats, at most one repair and honest cost (unknown, never $0), so that instability and spend are measured, not hidden | ✅ (S08: engine on scripted and cached clients; provider backends in S09; prices entered by the user) |
+| A8 | As a scientist, I want every model call to take one readable path with distinct repeats, at most one repair and honest cost (unknown, never $0), so that instability and spend are measured, not hidden | ✅ (S08: engine on scripted and cached clients; S09: Foundry backends for gpt and Claude, live ping, recorded fixtures, pipeline events; prices entered by the user) |
+| A10 | As a scientist, I want the Kimi deployment adapted and its structured-output support probed, so that the trap generator's model is checked like the others | ⏸ (deferred in S09 by the maintainer; stays in the catalogue, excluded from `llm ping`) |
+| A11 | As a maintainer, I want the Europe PMC retry helper to use `engine/llm/transport_policy`, so that there is one deterministic retry policy | ⏸ |
+| A12 | As a scientist, I want the Anthropic prompt-filter error shape recorded and handled, and the billing of prompt-filtered calls confirmed, so that filtered Claude calls are counted like gpt's | ⏸ (only the OpenAI 400 `content_filter` shape is known; ADR 0014 open items) |
+| A13 | As a maintainer, I want provider cache-write tokens (`input_tokens_details.cache_write_tokens`) priced once prices exist, so that cost stays honest | ⏸ (inside input; ignored while prices are `None`) |
+| A14 | As a scientist, I want a failed call's spend to survive every exception path (a re-raised client error after a billed attempt; a timeout or unexpected response counted as unmeasured), so that no paid attempt drops out of `Spend` | ⏳ (S11, with the ledger; found by the S09 implementation review) |
 | A9 | As a reviewer, I want one canonical JSON serialiser, typed errors with stable documented codes and exit codes, and redacted stderr logs, so that hashes cannot drift, failures are nameable and no secret reaches a log | ✅ (S08b: no output byte, hash, golden or seal changed; central exit mapping in S16) |
 
 ## Feature B — Real adapters and the product
@@ -29,6 +34,7 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | B2 | As a scientist, I want a held-out test split sealed before any tuning, so that results are not tuned to the test | ✅ (S07b: sealed; test audit by the author after the S12 prompt freeze) |
 | B2b | As a scientist, I want `surrogate_as_clinical` as a scored trap kind (biomarker or imaging result stated as a clinical benefit), so that the most common spin type in drug trials is covered | ⏸ (sieve precision too low in the consult, ~15 test candidates; S13 generates it as an unscored pitch example. Scoring it needs sieve v3 + a new ADR) |
 | B3 | As a user, I want `bio-claim-check run "<question>"` to give a per-claim trust report | ⏳ |
+| B4 | As a user, I want the S17 Streamlit UI layered as protocol → pure fold → render, so that the UI logic is tested offline without Streamlit | ⏳ (S17. Design note from S09: `app/ui/protocol.py` reads `events.jsonl` and artifacts through `app/events.parse_event`; `run_view.py` is a pure, total fold of events + artifacts into a `RunView`; `classify.py` splits the trace (stages, retries, repairs, usage) from the deliverable (verdict, quotes, disposition); `page.py` only renders and is the one `streamlit` importer, guarded by an import-linter contract. No streaming: the UI reads a finished run) |
 
 ## Feature C — Measurement
 

@@ -181,3 +181,15 @@ def test_a_cache_hit_is_visible_on_the_finished_event() -> None:
     finished = sink.events[1]
     assert isinstance(finished, LlmCallFinished)
     assert finished.cache_hit
+
+
+def test_a_lost_cache_race_reports_what_this_run_paid() -> None:
+    stored = Usage(input_tokens=10, output_tokens=4)
+    billed = Usage(input_tokens=12, output_tokens=6)
+    lost = LlmResponse.model_validate(
+        {**response(usage=stored).model_dump(), "billed_usage": billed.model_dump()}
+    )
+    sink, _ = run(ScriptedLlmClient([lost]))
+    finished = sink.events[1]
+    assert isinstance(finished, LlmCallFinished)
+    assert (finished.input_tokens, finished.output_tokens, finished.cache_hit) == (12, 6, False)

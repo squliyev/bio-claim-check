@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "anthropic>=2.1.0",
     "httpx>=0.28",
+    "httpx2>=2.16.0",  # the SDKs' HTTP library: backends tell "never sent" (retried) from "may be billed"
     "openai>=3.36.1",
     "pydantic-settings>=2.6",
     "pydantic[email]>=2.9",
@@ -47,7 +48,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.17.1",
-    "httpx2>=2.16.0",  # MockTransport in LLM backend tests (the SDKs' HTTP library; src never imports it)
+    # MockTransport in LLM backend tests (the SDKs' HTTP library; src never imports it)
 ]
 
 # ---------------------------------------------------------------- ruff
@@ -204,6 +205,7 @@ source_modules = [
 forbidden_modules = [
     "anthropic",
     "httpx",
+    "httpx2",
     "openai",
     "pydantic_settings",
     "sqlite3",

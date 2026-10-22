@@ -7,10 +7,10 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 ## 1. Where things stand
 
-- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b.
+- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09.
   CI is green on `main`.
-- **Next session: S09, provider adapters** (section 4).
-- Next free ids: invariant **I52**, ADR **0014**.
+- **Next session: S10, the answer agent** (section 4).
+- Next free ids: invariant **I61**, ADR **0017**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12) may use **dev-split sources only**.
 
@@ -35,46 +35,32 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S09 — provider adapters
+## 4. Next: S10 — answer agent
 
-**Goal:** real LLM calls behind the existing `BaseLlmClient`, with honest usage, typed failures and
-offline contract tests on recorded fixtures.
+**Goal:** the first real feature agent. Given a question and retrieved sources, it writes an answer of
+self-contained claims, each citing sources, in two modes (Strict / Over-eager), with stated non-scope and
+abstention; plus the negation and self-containment checks and invented-citation detection.
 
-**Planned files (to be confirmed in the plan):**
-- `engine/llm/openai_llm_client.py`: Azure AI Foundry `/openai/v1` surface (gpt-6.1-sol, Kimi-K2.6-1),
-  strict `json_schema` structured output. Probe Kimi's structured-output support and record it. Optional:
-  Ollama pinned by digest.
-- `engine/llm/anthropic_llm_client.py`: `AnthropicFoundry` (claude-opus-4-8), structured output by
-  **forced tool use**, system prompt as the separate `system` parameter.
-- `bio-claim-check llm ping` (live check of every deployment) and **ADR 0014** (pinned model ids and the
-  structured-output support matrix).
+**Planned shape (to be confirmed in the plan):**
+- `features/answer/answer_llm_agent.py`: `AnswerLlmAgent(BaseLlmAgent[…, …])` declaring `name`, `prompt`,
+  `output` and `variables` (ADR 0015). It joins `tests/contract/test_llm_agent_contract.py`.
+- `features/answer/llm_answerer.py`: implements `BaseAnswerer` by **composing** the agent (no multiple
+  inheritance); `app` wires the client, spec, emitter and processors.
+- The answer prompt lives under the prompts package with a template hash; dev-split sources only.
 
 **Bindings from earlier sessions (must hold):**
-- Usage normalisation: reasoning ⊆ output, cached input ⊆ input; `reasoning_tokens` is `None` when the
-  provider does not report it (I51). One test per raw usage shape of each provider.
-- Truncation and content filtering come back as `finish_reason` (`length`, `content_filter`); filtered
-  items are counted, never hidden (I44).
-- Reasoning content is **never replayed**. Model identity (provider, deployment, `model_version`) is in
-  the cache key (I46).
-- `model_version` is pinned and **supplied by the maintainer**. No invented model ids, limits or prices;
-  unknown price means "unpriced" (I45).
-- Recorded fixtures are scrubbed: no endpoints, keys, personal data or abstract text beyond fictional
-  content.
-- Request shapes come from the official SDK documentation and our own recordings.
-- Drivers (`openai`, `anthropic`) may be imported only by backend modules; classify them in
-  `tests/arch/test_dependency_policy.py`. Every backend runs the shared LLM client contract suite.
+- Every LLM agent subclasses `BaseLlmAgent` and passes the agent contract suite (I57).
+- Output models must be **strict-schema compatible** (every property required, no extra keys), or the
+  OpenAI codec refuses the request (ADR 0014).
+- Claude output is forced tool use without thinking; do not set `reasoning_effort` on Claude.
+- Events never carry content (I59); new domain events join `app/events.py`'s union (I58).
+- Tune on dev-split sources only; drop and count anything else.
+- Kimi has no adapter yet (backlog A10): do not assign it a live role.
 
-**Open questions for the maintainer (ask before planning details):**
-1. The pinned `model_version` for each deployment.
-2. Scope: include Ollama and the Anthropic API directly, or only the Foundry deployments?
-3. Credentials: does the Anthropic deployment use a separate Foundry endpoint/key?
-4. Fixtures: scrubbed live recordings, or hand-written from the documented shapes?
-5. Prices: supply them now, or leave them `None` (shown as "unpriced")?
+**Exit:** a Strict and an Over-eager answer run live on dev sources through the agent; offline tests on
+scripted clients; `make verify` and CI green.
 
-**Exit:** live `llm ping` passes for every deployment; the contract suite passes offline on recorded
-fixtures for each provider; `make verify` and CI green.
-
-## 5. Engine contracts you build on (S08, S08b)
+## 5. Engine contracts you build on (S08, S08b, S09)
 
 - `engine/llm`: `LlmRequest`, `LlmResponse`, `Message`, `FinishReason`, `Usage`, `Price`, `Spend`,
   `cost()`, `ModelSpec`, `ModelCatalog`, `Provider`, `LlmCallError` (kinds: invalid output, truncated,
@@ -86,6 +72,12 @@ fixtures for each provider; `make verify` and CI green.
 - `app/settings.py`: `FoundrySettings`, `AnthropicSettings`, `OllamaSettings`; `app/models.py` holds the
   deployment facts; `app/container.py::build_models` fails at wiring on an unknown deployment or a live
   role without provider settings.
+- **S09:** `engine/llm/{openai,anthropic}_llm_client.py` over pure codecs, `transport_policy` (our retries),
+  typed `llm.*` errors, `LlmResponse.served_model`; `app/container.py::build_llm_clients`;
+  `engine/agent/base_llm_agent.py` (`BaseLlmAgent`, `AgentResult`) and `ping_llm_agent.py`;
+  `engine/events` (`PipelineEvent`, stage and LLM events, `EventEmitter`, in-memory and logging sinks);
+  `app/events.py` (`AnyPipelineEvent`, `parse_event`); `common/base_clock.py` + scripted and system
+  clocks. `bio-claim-check llm ping` checks deployments live; `make record-llm` re-records fixtures.
 - `common/canonical_json.py` for every hash and written JSON; `common/errors.py::BccError` with a stable
   `code` for every deliberate error (listed in [error-codes.md](error-codes.md)); logging goes to stderr
   through a redacting filter.
@@ -98,7 +90,12 @@ fixtures for each provider; `make verify` and CI green.
   every cited paper uncached, and ends with the tag `prompts-frozen-v1`.
 - **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
   records the frozen prompts hash.
-- **S11:** ledger records failed and `cancelled` runs; a stopped run is never recorded as success.
+- **S11:** ledger records failed and `cancelled` runs; a stopped run is never recorded as success. S11
+  adds the `events.jsonl` sink and run-level events on the S09 vocabulary, and builds the ledger from
+  `LlmCallFinished` (ADR 0016), and closes the S09 spend gap on re-raised client errors (backlog A14).
+- **S12:** the verifier agent subclasses `BaseLlmAgent`; map `llm.*` errors (including
+  `llm.prompt_filtered`) to `FailureKind`; revisit Claude's `max_output_tokens=8192` budget.
+- **S17:** layered Streamlit UI (backlog B4).
 - **S15:** protocol hashes must equal `prompts-frozen-v1`, or each deviation is disclosed.
 - **S16/S19:** a pre-flight token estimate is a labelled heuristic range, never mixed with measured usage
   and never turned into a money estimate without a defensible price.
@@ -117,7 +114,9 @@ fixtures for each provider; `make verify` and CI green.
 make verify          # the gate: ruff, format, pyright strict, lint-imports, tests, core coverage
 make graph           # regenerate docs/architecture/*.dot after import changes
 make schemas         # regenerate schemas/ after contract changes
-make live            # opt-in live tests (needs BCC_CONTACT_EMAIL)
+make live            # opt-in live tests (needs BCC_CONTACT_EMAIL and BCC_FOUNDRY__*)
+make record-llm      # re-record scrubbed LLM fixtures (live, fictional text)
+uv run bio-claim-check llm ping
 uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake
 uv run bio-claim-check corpus verify
 gh run list --limit 3

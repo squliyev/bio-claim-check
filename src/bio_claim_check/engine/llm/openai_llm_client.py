@@ -14,6 +14,7 @@ or an event (the SDK's exception text embeds the body; it is dropped, never chai
 from collections.abc import Callable, Mapping
 from typing import cast, override
 
+import httpx2
 import openai
 from pydantic import JsonValue
 
@@ -69,15 +70,19 @@ class OpenAiLlmClient(BaseLlmClient):
         try:
             result = self._sdk.post(PATH, body=body, cast_to=object)
         except openai.APITimeoutError:
-            return TransportFailure(status=None, timed_out=True)
-        except openai.APIConnectionError:
-            return TransportFailure(status=None)
+            return TransportFailure(status=None, maybe_billed=True)
+        except openai.APIConnectionError as error:
+            # Only a refused connection proves the request never left; a later drop may have been billed.
+            refused = isinstance(error.__cause__, httpx2.ConnectError)
+            return TransportFailure(status=None, maybe_billed=not refused)
         except openai.APIStatusError as error:
             return TransportFailure(
                 status=error.status_code,
                 headers=retry_headers(error.response.headers),
                 provider_code=provider_error_code(error.body),
             )
+        except ValueError:  # a 200 whose body is not JSON; the decoder error holds the body, so drop it
+            raise unexpected(deployment, "$", "is not valid JSON") from None
         if not isinstance(result, dict):
             raise unexpected(deployment, "$", "is not a JSON object")
         return cast(dict[str, JsonValue], result)

@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping
 from typing import cast, override
 
 import anthropic
+import httpx2
 from pydantic import JsonValue
 
 from bio_claim_check.engine.events.emitter import EventEmitter
@@ -68,15 +69,19 @@ class AnthropicLlmClient(BaseLlmClient):
         try:
             result = self._sdk.post(PATH, body=body, cast_to=object)
         except anthropic.APITimeoutError:
-            return TransportFailure(status=None, timed_out=True)
-        except anthropic.APIConnectionError:
-            return TransportFailure(status=None)
+            return TransportFailure(status=None, maybe_billed=True)
+        except anthropic.APIConnectionError as error:
+            # Only a refused connection proves the request never left; a later drop may have been billed.
+            refused = isinstance(error.__cause__, httpx2.ConnectError)
+            return TransportFailure(status=None, maybe_billed=not refused)
         except anthropic.APIStatusError as error:
             return TransportFailure(
                 status=error.status_code,
                 headers=retry_headers(error.response.headers),
                 provider_code=provider_error_code(error.body),
             )
+        except ValueError:  # a 200 whose body is not JSON; the decoder error holds the body, so drop it
+            raise unexpected(deployment, "$", "is not valid JSON") from None
         if not isinstance(result, dict):
             raise unexpected(deployment, "$", "is not a JSON object")
         return cast(dict[str, JsonValue], result)

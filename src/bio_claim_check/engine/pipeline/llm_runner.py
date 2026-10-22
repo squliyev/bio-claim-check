@@ -8,9 +8,11 @@ failures or double-counts money. The order here is the whole contract (ADR 0012)
 5. a content filter or truncation fails at once, never repaired (it would happen again);
 6. validation; only a validation error (incl. invalid JSON) earns ONE repair turn;
 7. typed response processors.
-Every failure is an `LlmCallError` carrying the spend of all its attempts. A prompt rejected by the
-provider's filter (`LlmPromptFilteredError`) is recorded as an unmeasured call and fails as
+Every failure the runner decides is an `LlmCallError` carrying the spend of all its attempts. A prompt
+rejected by the provider's filter (`LlmPromptFilteredError`) is recorded as an unmeasured call and fails as
 `content_filtered`. Any other exception (client, cache, processor) propagates unchanged: no blind except.
+Known gap (S11 binding): such a propagated client error does not carry the spend of earlier attempts, and
+a call that may have been billed (timeout, unexpected response) is not yet counted as unmeasured.
 Events (ADR 0016, I60), when an emitter is given: each logical attempt emits `LlmCallStarted` and then
 `LlmCallFinished` once a response exists; a repair emits `LlmRepairRequested`; a typed (`BccError`)
 failure emits one `LlmCallFailed` before it propagates. Events carry no text (I59).
@@ -199,7 +201,9 @@ class LlmRunner[P, T: BaseModel]:
         )
 
     def _finished(self, response: LlmResponse, attempt: int) -> None:
-        usage = response.usage
+        # What this attempt's live call consumed: the bill when another writer's answer was stored first,
+        # the stored usage on a cache hit (flagged by `cache_hit`); so a ledger from events matches Spend.
+        usage = response.usage if response.billed_usage is None else response.billed_usage
         self._emit(
             lambda at: LlmCallFinished(
                 at=at,

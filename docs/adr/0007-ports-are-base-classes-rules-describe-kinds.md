@@ -65,7 +65,8 @@ the container; use cases receive ports and never import interfaces, the containe
 
 **8. No wall clock or randomness in production code** (`datetime.now`, `time.time`, `random`,
 `uuid.uuid4`, `secrets`, …). Canonical artifacts must be byte-identical; time arrives through an
-injected `Clock` (S11). `uuid.uuid5` stays allowed. `importlib.import_module` is banned too, so every
+injected clock (`common/base_clock.py`; amended by [ADR 0016](./0016-pipeline-events-and-clock.md): exactly
+one module, `common/system_clock.py`, may read the wall clock). `uuid.uuid5` stays allowed. `importlib.import_module` is banned too, so every
 import stays visible to the import rules (the builtin `__import__` is deliberate evasion and is left to
 review).
 

@@ -2,11 +2,12 @@
 
 Why: retries decide what a run is billed and how long it waits, so they must be predictable and
 testable without a network (I55). Each backend turns its SDK's exception into a neutral
-`TransportFailure`; this module decides: retry (408, 429, transient 5xx incl. Anthropic's 529
-"overloaded", and connection failures, after 1, 2, 4 s or the provider's `retry-after-ms`/`Retry-After`,
-capped at 60 s), a prompt filter (HTTP 400 with code `content_filter`), a permanent rejection, or give
-up. Timeouts are never retried: the
-provider may have processed (and billed) the request, and a retry would hide that spend. SDK retries
+`TransportFailure`; this module decides: retry (408, 429, 500, 502, 503, Anthropic's 529 "overloaded",
+and a refused connection, after 1, 2, 4 s or the provider's `retry-after-ms`/`Retry-After`, capped at
+60 s), a prompt filter (HTTP 400 with code `content_filter`), a permanent rejection, or give up. A
+failure after the request may have reached the provider (a timeout, a dropped connection, a gateway
+timeout 504) is never retried: the provider may have processed and billed it, and a retry would bill
+again and hide that spend. SDK retries
 are switched off in `app`, so this is the only retry loop. No jitter: two runs wait the same.
 Must not: import a provider driver, read the wall clock (sleep is injected), or put a response body,
 header value or message into an error.
@@ -25,9 +26,10 @@ from bio_claim_check.engine.llm.errors import LlmPromptFilteredError, LlmProvide
 
 RETRY_DELAYS: Final = (1.0, 2.0, 4.0)
 MAX_RETRY_AFTER: Final = 60.0
-RETRY_STATUSES: Final = frozenset({408, 429, 500, 502, 503, 504, 529})  # 529: Anthropic "overloaded"
+RETRY_STATUSES: Final = frozenset({408, 429, 500, 502, 503, 529})  # 529: Anthropic "overloaded"
+MAYBE_BILLED_STATUSES: Final = frozenset({504})  # the gateway gave up; the model may still have run
 CONTENT_FILTER_CODE: Final = "content_filter"
-TIMEOUT_REASON: Final = "timed out (not retried: the call may have been billed)"
+MAYBE_BILLED_REASON: Final = "may have reached the provider (not retried: it may have been billed)"
 
 
 class Outcome(StrEnum):
@@ -44,11 +46,11 @@ class TransportFailure:
     status: int | None  # None: no HTTP response (connection failure or timeout)
     headers: Mapping[str, str] = field(default_factory=dict[str, str])
     provider_code: str | None = None
-    timed_out: bool = False
+    maybe_billed: bool = False  # the request may have reached the provider (timeout, dropped connection)
 
 
 def classify(failure: TransportFailure) -> Outcome:
-    if failure.timed_out:
+    if failure.maybe_billed or failure.status in MAYBE_BILLED_STATUSES:
         return Outcome.GIVE_UP
     if failure.status is None:
         return Outcome.RETRY
@@ -130,7 +132,7 @@ def with_retries[T](
                 deployment=deployment,
                 status=result.status,
                 attempts=retries + 1,
-                reason=TIMEOUT_REASON if result.timed_out else "failed",
+                reason=MAYBE_BILLED_REASON if classify(result) is Outcome.GIVE_UP else "failed",
             )
         delay = retry_delay(retries, result.headers)
         retries += 1

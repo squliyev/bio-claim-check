@@ -114,6 +114,21 @@ def test_a_read_timeout_is_never_retried(provider: ProviderDir) -> None:
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize(
+    "error",
+    [httpx2.RemoteProtocolError("disconnected"), httpx2.ReadError("reset"), httpx2.WriteError("broken")],
+    ids=type,
+)
+def test_a_connection_lost_after_sending_is_never_retried(provider: ProviderDir, error: Exception) -> None:
+    sleeps: list[float] = []
+    client = backend(provider, _raising(error), sleeps=sleeps)
+    with pytest.raises(LlmTransportError, match="may have been billed") as caught:
+        client.complete(load_fixtures(provider)[0].request)
+    assert caught.value.attempts == 1
+    assert sleeps == []
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
 def test_every_retry_emits_one_event(provider: ProviderDir) -> None:
     sink = InMemoryEventSink()
     sleeps: list[float] = []
@@ -143,6 +158,20 @@ def test_a_body_that_is_not_an_object_is_unexpected(provider: ProviderDir) -> No
     client = backend(provider, _always(200, ["not", "an", "object"]))
     with pytest.raises(LlmUnexpectedResponseError):
         client.complete(load_fixtures(provider)[0].request)
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_a_body_that_is_not_json_is_unexpected_and_never_carries_the_body(provider: ProviderDir) -> None:
+    transport = httpx2.MockTransport(
+        lambda _r: httpx2.Response(
+            200, content=f'{{"trunc {SENTINEL}'.encode(), headers={"content-type": "application/json"}
+        )
+    )
+    with pytest.raises(LlmUnexpectedResponseError) as caught:
+        backend(provider, transport).complete(load_fixtures(provider)[0].request)
+    assert caught.value.__cause__ is None
+    assert caught.value.__suppress_context__
+    assert SENTINEL not in str(caught.value)
 
 
 def test_sdk_retries_must_be_off() -> None:

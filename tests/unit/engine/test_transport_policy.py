@@ -17,7 +17,7 @@ from bio_claim_check.engine.llm.transport_policy import (
 pytestmark = pytest.mark.unit
 
 
-@pytest.mark.parametrize("status", [408, 429, 500, 502, 503, 504])
+@pytest.mark.parametrize("status", [408, 429, 500, 502, 503, 529])
 def test_transient_statuses_are_retried(status: int) -> None:
     assert classify(TransportFailure(status=status)) is Outcome.RETRY
 
@@ -27,7 +27,11 @@ def test_a_connection_failure_is_retried() -> None:
 
 
 def test_a_timeout_is_never_retried() -> None:
-    assert classify(TransportFailure(status=None, timed_out=True)) is Outcome.GIVE_UP
+    assert classify(TransportFailure(status=None, maybe_billed=True)) is Outcome.GIVE_UP
+
+
+def test_a_gateway_timeout_is_never_retried() -> None:
+    assert classify(TransportFailure(status=504)) is Outcome.GIVE_UP
 
 
 @pytest.mark.parametrize("status", [400, 401, 403, 404, 422, 501])
@@ -113,10 +117,17 @@ def test_gives_up_after_the_last_delay() -> None:
 
 
 def test_a_timeout_fails_at_once_and_says_why() -> None:
-    attempt = _Attempts(TransportFailure(status=None, timed_out=True))
+    attempt = _Attempts(TransportFailure(status=None, maybe_billed=True))
     with pytest.raises(LlmTransportError, match="may have been billed") as caught:
         with_retries(attempt, deployment="d", sleep=lambda _s: None)
     assert caught.value.attempts == 1
+
+
+def test_a_gateway_timeout_fails_at_once_and_says_why() -> None:
+    attempt = _Attempts(TransportFailure(status=504))
+    with pytest.raises(LlmTransportError, match="may have been billed") as caught:
+        with_retries(attempt, deployment="d", sleep=lambda _s: None)
+    assert (caught.value.status, caught.value.attempts) == (504, 1)
 
 
 def test_a_rejection_is_not_retried_and_carries_only_the_code() -> None:
