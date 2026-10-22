@@ -23,6 +23,7 @@ from pydantic import (
     model_validator,
 )
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import NonBlankStr
 from bio_claim_check.features.contracts.labels import Label, OverstatedReason
 
@@ -107,8 +108,10 @@ def rulepack_json_schema() -> dict[str, JsonValue]:
     return RulePack.model_json_schema(mode="validation")
 
 
-class RulePackError(Exception):
+class RulePackError(BccError):
     """A rule pack could not be loaded. `problems` holds one human-readable line per problem."""
+
+    code = "contracts.rule_pack"
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("\n".join(problems))

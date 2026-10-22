@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
+from tests.support.settings import make_settings
 
 from bio_claim_check.app.settings import Settings, load_settings
 from bio_claim_check.engine.cache.policy import CacheMode
@@ -12,9 +13,7 @@ FOUNDRY = {"base_url": "https://example-resource.services.ai.azure.com", "api_ke
 
 
 def make(**overrides: object) -> Settings:
-    values: dict[str, object] = {"contact_email": "someone@example.org", "foundry": FOUNDRY}
-    values.update(overrides)
-    return Settings.model_validate(values)
+    return make_settings(**{"foundry": FOUNDRY, **overrides})
 
 
 def test_defaults_bind_three_model_roles() -> None:

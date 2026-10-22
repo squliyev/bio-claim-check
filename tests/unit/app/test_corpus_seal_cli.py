@@ -65,7 +65,7 @@ def test_seal_then_verify(tmp_path: Path) -> None:
 def test_verify_without_a_seal_exits_7(tmp_path: Path) -> None:
     folder = _write(tmp_path, dataset_files())
     code, _, err = _invoke("verify", "--dataset", str(folder))
-    assert code == cli.EXIT_DATASET
+    assert code == cli.ExitCode.DATASET
     assert err == f"{folder} is not intact (1 problem(s)):\n  - {SEALED} is missing\n"
 
 
@@ -74,7 +74,7 @@ def test_seal_refuses_a_broken_dataset_and_writes_nothing(tmp_path: Path) -> Non
     files[DEV_SOURCES] += b" "
     folder = _write(tmp_path, files)
     code, _, err = _invoke("seal", "--dataset", str(folder))
-    assert code == cli.EXIT_DATASET
+    assert code == cli.ExitCode.DATASET
     assert f"{DEV_SOURCES} does not match its hash in {MANIFEST}" in err
     assert not (folder / SEALED).exists()
 
@@ -82,7 +82,7 @@ def test_seal_refuses_a_broken_dataset_and_writes_nothing(tmp_path: Path) -> Non
 def test_seal_refuses_to_replace_a_wrong_seal(tmp_path: Path) -> None:
     folder = _write(tmp_path, {**dataset_files(), SEALED: sealed_bytes(b"something else")})
     code, _, err = _invoke("seal", "--dataset", str(folder))
-    assert code == cli.EXIT_DATASET
+    assert code == cli.ExitCode.DATASET
     assert f"{SEALED} does not match {MANIFEST}" in err
     assert (folder / SEALED).read_bytes() == sealed_bytes(b"something else")
 
@@ -92,17 +92,17 @@ def test_a_tampered_sealed_dataset_fails_verify(tmp_path: Path) -> None:
     assert _invoke("seal", "--dataset", str(folder))[0] == 0
     (folder / "extra.txt").write_bytes(b"x")
     code, _, err = _invoke("verify", "--dataset", str(folder))
-    assert code == cli.EXIT_DATASET
+    assert code == cli.ExitCode.DATASET
     assert "extra.txt is not part of the dataset" in err
 
 
 def test_a_missing_folder_or_spec_exits_2(tmp_path: Path) -> None:
     code, _, err = _invoke("verify", "--dataset", str(tmp_path / "nope"))
-    assert code == cli.EXIT_INPUT
+    assert code == cli.ExitCode.INPUT
     assert "is not a folder" in err
     files = dataset_files()
     del files[SPEC]
     folder = _write(tmp_path / "d", files)
     code, _, err = _invoke("seal", "--dataset", str(folder))
-    assert code == cli.EXIT_INPUT
+    assert code == cli.ExitCode.INPUT
     assert err.startswith("Invalid corpus spec (1 problem(s)):\n")

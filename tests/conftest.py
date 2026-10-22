@@ -10,8 +10,9 @@ Hypothesis profiles: ``dev`` (default) and ``ci`` (derandomized, more examples),
 ``HYPOTHESIS_PROFILE``. An unknown name raises, so a typo cannot silently fall back to ``dev``.
 """
 
+import logging
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 
 import pytest
 from hypothesis import settings
@@ -65,6 +66,18 @@ def _isolate_env(
     for key in scrubbed(list(os.environ), live=is_live(request.keywords)):  # TID251 is relaxed in tests/
         monkeypatch.delenv(key)
     monkeypatch.chdir(tmp_path_factory.mktemp("cwd"))  # a stray ./.env can never leak into a test
+
+
+@pytest.fixture(autouse=True)
+def _restore_package_logger() -> Iterator[None]:
+    """`configure_logging` (called by every CLI command that loads settings) changes the package logger
+    process-wide; undo it so a later test's `caplog` still sees records."""
+    logger = logging.getLogger("bio_claim_check")
+    saved = (list(logger.handlers), logger.level, logger.propagate)
+    yield
+    logger.handlers[:] = saved[0]
+    logger.setLevel(saved[1])
+    logger.propagate = saved[2]
 
 
 @pytest.fixture(autouse=True)

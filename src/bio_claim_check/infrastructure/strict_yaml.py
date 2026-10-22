@@ -18,13 +18,17 @@ import yaml
 from yaml.constructor import ConstructorError
 from yaml.nodes import MappingNode, ScalarNode
 
+from bio_claim_check.common.errors import BccError
+
 _MERGE_TAG = "tag:yaml.org,2002:merge"
 _STR_TAG = "tag:yaml.org,2002:str"
 _SCALARS = (str, int, float, bool, type(None))
 
 
-class StrictYamlError(Exception):
+class StrictYamlError(BccError):
     """The text is not unambiguous YAML. `problems` holds one located, human-readable line per problem."""
+
+    code = "config.strict_yaml"
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("\n".join(problems))

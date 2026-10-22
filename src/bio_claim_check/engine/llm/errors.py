@@ -12,6 +12,7 @@ ADR 0003 deterministic marker.)
 
 from enum import StrEnum
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.llm.usage import Spend
 
 
@@ -21,8 +22,10 @@ class LlmFailureKind(StrEnum):
     CONTENT_FILTERED = "content_filtered"
 
 
-class LlmCallError(Exception):
+class LlmCallError(BccError):
     """A structured call that produced no usable output."""
+
+    code = "llm.call_failed"
 
     def __init__(
         self,

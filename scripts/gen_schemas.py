@@ -3,12 +3,12 @@
 `tests/arch/test_schemas.py` fails when a file here is stale; run `make schemas` after changing a contract.
 """
 
-import json
 from collections.abc import Callable
 from pathlib import Path
 
 from pydantic import JsonValue
 
+from bio_claim_check.common.canonical_json import pretty_json
 from bio_claim_check.features.contracts.rulepack import rulepack_json_schema
 from bio_claim_check.features.contracts.verdict import verifier_output_json_schema
 
@@ -19,7 +19,7 @@ SCHEMAS: dict[str, Callable[[], dict[str, JsonValue]]] = {
 
 
 def render(build: Callable[[], dict[str, JsonValue]]) -> str:
-    return json.dumps(build(), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    return pretty_json(build()) + "\n"
 
 
 def main() -> None:

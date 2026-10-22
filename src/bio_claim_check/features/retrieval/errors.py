@@ -7,6 +7,10 @@ Must not: carry request headers or the contact email in its message.
 No LLM is involved in this module.
 """
 
+from bio_claim_check.common.errors import BccError
 
-class RetrievalError(Exception):
+
+class RetrievalError(BccError):
     """The literature database could not be reached, refused the request or sent a malformed response."""
+
+    code = "retrieval.failed"

@@ -24,6 +24,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0002](./0002-rings-ports-composition-root.md) | Rings, slices, ports and a composition root | Accepted | Where code goes; who may import whom |
 | [0003](./0003-structure-in-code-judgement-in-llm.md) | Structure in code, judgement in the LLM | Accepted | Which decisions a model may make |
 | [0007](./0007-ports-are-base-classes-rules-describe-kinds.md) | Ports are base classes, backends sit beside them, and rules describe kinds | Accepted | What a port looks like; where backends and drivers go; why a new slice needs no rule edits |
+| [0013](./0013-canonical-json-errors-logging.md) | Canonical JSON, typed errors with stable codes, and redacted logging | Accepted | How hashes and artifacts are serialised; how failures are named and exit; what may be logged |
 
 ## Evidence
 

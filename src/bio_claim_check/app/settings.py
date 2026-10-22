@@ -17,6 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from bio_claim_check.engine.cache.policy import CacheMode
 
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+type LogFormat = Literal["json", "text"]
 
 ENV_PREFIX = "BCC_"
 
@@ -67,7 +68,12 @@ class Settings(BaseSettings):
     cache_mode: CacheMode = CacheMode.READ_WRITE
     """``read-only`` replays from cache and fails closed on a miss (CI and offline demos). ADR 0009."""
 
-    log_level: LogLevel = "INFO"
+    log_level: LogLevel = "WARNING"
+    """Applied by `app.logging_setup` (S08b). WARNING shows only retries and problems; INFO adds progress.
+    Before S08b this setting was read but never applied, so a `.env` with INFO now prints progress lines."""
+
+    log_format: LogFormat = "json"
+    """``json`` (one object per line, for machines) or ``text`` (for a terminal). Logs go to stderr only."""
 
     foundry: FoundrySettings | None = None
     anthropic: AnthropicSettings | None = None

@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+from tests.support.settings import make_settings
 
 from bio_claim_check.app.container import MissingProviderError, build_models
 from bio_claim_check.app.models import MODEL_SPECS, model_catalog
@@ -15,7 +16,7 @@ FOUNDRY = {"base_url": "https://example.org/", "api_key": "test-key"}
 
 
 def settings(**values: Any) -> Settings:
-    return Settings.model_validate({"contact_email": "someone@example.org", **values})
+    return make_settings(**values)
 
 
 def test_the_shipped_catalogue_is_unpriced_and_names_the_default_roles() -> None:

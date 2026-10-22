@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from bio_claim_check.app.usecases.build_corpus import pool_query
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.text import CleanedText
 from bio_claim_check.features.bench.stats import wilson
 from bio_claim_check.features.contracts.corpus import (
@@ -35,8 +36,10 @@ AUDIT_SPLIT: Final = CorpusSplit.DEV
 _SHA256: Final = re.compile(r"[0-9a-f]{64}")
 
 
-class AuditInputError(Exception):
+class AuditInputError(BccError):
     """The dataset, the kind or the cache cannot support this audit. `problems` holds one line each."""
+
+    code = "corpus.audit_input"
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("\n".join(problems))

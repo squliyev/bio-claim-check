@@ -72,7 +72,8 @@ BCC_CACHE_MODE=read-only uv run bio-claim-check retrieve "metformin colorectal c
 ```
 
 Exit codes: 2 bad input or configuration, 3 not cached in read-only mode, 4 Europe PMC failed, 5 the
-cache file is unusable. Retraction status is as of the first fetch.
+cache file is unusable (full table: [docs/error-codes.md](docs/error-codes.md)). Retraction status is as of
+the first fetch.
 
 Build the evaluation corpus from a pre-registered spec (ADR 0010). Each question's pool is fetched
 through the same cache, sieved for trap-eligible abstracts, clustered by trial and split into dev and

@@ -81,3 +81,10 @@ def test_deterministic_ids_stay_allowed() -> None:
     assert not _tid251(
         "src/bio_claim_check/features/report/x.py", "import uuid\nuuid.uuid5(uuid.NAMESPACE_URL, 'x')\n"
     )
+
+
+@pytest.mark.parametrize("source", ["import json\njson.dumps({})\n", "from json import dump\n"])
+def test_json_serialisation_banned_outside_canonical_json(source: str) -> None:
+    assert _tid251("src/bio_claim_check/features/report/x.py", source)
+    assert not _tid251("src/bio_claim_check/common/canonical_json.py", source)
+    assert not _tid251("src/bio_claim_check/common/x.py", "import json\njson.loads('{}')\n")

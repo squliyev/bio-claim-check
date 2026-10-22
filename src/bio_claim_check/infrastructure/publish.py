@@ -15,9 +15,13 @@ import os
 import tempfile
 from pathlib import Path, PurePath
 
+from bio_claim_check.common.errors import BccError
 
-class PublishError(Exception):
+
+class PublishError(BccError):
     """A file could not be published without losing or corrupting data."""
+
+    code = "files.publish"
 
 
 def _check_name(name: str) -> None:

@@ -10,9 +10,13 @@ No LLM is involved in this module.
 from importlib.resources import files
 from pathlib import Path
 
+from bio_claim_check.common.errors import BccError
 
-class ReadError(Exception):
+
+class ReadError(BccError):
     """A file could not be read as UTF-8 text. The message names the path."""
+
+    code = "files.read"
 
 
 def read_text_file(path: Path) -> str:

@@ -82,9 +82,12 @@ ban-relative-imports = "all"
 "time.time_ns".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
 "uuid.uuid1".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
 "uuid.uuid4".msg = "Canonical artifacts must be byte-identical: inject a Clock or seed instead (ADR 0007)."
+"json.dumps".msg = "Serialise through bio_claim_check.common.canonical_json so every hash and artifact uses one form (ADR 0013)."
+"json.dump".msg = "Serialise through bio_claim_check.common.canonical_json so every hash and artifact uses one form (ADR 0013)."
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "TID251"]  # tests may import tests.support; the ban stays active in src/**
+"src/bio_claim_check/common/canonical_json.py" = ["TID251"]  # the one module allowed to call json.dumps (ADR 0013)
 
 # ---------------------------------------------------------------- import-linter
 # Every contract has an `id`; tests/arch/test_rules_fire.py proves each one fails on a planted violation.

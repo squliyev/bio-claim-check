@@ -23,6 +23,7 @@ from dataclasses import replace
 
 from pydantic import BaseModel, ValidationError
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
 from bio_claim_check.engine.llm.errors import LlmCallError, LlmFailureKind
 from bio_claim_check.engine.llm.messages import FinishReason, LlmRequest, LlmResponse, Message
@@ -39,8 +40,10 @@ REPAIR_INSTRUCTION = (
 EMPTY_REPLY = "(empty reply)"
 
 
-class ProcessorContractError(RuntimeError):
+class ProcessorContractError(BccError, RuntimeError):
     """A processor changed a field the runner owns (model identity, responses, spend, or the request)."""
+
+    code = "llm.processor_contract"
 
 
 def _problems(error: ValidationError) -> tuple[tuple[str, str], ...]:

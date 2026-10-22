@@ -1,4 +1,4 @@
-"""Usage subsets, exact Decimal cost and honest spend (I45)."""
+"""Usage subsets, exact Decimal cost, honest spend (I45) and unreported reasoning tokens (I51)."""
 
 from datetime import date
 from decimal import Decimal
@@ -12,10 +12,46 @@ from bio_claim_check.engine.llm.usage import Price, Spend, Usage, cost
 pytestmark = pytest.mark.unit
 
 
-def test_defaults_are_zero_and_keyword_only() -> None:
-    assert Usage() == Usage(input_tokens=0, output_tokens=0, reasoning_tokens=0, cached_input_tokens=0)
-    assert Spend().usage == Usage()
+def test_defaults_are_zero_and_reasoning_is_unreported() -> None:
+    assert Usage() == Usage(input_tokens=0, output_tokens=0, reasoning_tokens=None, cached_input_tokens=0)
+    assert Usage.zero() == Usage(reasoning_tokens=0)
+    assert Spend().usage == Spend().replayed_usage == Usage.zero()
     assert Spend().cost == Decimal(0)
+
+
+@pytest.mark.parametrize(
+    ("reasoning", "expected"),
+    [(None, None), (0, 0), (5, 5), (20, 20)],
+    ids=["not-reported", "reported-zero", "positive", "all-of-output"],
+)
+def test_reasoning_is_kept_exactly_as_reported(reasoning: int | None, expected: int | None) -> None:
+    assert Usage(output_tokens=20, reasoning_tokens=reasoning).reasoning_tokens == expected
+
+
+@pytest.mark.parametrize(
+    ("left", "right", "expected"),
+    [(None, None, None), (None, 3, None), (3, None, None), (0, 3, 3), (2, 3, 5)],
+)
+def test_a_sum_with_an_unreported_side_is_unknown(
+    left: int | None, right: int | None, expected: int | None
+) -> None:
+    total = Usage(output_tokens=9, reasoning_tokens=left) + Usage(output_tokens=9, reasoning_tokens=right)
+    assert total.reasoning_tokens == expected
+    assert total.output_tokens == 18
+
+
+def test_spend_reasoning_turns_unknown_after_one_non_reporting_call() -> None:
+    told = Usage(input_tokens=1, output_tokens=4, reasoning_tokens=2)
+    silent = Usage(input_tokens=1, output_tokens=4)
+    spend = Spend().record(paid=told, usage=told, price=PRICE)
+    assert spend.usage.reasoning_tokens == 2
+    assert spend.record(paid=silent, usage=silent, price=PRICE).usage.reasoning_tokens is None
+
+
+def test_unreported_reasoning_does_not_change_the_cost() -> None:
+    reported = Usage(input_tokens=1_000, output_tokens=200, reasoning_tokens=0)
+    silent = Usage(input_tokens=1_000, output_tokens=200)
+    assert cost(reported, PRICE) == cost(silent, PRICE) == Decimal("0.0045")
 
 
 @pytest.mark.parametrize(
@@ -77,7 +113,7 @@ def test_spend_counts_live_calls_and_their_cost() -> None:
 def test_a_cache_hit_costs_nothing_but_is_counted_as_replayed() -> None:
     used = Usage(input_tokens=7, output_tokens=3)
     spend = Spend().record(paid=None, usage=used, price=PRICE)
-    assert (spend.calls, spend.cache_hits, spend.cost, spend.usage) == (0, 1, Decimal(0), Usage())
+    assert (spend.calls, spend.cache_hits, spend.cost, spend.usage) == (0, 1, Decimal(0), Usage.zero())
     assert spend.replayed_usage == used
 
 

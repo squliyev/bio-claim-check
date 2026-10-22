@@ -12,4 +12,5 @@ digraph {
     ".engine" ->  ".common"
     ".features" ->  ".common"
     ".features" ->  ".engine"
+    ".infrastructure" ->  ".common"
 }

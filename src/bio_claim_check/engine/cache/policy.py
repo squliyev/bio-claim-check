@@ -7,14 +7,14 @@ so changing any of them misses instead of returning a stale answer (I34).
 Must not: know what is cached, or read a clock.
 """
 
-import hashlib
-import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
 from pydantic import JsonValue
 
+from bio_claim_check.common.canonical_json import compact_sha256
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.cache.base_cache import BaseCache
 
 
@@ -26,12 +26,16 @@ class CacheMode(StrEnum):
     OFF = "off"
 
 
-class CacheError(Exception):
+class CacheError(BccError):
     """The cache itself failed (cannot open, cannot write)."""
 
+    code = "cache.failed"
 
-class CacheMissError(LookupError):
+
+class CacheMissError(BccError, LookupError):
     """`read-only` mode and the key is absent: fail closed instead of fetching."""
+
+    code = "cache.miss"
 
     def __init__(self, namespace: str) -> None:
         super().__init__(f"{namespace}: not in the cache and the cache mode is read-only")
@@ -43,8 +47,7 @@ def cache_key(namespace: str, version: int, payload: Mapping[str, JsonValue]) ->
     if not namespace.strip():
         raise ValueError("cache namespace must not be blank")
     body = {"namespace": namespace, "version": version, "payload": dict(payload)}
-    text = json.dumps(body, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return compact_sha256(body)
 
 
 @dataclass(frozen=True, slots=True)

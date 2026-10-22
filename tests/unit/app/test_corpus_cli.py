@@ -93,7 +93,7 @@ def test_a_different_existing_file_exits_6_and_the_manifest_is_not_written(
     (out / "test").mkdir(parents=True)
     (out / TEST_SOURCES).write_bytes(b"something else\n")
     code, _, stderr = build(out)
-    assert code == cli.EXIT_OUTPUT
+    assert code == cli.ExitCode.OUTPUT
     assert "Traceback" not in stderr
     assert (out / TEST_SOURCES).read_bytes() == b"something else\n"
     assert not (out / MANIFEST).exists()
@@ -104,7 +104,7 @@ def test_an_output_path_that_is_a_file_exits_6(tmp_path: Path, monkeypatch: pyte
     out = tmp_path / "datasets"
     out.write_bytes(b"a file\n")
     code, _, stderr = build(out)
-    assert code == cli.EXIT_OUTPUT
+    assert code == cli.ExitCode.OUTPUT
     assert "Traceback" not in stderr
 
 
@@ -115,7 +115,7 @@ def test_a_different_declared_date_cannot_overwrite_a_manifest(
     out = tmp_path / "datasets"
     assert build(out)[0] == 0
     before = (out / MANIFEST).read_bytes()
-    assert build(out, day="2025-02-01")[0] == cli.EXIT_OUTPUT
+    assert build(out, day="2025-02-01")[0] == cli.ExitCode.OUTPUT
     assert (out / MANIFEST).read_bytes() == before
 
 
@@ -125,7 +125,7 @@ def test_a_bad_date_exits_2_before_any_retrieval(
 ) -> None:
     use(monkeypatch, lambda: pytest.fail("retrieval must not start"))
     code, _, stderr = build(tmp_path / "datasets", day=day)
-    assert code == cli.EXIT_INPUT
+    assert code == cli.ExitCode.INPUT
     assert "--declared-fetched-on must be YYYY-MM-DD" in stderr
 
 
@@ -136,7 +136,7 @@ def test_an_invalid_spec_exits_2_and_lists_each_problem(
     spec = tmp_path / "spec.yaml"
     spec.write_text(SPEC_FILE.read_text(encoding="utf-8").replace("audit_n: 50", "audit_n: 0\nextra: 1"))
     code, _, stderr = build(tmp_path / "datasets", spec=spec)
-    assert code == cli.EXIT_INPUT
+    assert code == cli.ExitCode.INPUT
     assert stderr.startswith("Invalid corpus spec (2 problem(s)):\n")
     assert "audit_n" in stderr
     assert "extra" in stderr
@@ -146,17 +146,21 @@ def test_an_invalid_spec_exits_2_and_lists_each_problem(
 def test_a_missing_spec_exits_2(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     use(monkeypatch, lambda: pytest.fail("retrieval must not start"))
     code, _, stderr = build(tmp_path / "datasets", spec=tmp_path / "missing.yaml")
-    assert code == cli.EXIT_INPUT
+    assert code == cli.ExitCode.INPUT
     assert "Invalid corpus spec (1 problem(s)):" in stderr
 
 
 @pytest.mark.parametrize(
     ("make", "exit_code", "message"),
     [
-        (lambda: RaisingSource(CacheMissError("k")), cli.EXIT_CACHE_MISS, "BCC_CACHE_MODE=read-only"),
-        (lambda: RaisingSource(RetrievalError("HTTP 500")), cli.EXIT_UPSTREAM, "retrieval failed: HTTP 500"),
-        (lambda: RaisingSource(CacheError("locked")), cli.EXIT_LOCAL_CACHE, "cache problem: locked"),
-        (lambda: RaisingSource(ValueError("blank question")), cli.EXIT_INPUT, "blank question"),
+        (lambda: RaisingSource(CacheMissError("k")), cli.ExitCode.CACHE_MISS, "BCC_CACHE_MODE=read-only"),
+        (
+            lambda: RaisingSource(RetrievalError("HTTP 500")),
+            cli.ExitCode.UPSTREAM,
+            "retrieval failed: HTTP 500",
+        ),
+        (lambda: RaisingSource(CacheError("locked")), cli.ExitCode.LOCAL_CACHE, "cache problem: locked"),
+        (lambda: RaisingSource(ValueError("blank question")), cli.ExitCode.INPUT, "blank question"),
     ],
     ids=["cache-miss", "upstream", "local-cache", "input"],
 )
@@ -182,5 +186,5 @@ def test_a_pool_conflict_exits_4(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     pools[second] = (*pools[second][:-1], paper(1, mesh=("Humans",)))  # ANIMAL (MED:1), changed metadata
     use(monkeypatch, lambda: QueryLiteratureSource(pools))
     code, _, stderr = build(tmp_path / "datasets")
-    assert code == cli.EXIT_UPSTREAM
+    assert code == cli.ExitCode.UPSTREAM
     assert "MED:1 differs between two questions' results" in stderr

@@ -10,11 +10,11 @@ No LLM is involved in this module.
 """
 
 import hashlib
-import json
 from collections.abc import Iterable, Sequence
 
 from pydantic import BaseModel
 
+from bio_claim_check.common.canonical_json import compact_json, pretty_json_bytes
 from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.paper import Paper
 
@@ -24,7 +24,7 @@ def sha256_hex(data: bytes) -> str:
 
 
 def _line(value: object) -> str:
-    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return compact_json(value)
 
 
 def jsonl_bytes(rows: Iterable[BaseModel]) -> bytes:
@@ -34,8 +34,7 @@ def jsonl_bytes(rows: Iterable[BaseModel]) -> bytes:
 
 def document_bytes(model: BaseModel) -> bytes:
     """A single JSON document, indented for review in a diff."""
-    text = json.dumps(model.model_dump(mode="json"), sort_keys=True, ensure_ascii=False, indent=2)
-    return (text + "\n").encode()
+    return pretty_json_bytes(model.model_dump(mode="json"))
 
 
 def model_sha256(model: BaseModel) -> str:

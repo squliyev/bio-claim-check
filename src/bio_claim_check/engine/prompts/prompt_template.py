@@ -12,20 +12,22 @@ Pure values: makes no provider call. (It is LLM vocabulary, so it does not carry
 ADR 0003 deterministic marker.)
 """
 
-import hashlib
-import json
 from collections.abc import Mapping
 from string import Template
 from typing import Annotated, Self
 
 from pydantic import Field, model_validator
 
+from bio_claim_check.common.canonical_json import compact_sha256
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.engine.llm.messages import Message, PromptRef
 
 
-class PromptRenderError(ValueError):
+class PromptRenderError(BccError, ValueError):
     """The variables do not match the template's placeholders exactly."""
+
+    code = "prompts.render"
 
 
 class PromptTemplate(ValidatedModel):
@@ -48,10 +50,7 @@ class PromptTemplate(ValidatedModel):
     @property
     def sha256(self) -> str:
         """Of the canonical JSON of every field, so any change to the text changes the hash."""
-        body = json.dumps(
-            self.model_dump(mode="json"), sort_keys=True, ensure_ascii=False, separators=(",", ":")
-        )
-        return hashlib.sha256(body.encode("utf-8")).hexdigest()
+        return compact_sha256(self.model_dump(mode="json"))
 
     def ref(self) -> PromptRef:
         return PromptRef(name=self.name, version=self.version, sha256=self.sha256)

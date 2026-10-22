@@ -19,6 +19,7 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | A6 | As a reviewer, I want an end-to-end run on fakes, so that the structure is proven before any provider exists | ✅ |
 | A7 | As a contributor, I want one obvious shape for ports and backends and rules that describe kinds, so that a new slice or backend passes the architecture checks without anyone editing them | ✅ |
 | A8 | As a scientist, I want every model call to take one readable path with distinct repeats, at most one repair and honest cost (unknown, never $0), so that instability and spend are measured, not hidden | ✅ (S08: engine on scripted and cached clients; provider backends in S09; prices entered by the user) |
+| A9 | As a reviewer, I want one canonical JSON serialiser, typed errors with stable documented codes and exit codes, and redacted stderr logs, so that hashes cannot drift, failures are nameable and no secret reaches a log | ✅ (S08b: no output byte, hash, golden or seal changed; central exit mapping in S16) |
 
 ## Feature B — Real adapters and the product
 

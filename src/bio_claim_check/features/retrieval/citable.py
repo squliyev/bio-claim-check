@@ -14,6 +14,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import cast
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.features.contracts.paper import Paper
 
 EXCLUDED_PUB_TYPES: tuple[str, ...] = (
@@ -51,8 +52,10 @@ class RejectReason(StrEnum):
     DUPLICATE = "duplicate"
 
 
-class MalformedRecordError(ValueError):
+class MalformedRecordError(BccError, ValueError):
     """A record field has a type the API has not been seen to return."""
+
+    code = "retrieval.malformed_record"
 
 
 def _opt_str(record: Record, field: str) -> str | None:

@@ -15,6 +15,7 @@ from enum import StrEnum
 
 from pydantic import Field
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import FrozenJson, NonBlankStr, ValidatedModel
 from bio_claim_check.engine.llm.usage import Price
 
@@ -51,8 +52,10 @@ class ModelSpec(ValidatedModel):
         )
 
 
-class UnknownDeploymentError(LookupError):
+class UnknownDeploymentError(BccError, LookupError):
     """A deployment name that is not in the catalogue."""
+
+    code = "llm.unknown_deployment"
 
     def __init__(self, deployment: str, known: Iterable[str]) -> None:
         super().__init__(f"unknown deployment {deployment!r}; known: {', '.join(sorted(known))}")

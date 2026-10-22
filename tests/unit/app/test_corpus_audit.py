@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from tests.support.corpus import SPEC_FILE, QueryLiteratureSource, dataset_files, world
 from tests.support.papers import paper
+from tests.support.settings import make_settings
 from typer.testing import CliRunner
 
 from bio_claim_check.app import cli
@@ -182,9 +183,7 @@ def test_publish_sheet_never_overwrites(tmp_path: Path) -> None:
 
 
 def test_replay_never_fetches_even_when_settings_allow_it(tmp_path: Path) -> None:
-    settings = Settings.model_validate(
-        {"contact_email": "someone@example.org", "var_dir": tmp_path, "cache_mode": "read-write"}
-    )
+    settings = make_settings(var_dir=tmp_path, cache_mode="read-write")
     with build_replay(settings) as source, pytest.raises(CacheMissError):
         source.search("anything", limit=1)
 
@@ -260,7 +259,7 @@ def test_cli_sheet_refuses_an_unsealed_dataset(tmp_path: Path) -> None:
         "--env-file",
         str(tmp_path / "none.env"),
     )
-    assert code == cli.EXIT_DATASET
+    assert code == cli.ExitCode.DATASET
     assert f"{SEALED} is missing" in err
     assert not (tmp_path / "a").exists()
 
@@ -280,7 +279,7 @@ def test_cli_sheet_maps_a_cache_miss_to_exit_3(monkeypatch: pytest.MonkeyPatch, 
         "--env-file",
         str(tmp_path / "none.env"),
     )
-    assert code == cli.EXIT_CACHE_MISS
+    assert code == cli.ExitCode.CACHE_MISS
     assert "built from the cache only" in err
 
 
@@ -289,9 +288,9 @@ def test_cli_apply_maps_errors_to_exit_codes(tmp_path: Path) -> None:
     bad = tmp_path / "bad.csv"
     bad.write_text("source_id,decision,reason\nMED:999,confirm,\n", encoding="utf-8")
     base = ("apply-audit", "--kind", KIND.value, "--dataset", str(folder), "--sheet")
-    assert _invoke(*base, str(bad), "--prompts-sha256", PROMPTS)[0] == cli.EXIT_INPUT
-    assert _invoke(*base, str(tmp_path / "missing.csv"), "--prompts-sha256", PROMPTS)[0] == cli.EXIT_INPUT
-    assert _invoke(*base, str(bad), "--prompts-sha256", "nothex")[0] == cli.EXIT_DATASET
+    assert _invoke(*base, str(bad), "--prompts-sha256", PROMPTS)[0] == cli.ExitCode.INPUT
+    assert _invoke(*base, str(tmp_path / "missing.csv"), "--prompts-sha256", PROMPTS)[0] == cli.ExitCode.INPUT
+    assert _invoke(*base, str(bad), "--prompts-sha256", "nothex")[0] == cli.ExitCode.DATASET
     assert not (folder / "audit").exists()
 
 
@@ -305,4 +304,4 @@ def test_cli_apply_refuses_to_replace_a_different_record(tmp_path: Path) -> None
     assert _invoke(*args, "--prompts-sha256", PROMPTS)[0] == 0
     assert _invoke(*args, "--prompts-sha256", PROMPTS)[0] == 0  # same record: a no-op
     code, _, _ = _invoke(*args, "--prompts-sha256", "c" * 64)
-    assert code == cli.EXIT_OUTPUT
+    assert code == cli.ExitCode.OUTPUT

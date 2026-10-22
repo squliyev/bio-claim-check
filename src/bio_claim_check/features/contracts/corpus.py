@@ -16,6 +16,7 @@ from typing import Annotated, Final, Literal, Self
 
 from pydantic import BeforeValidator, Field, StringConstraints, ValidationError, model_validator
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import NonBlankStr, Sha256Hex, ValidatedModel
 from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import OverstatedReason
@@ -278,8 +279,10 @@ class CorpusManifest(ValidatedModel):
         return self
 
 
-class CorpusSpecError(Exception):
+class CorpusSpecError(BccError):
     """A corpus spec could not be loaded. `problems` holds one human-readable line per problem."""
+
+    code = "contracts.corpus_spec"
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("\n".join(problems))

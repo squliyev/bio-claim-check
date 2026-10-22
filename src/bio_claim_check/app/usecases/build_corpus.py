@@ -18,6 +18,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.features.contracts.corpus import (
     NLM_NOTICE,
     CorpusManifest,
@@ -49,8 +50,10 @@ from bio_claim_check.features.corpus.serialise import (
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 
 
-class PoolConflictError(Exception):
+class PoolConflictError(BccError):
     """One source came back with different metadata under two questions; the build cannot pick one."""
+
+    code = "corpus.pool_conflict"
 
 
 @dataclass(frozen=True, slots=True)

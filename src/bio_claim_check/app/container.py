@@ -23,6 +23,7 @@ from bio_claim_check import __version__
 from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.cache.base_cache import BaseCache
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
@@ -104,8 +105,10 @@ def file_sha256(path: Path) -> str:
         raise CorpusSpecError([f"{path}: cannot read: {err.strerror}"]) from None
 
 
-class OutputConflictError(Exception):
+class OutputConflictError(BccError):
     """An output file exists with different bytes, or cannot be written; nothing is overwritten."""
+
+    code = "app.output_conflict"
 
 
 def publish_corpus(out: Path, files: CorpusFiles) -> list[Path]:
@@ -129,8 +132,10 @@ def publish_corpus(out: Path, files: CorpusFiles) -> list[Path]:
         raise OutputConflictError(f"cannot write the dataset under {out}: {err}") from None
 
 
-class DatasetReadError(Exception):
+class DatasetReadError(BccError):
     """The dataset folder, or a file in it, cannot be read."""
+
+    code = "app.dataset_read"
 
 
 def read_dataset(folder: Path) -> dict[str, bytes]:
@@ -235,8 +240,10 @@ def build_retrieval(
         yield EuropePmcLiteratureSource(client, cache, settings.cache_mode, sleep=sleep)
 
 
-class MissingProviderError(Exception):
+class MissingProviderError(BccError):
     """A live LLM role whose provider has no settings; the message names the role and the settings."""
+
+    code = "app.missing_provider"
 
 
 _PROVIDER_SETTINGS: dict[Provider, str] = {

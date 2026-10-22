@@ -11,9 +11,9 @@ No LLM is involved in this module.
 """
 
 import hashlib
-import json
 from typing import Final
 
+from bio_claim_check.common.canonical_json import pretty_json_bytes
 from bio_claim_check.features.report.models import Report
 
 REPORT_FILE: Final = "report.json"
@@ -22,8 +22,7 @@ RUN_ID_HEX: Final = 16
 
 def canonical_bytes(report: Report) -> bytes:
     """The one serialisation used for both hashing and writing."""
-    text = json.dumps(report.model_dump(mode="json"), sort_keys=True, ensure_ascii=False, indent=2)
-    return (text + "\n").encode("utf-8")
+    return pretty_json_bytes(report.model_dump(mode="json"))
 
 
 def run_id(data: bytes) -> str:

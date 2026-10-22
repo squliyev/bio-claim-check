@@ -37,26 +37,39 @@ class Usage(ValidatedModel):
 
     `reasoning_tokens` are part of `output_tokens` and `cached_input_tokens` part of `input_tokens`
     (the engine's normalised contract; each provider codec maps its raw fields onto it, S09).
+    `reasoning_tokens` is None when the provider did not report it: "not reported" is never written as
+    0, and is never estimated (I51). A sum that includes a non-reporting call is None as well, because
+    the true total is unknown. `Usage.zero()` (reasoning 0) is the identity for sums: no calls, no tokens.
     """
 
     input_tokens: NonNegInt = 0
     output_tokens: NonNegInt = 0
-    reasoning_tokens: NonNegInt = 0
+    reasoning_tokens: NonNegInt | None = None
     cached_input_tokens: NonNegInt = 0
 
     @model_validator(mode="after")
     def _subsets(self) -> Self:
-        if self.reasoning_tokens > self.output_tokens:
+        if self.reasoning_tokens is not None and self.reasoning_tokens > self.output_tokens:
             raise ValueError("reasoning_tokens are part of output_tokens, so cannot exceed them")
         if self.cached_input_tokens > self.input_tokens:
             raise ValueError("cached_input_tokens are part of input_tokens, so cannot exceed them")
         return self
 
+    @classmethod
+    def zero(cls) -> Self:
+        """The empty sum: no calls, so every count (reasoning included) is a measured 0."""
+        return cls(reasoning_tokens=0)
+
     def __add__(self, other: Self) -> Self:
+        reasoning = (
+            None
+            if self.reasoning_tokens is None or other.reasoning_tokens is None
+            else self.reasoning_tokens + other.reasoning_tokens
+        )
         return type(self)(
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
-            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
+            reasoning_tokens=reasoning,
             cached_input_tokens=self.cached_input_tokens + other.cached_input_tokens,
         )
 
@@ -96,10 +109,10 @@ class Spend(ValidatedModel):
     """
 
     calls: NonNegInt = 0
-    usage: Usage = Field(default_factory=Usage)
+    usage: Usage = Field(default_factory=Usage.zero)
     cost: Money | None = Decimal(0)
     cache_hits: NonNegInt = 0
-    replayed_usage: Usage = Field(default_factory=Usage)
+    replayed_usage: Usage = Field(default_factory=Usage.zero)
 
     def record(self, *, paid: Usage | None, usage: Usage, price: Price | None) -> Self:
         """Add one call: `paid` is what this run was billed for, None for a cache hit.

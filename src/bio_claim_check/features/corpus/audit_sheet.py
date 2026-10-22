@@ -17,6 +17,7 @@ from typing import Final
 
 from pydantic import ValidationError
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.text import CleanedText
 from bio_claim_check.features.contracts.corpus import AuditDecision, CorpusSplit, SourceEntry
 from bio_claim_check.features.contracts.ids import SourceId
@@ -26,8 +27,10 @@ COLUMNS: Final = ("position", "source_id", "rule", "evidence", "abstract", "deci
 _FORMULA_START: Final = ("=", "+", "-", "@", "\t", "\r")
 
 
-class AuditSheetError(Exception):
+class AuditSheetError(BccError):
     """A filled-in sheet broke the audit rules. `problems` holds one line per problem."""
+
+    code = "corpus.audit_sheet"
 
     def __init__(self, problems: list[str]) -> None:
         super().__init__("\n".join(problems))
