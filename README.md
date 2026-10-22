@@ -123,5 +123,6 @@ repository*). A DOI will be added at the 1.0 release.
 
 ## License
 
-Code: [Apache-2.0](LICENSE). Planned datasets ship identifiers, spans and claims rather than abstract
-text, because abstracts carry publisher copyright.
+Code: [Apache-2.0](LICENSE). The evaluation corpus ([`datasets/`](datasets/README.md)) ships
+identifiers, metadata, offsets and hashes rather than abstract text, because abstracts carry publisher
+copyright; see its README for credit and terms.

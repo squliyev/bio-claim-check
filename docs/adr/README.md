@@ -34,6 +34,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0008](./0008-citable-sources-medline-abstracts.md) | Citable sources: MEDLINE abstracts, identity `MED:<pmid>` | Accepted | Which records a claim may be checked against; how a paper is identified; Europe PMC terms |
 | [0009](./0009-cache-and-replay.md) | Cache and replay: raw responses keyed by request; read-only fails closed | Accepted | How a run is reproduced without the network; what a cache miss means in replay |
 | [0010](./0010-evaluation-corpus-and-split.md) | Evaluation corpus: pre-registered sieve, trial clusters and a held-out split | Accepted | How eligible abstracts are chosen and split so dev tuning never sees test findings |
+| [0011](./0011-sieve-v2-and-sealed-dataset.md) | Sieve v2, own-split pools and the sealed dataset | Accepted | Which rules admitted each candidate; how any edit to the frozen dataset becomes visible; how test ids stay out of the code |
 
 ## Superseded / historical
 

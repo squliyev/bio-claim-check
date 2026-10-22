@@ -33,7 +33,8 @@ planted overstatements. Three things can make those numbers meaningless without 
   systematic reviews and meta-analyses; records with **no** publication types (unknown cannot prove "not
   a review"); and, for the MeSH-based kinds only, records with `mesh_headings = None` (not indexed yet
   cannot prove "no Humans tag").
-- **Sieve v1** (`features/corpus/eligibility.py`, no LLM, ADR 0003), four kinds:
+- **Sieve v1** (`features/corpus/eligibility.py`, no LLM, ADR 0003), four kinds. *Extended by
+  [ADR 0011](./0011-sieve-v2-and-sealed-dataset.md): sieve v2, five kinds, is what built the dataset.*
 
   | Kind | Rule | Evidence |
   |---|---|---|

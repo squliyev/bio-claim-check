@@ -81,6 +81,11 @@ def test_question_order_in_the_spec_does_not_change_the_data() -> None:
     assert build(reordered).manifest != build(spec).manifest  # the spec is hashed as written
 
 
+def test_rank_order_within_a_pool_is_data() -> None:
+    reranked = {q: tuple(reversed(pool)) for q, pool in world().items()}
+    assert build(source=QueryLiteratureSource(reranked)).data != build().data
+
+
 def test_each_question_is_searched_once_with_its_cutoff_and_pool_size() -> None:
     source = QueryLiteratureSource(world())
     build(source=source)

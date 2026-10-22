@@ -133,13 +133,14 @@ class DatasetReadError(Exception):
 def read_dataset(folder: Path) -> dict[str, bytes]:
     """Every file under `folder`, keyed by its POSIX path relative to it, so the seal check sees extras too.
 
-    Hidden files (`.DS_Store` and the like) are skipped: they are OS metadata, ignored by git, never data.
+    Only `.DS_Store` (macOS folder metadata) is skipped. Any other hidden file is returned, so the seal
+    check reports it as an unexpected file instead of letting it sit beside the data unseen.
     """
     if not folder.is_dir():
         raise DatasetReadError(f"{folder} is not a folder")
     try:
         paths = [p for p in sorted(folder.rglob("*")) if p.is_file()]
-        visible = [p for p in paths if not any(part.startswith(".") for part in p.relative_to(folder).parts)]
+        visible = [p for p in paths if p.name != ".DS_Store"]
         return {p.relative_to(folder).as_posix(): p.read_bytes() for p in visible}
     except OSError as err:
         raise DatasetReadError(f"cannot read the dataset under {folder}: {err}") from None

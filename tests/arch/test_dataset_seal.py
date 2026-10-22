@@ -17,6 +17,10 @@ pytestmark = pytest.mark.arch
 DATASET = ROOT / "datasets"
 PMIDS = frozenset({"31234567", "29876543"})
 QIDS = frozenset({"fx-statin-q1", "fx-glp1-q4"})
+# Pinned outside datasets/, so editing the data, re-hashing the manifest and re-sealing cannot stay green:
+# a new seal is a visible diff in this file. SEALED hashes manifest.json, which hashes corpus.yaml and
+# every data file, so this one value pins them all.
+EXPECTED_SEAL = "fd519195e96bdff2d4b7665c2f2c57acaf05d6efa89cc8d690bd18d45ce27fb5"
 
 
 def _check(text: str) -> list[str]:
@@ -43,10 +47,19 @@ def test_no_test_ids_guard_accepts(text: str) -> None:
         ("PMID 29876543.", "test PMID 29876543"),
         ('{"id": "fx-statin-q1"}', "test question id fx-statin-q1"),
         ("see fx-glp1-q4, then", "test question id fx-glp1-q4"),
+        ("PMID31234567 and MED31234567", "test PMID 31234567"),
+        ("pmid_29876543", "test PMID 29876543"),
     ],
 )
 def test_no_test_ids_guard_rejects(text: str, detail: str) -> None:
-    assert _check(text) == [detail]
+    assert detail in _check(text)
+
+
+def test_no_test_ids_guard_scans_the_path() -> None:
+    found = check_no_test_ids(
+        Path("docs/notes-31234567.md"), "clean", test_pmids=PMIDS, test_question_ids=QIDS
+    )
+    assert [(v.line, v.detail) for v in found] == [(0, "test PMID 31234567")]
 
 
 def _text_files() -> list[Path]:
@@ -54,10 +67,7 @@ def _text_files() -> list[Path]:
     for path in repo_files(ROOT):
         if path.relative_to(ROOT).parts[0] == "datasets":
             continue
-        try:
-            path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
+        path.read_text(encoding="utf-8")  # fail closed: a non-UTF-8 tracked file would hide ids from the scan
         texts.append(path)
     return texts
 
@@ -74,6 +84,11 @@ needs_dataset = pytest.mark.skipif(
 def test_the_committed_dataset_is_intact_and_sealed() -> None:
     spec = load_corpus_spec(DATASET / SPEC)
     assert dataset_problems(read_dataset(DATASET), spec) == []
+
+
+@needs_dataset
+def test_the_seal_is_the_pinned_one() -> None:
+    assert (DATASET / "SEALED").read_text(encoding="ascii").strip() == EXPECTED_SEAL
 
 
 @needs_dataset

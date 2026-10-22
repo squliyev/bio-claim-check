@@ -34,7 +34,16 @@ def test_a_wider_z_gives_a_wider_interval() -> None:
 
 @pytest.mark.parametrize(
     ("k", "n", "z"),
-    [(0, 0, 1.96), (-1, 5, 1.96), (6, 5, 1.96), (1, 5, 0.0), (1, 5, float("nan")), (True, 5, 1.96)],
+    [
+        (0, 0, 1.96),
+        (-1, 5, 1.96),
+        (6, 5, 1.96),
+        (1, 5, 0.0),
+        (1, 5, float("nan")),
+        (1, 5, float("inf")),
+        (1, 5, True),
+        (True, 5, 1.96),
+    ],
 )
 def test_rejects_invalid_input(k: int, n: int, z: float) -> None:
     with pytest.raises(ValueError, match=r"wilson|z must"):

@@ -3,7 +3,8 @@
 Why: the corpus needs retrieval (the pools) and the corpus slice (sieve, clusters, serialisation).
 Slices never import each other, so only app may combine them. The whole build is deterministic: the
 same spec, the same cached responses, the same tool version and the same declared fetch date give the
-same bytes (invariant I37), whatever order the papers arrive in.
+same bytes (invariant I37). The order of questions in the spec does not change the data files; the rank
+order of each pool does, because ranks are data.
 It distrusts its port: if one source comes back with different metadata under two questions, the build
 stops instead of guessing which one is true.
 Must not: do I/O (the caller publishes the bytes, manifest last), read the clock (the fetch date is

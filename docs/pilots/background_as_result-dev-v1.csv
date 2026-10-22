@@ -1,0 +1,19 @@
+order,source_id,decision,reason
+1,MED:37852737,confirm,background is preclinical immune effects; own phase II trial found no efficacy and no immune modulation from metformin alone
+2,MED:32794612,confirm,background is reduced CRC incidence and mortality; own study measures pathology and DFS after resection only
+3,MED:29524831,reject,own cohort results establish the dose-dependent protective association stated as background
+4,MED:31770138,reject,own case-control results establish the reduced-CRC association stated as background
+5,MED:35608580,confirm,background is observational and preclinical benefit; own RCT is null
+6,MED:36751811,confirm,background is lower PD incidence in patients; own study is a mouse model
+7,MED:36744171,confirm,background is in vitro antiproliferation; own retrospective study does not test it and is mostly null
+8,MED:38212401,confirm,background is ICP reduction from an earlier trial; own analysis measures cognition only
+9,MED:29137418,confirm,background is mTOR inhibition; own trial is null and does not test the mechanism
+10,MED:31324361,confirm,background covers other cancers; own study covers pancreatic cancer and lymphoma
+11,MED:39594606,confirm,background is about a different drug (a DPP-4 inhibitor); own study tests semaglutide
+12,MED:32021570,confirm,background is favourable evidence; own retrospective study is null
+13,MED:35859114,reject,own results show better OS and DFS with metformin and so establish the protective effect stated as background
+14,MED:38798180,confirm,background is anti-obesity effects; own mouse study measures liver transcriptomics only
+15,MED:36351567,confirm,background is preclinical immunomodulation; own study measures clinical outcomes not immunomodulation
+16,MED:28819383,reject,own in vitro and xenograft results establish breast cancer growth inhibition stated as background
+17,MED:36091775,reject,own results show AMPK activation attenuates BMP signalling as stated in background
+18,MED:28885995,reject,own rat results establish a beneficial CNS effect stated as background

@@ -514,7 +514,7 @@ def check_suppression_reasons(path: Path, text: str) -> list[Violation]:
     return found
 
 
-_NUMBER = re.compile(r"(?<!\w)(?<!\d\.)(?:MED:)?(\d+)(?!\w|\.\d)")
+_NUMBER = re.compile(r"(?<!\d)(?<!\d\.)(\d+)(?!\d|\.\d)")
 _ID_WORD = re.compile(r"[\w-]+")
 
 
@@ -523,11 +523,14 @@ def check_no_test_ids(
 ) -> list[Violation]:
     """No sealed-test PMID or test question id may appear outside `datasets/` (I41, ADR 0010).
 
-    PMIDs are matched by exact membership, as `MED:<n>` or a bare `<n>`, so an unrelated number (a date, a
-    constant) never fires unless it *is* a test PMID. Question ids match as whole hyphenated words.
+    PMIDs are matched by exact membership of every maximal digit run that is not part of a decimal, so
+    `MED:<n>`, `PMID<n>`, `pmid_<n>` and a bare `<n>` all fire, while an unrelated number (a date, a constant)
+    never does unless it *is* a test PMID. Question ids match as whole hyphenated words. The path is scanned
+    like a line of text (row 0), so an id in a file name fires too. Deliberate obfuscation (escapes, string
+    concatenation) is out of scope: this guards against accidents, not adversaries.
     """
     found: list[Violation] = []
-    for row, line in enumerate(text.splitlines(), start=1):
+    for row, line in [(0, path.as_posix()), *enumerate(text.splitlines(), start=1)]:
         found += [
             Violation("no-test-ids", path, row, f"test PMID {m.group(1)}")
             for m in _NUMBER.finditer(line)

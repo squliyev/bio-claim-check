@@ -21,8 +21,8 @@ def wilson(k: int, n: int, z: float = Z_95) -> tuple[float, float]:
     """
     if type(k) is not int or type(n) is not int or n < 1 or not 0 <= k <= n:
         raise ValueError(f"wilson needs integers n >= 1 and 0 <= k <= n, got k={k!r}, n={n!r}")
-    if not z > 0:
-        raise ValueError(f"z must be positive, got {z!r}")
+    if type(z) is bool or not (math.isfinite(z) and z > 0):
+        raise ValueError(f"z must be a finite positive number, got {z!r}")
     p = k / n
     z2 = z * z
     centre = (p + z2 / (2 * n)) / (1 + z2 / n)

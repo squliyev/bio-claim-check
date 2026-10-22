@@ -28,10 +28,11 @@ def _invoke(*argv: str) -> tuple[int, str, str]:
     return result.exit_code, result.stdout, result.stderr
 
 
-def test_read_dataset_keys_every_visible_file_by_posix_path(tmp_path: Path) -> None:
+def test_read_dataset_keys_every_file_by_posix_path_except_ds_store(tmp_path: Path) -> None:
     files = dataset_files()
-    _write(tmp_path, {**files, ".DS_Store": b"x", ".hidden/a": b"y"})
-    assert read_dataset(tmp_path) == files
+    _write(tmp_path, {**files, ".DS_Store": b"x", "dev/.DS_Store": b"x", ".hidden/a": b"y"})
+    # a hidden file is seen, so the seal check flags it
+    assert read_dataset(tmp_path) == {**files, ".hidden/a": b"y"}
 
 
 def test_read_dataset_refuses_a_missing_folder(tmp_path: Path) -> None:
