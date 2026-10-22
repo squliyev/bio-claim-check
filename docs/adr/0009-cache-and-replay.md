@@ -41,5 +41,6 @@ fetches on a miss is just as bad: a replay that quietly went to the network is n
 - **Negative (accepted):** a stale snapshot can hide a later retraction. S12 re-checks retraction for
   every cited paper with an uncached lookup and the report says when it could not.
 - **Negative (accepted):** the cache grows without bound; deleting `var/cache.sqlite` is the reset.
-- **Follow-ups:** LLM response keys add a repeat index (S08); a later session exports the cache entries a
+- **Follow-ups:** done in S08: LLM response keys include a repeat index and the pinned model identity
+  (ADR 0012). Open: a later session exports the cache entries a
   report used as a scrubbed replay bundle.

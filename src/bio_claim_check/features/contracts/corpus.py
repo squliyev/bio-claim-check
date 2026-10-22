@@ -16,9 +16,10 @@ from typing import Annotated, Final, Literal, Self
 
 from pydantic import BeforeValidator, Field, StringConstraints, ValidationError, model_validator
 
+from bio_claim_check.common.models import NonBlankStr, Sha256Hex, ValidatedModel
 from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import OverstatedReason
-from bio_claim_check.features.contracts.verdict import NonBlankStr, StrictSpan, ValidatedModel
+from bio_claim_check.features.contracts.verdict import StrictSpan
 
 TRAP_KINDS: Final = (
     OverstatedReason.PRECLINICAL_TO_CLINICAL,
@@ -47,7 +48,6 @@ NLM_NOTICE: Final = (
 
 QuestionId = Annotated[str, StringConstraints(strict=True, pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
 DomainId = Annotated[str, StringConstraints(strict=True, pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")]
-Sha256Hex = Annotated[str, StringConstraints(strict=True, pattern=r"^[0-9a-f]{64}$")]
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

@@ -16,10 +16,9 @@ No LLM is involved in this module.
 """
 
 from collections.abc import Callable, Mapping
-from typing import Annotated, Any, Self, cast, override
+from typing import Annotated, ClassVar, Self, cast
 
 from pydantic import (
-    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -29,6 +28,7 @@ from pydantic import (
     model_validator,
 )
 
+from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.common.text import CleanedText, Span, locate_quote, near_match
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import (
@@ -39,16 +39,6 @@ from bio_claim_check.features.contracts.labels import (
     NegationCheck,
     OverstatedReason,
 )
-
-
-def _non_blank(value: str) -> str:
-    if not value.strip():
-        raise ValueError("must not be blank")
-    return value
-
-
-NonBlankStr = Annotated[str, Field(strict=True), AfterValidator(_non_blank)]
-"""A string with at least one non-space character. A validator, not ``minLength``: strict-mode subset."""
 
 
 def _int_offsets(value: object) -> object:
@@ -99,18 +89,6 @@ def disposition(label: Label, status: EvidenceStatus, negation: NegationCheck) -
 
 NegationDetector = Callable[[Span, CleanedText], NegationCheck]
 """Decides whether a located span sits under a negation (S10). Re-run on replay, so it must be pure."""
-
-
-class ValidatedModel(BaseModel):
-    """Frozen, extra=forbid, no unvalidated copies (pydantic's `model_copy(update=...)` skips validation)."""
-
-    model_config = _FROZEN
-
-    @override
-    def model_copy(self, *, update: Mapping[str, Any] | None = None, deep: bool = False) -> Self:
-        if update:
-            raise TypeError(f"{type(self).__name__} is validated on construction; build a new one (finalise)")
-        return super().model_copy(deep=deep)
 
 
 class Claim(ValidatedModel):
@@ -183,6 +161,8 @@ def _negation(span: Span | None, abstract: CleanedText, detector: NegationDetect
 
 class Verdict(ValidatedModel):
     """The system's conclusion for one (claim, source) pair. Build it with `Verdict.finalise`."""
+
+    _rebuild_hint: ClassVar[str] = "build a new one (finalise)"
 
     claim_id: ClaimId
     source_id: SourceId

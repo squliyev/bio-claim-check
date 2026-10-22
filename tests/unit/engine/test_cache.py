@@ -11,8 +11,10 @@ from bio_claim_check.engine.cache.policy import (
     CacheError,
     CacheMissError,
     CacheMode,
+    Fetched,
     cache_key,
     fetch_through,
+    fetch_through_result,
 )
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
 
@@ -97,6 +99,52 @@ def test_a_concurrent_first_writer_wins_for_this_run_too() -> None:
     assert fetch_through(
         cache, CacheMode.READ_WRITE, "k", fetch_while_another_process_stores, namespace="ns"
     ) == (b"theirs")
+
+
+class _SpyCache(InMemoryCache):
+    def __init__(self) -> None:
+        super().__init__()
+        self.touched = 0
+
+    @override
+    def get(self, key: str) -> bytes | None:
+        self.touched += 1
+        return super().get(key)
+
+    @override
+    def put(self, key: str, data: bytes) -> None:
+        self.touched += 1
+        super().put(key, data)
+
+
+def test_result_reports_live_bytes_only_when_fetch_ran() -> None:
+    cache = InMemoryCache()
+    first = fetch_through_result(cache, CacheMode.READ_WRITE, "k", _Fetch(), namespace="ns")
+    assert first == Fetched(data=b"fresh", live=b"fresh")
+    again = fetch_through_result(cache, CacheMode.READ_WRITE, "k", _Fetch(b"other"), namespace="ns")
+    assert again == Fetched(data=b"fresh", live=None)
+    replay = fetch_through_result(cache, CacheMode.READ_ONLY, "k", _Fetch(), namespace="ns")
+    assert replay == Fetched(data=b"fresh", live=None)
+
+
+def test_result_on_a_lost_race_uses_stored_bytes_but_reports_the_paid_fetch() -> None:
+    cache = InMemoryCache()
+
+    def fetch_while_another_process_stores() -> bytes:
+        cache.put("k", b"theirs")
+        return b"ours"
+
+    got = fetch_through_result(
+        cache, CacheMode.READ_WRITE, "k", fetch_while_another_process_stores, namespace="ns"
+    )
+    assert got == Fetched(data=b"theirs", live=b"ours")
+
+
+def test_result_in_off_mode_never_touches_the_cache() -> None:
+    cache = _SpyCache()
+    got = fetch_through_result(cache, CacheMode.OFF, "k", _Fetch(), namespace="ns")
+    assert got == Fetched(data=b"fresh", live=b"fresh")
+    assert cache.touched == 0
 
 
 class _ForgetfulCache(InMemoryCache):

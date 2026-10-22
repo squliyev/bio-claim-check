@@ -11,8 +11,9 @@ from typing import Self
 
 from pydantic import model_validator
 
+from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.features.contracts.labels import AnswerMode
-from bio_claim_check.features.contracts.verdict import Claim, NonBlankStr, ValidatedModel
+from bio_claim_check.features.contracts.verdict import Claim
 
 
 class Answer(ValidatedModel):

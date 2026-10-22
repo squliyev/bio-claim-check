@@ -10,8 +10,8 @@ No LLM is involved in this module.
 
 from enum import StrEnum
 
+from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
-from bio_claim_check.features.contracts.verdict import NonBlankStr, ValidatedModel
 
 
 class FindingKind(StrEnum):

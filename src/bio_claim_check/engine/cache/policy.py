@@ -10,6 +10,7 @@ Must not: know what is cached, or read a clock.
 import hashlib
 import json
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from enum import StrEnum
 
 from pydantic import JsonValue
@@ -46,10 +47,23 @@ def cache_key(namespace: str, version: int, payload: Mapping[str, JsonValue]) ->
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def fetch_through(
+@dataclass(frozen=True, slots=True)
+class Fetched:
+    """What `fetch_through_result` returned, and whether this call paid for a live fetch.
+
+    `data` is what the caller must use (the stored bytes, so every replay sees the same).
+    `live` is what `fetch()` returned in this call, or None on a cache hit. They differ only when another
+    writer stored the key first; spend is counted on `live`, the result is built from `data`.
+    """
+
+    data: bytes
+    live: bytes | None
+
+
+def fetch_through_result(
     cache: BaseCache, mode: CacheMode, key: str, fetch: Callable[[], bytes], *, namespace: str
-) -> bytes:
-    """Return the bytes for `key`.
+) -> Fetched:
+    """Return the bytes for `key`, and the live bytes if `fetch` ran.
 
     - `off`: always `fetch()`; the cache is neither read nor written.
     - `read-only`: the cached bytes, or `CacheMissError`; `fetch` is never called.
@@ -59,13 +73,22 @@ def fetch_through(
       this run uses the bytes every replay will see.
     """
     if mode is CacheMode.OFF:
-        return fetch()
+        live = fetch()
+        return Fetched(data=live, live=live)
     if (hit := cache.get(key)) is not None:
-        return hit
+        return Fetched(data=hit, live=None)
     if mode is CacheMode.READ_ONLY:
         raise CacheMissError(namespace)
-    cache.put(key, fetch())
+    live = fetch()
+    cache.put(key, live)
     stored = cache.get(key)
     if stored is None:
         raise CacheError(f"the {namespace} cache did not keep a written entry")
-    return stored
+    return Fetched(data=stored, live=live)
+
+
+def fetch_through(
+    cache: BaseCache, mode: CacheMode, key: str, fetch: Callable[[], bytes], *, namespace: str
+) -> bytes:
+    """`fetch_through_result(...).data`, for callers that do not count spend."""
+    return fetch_through_result(cache, mode, key, fetch, namespace=namespace).data

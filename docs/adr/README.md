@@ -36,6 +36,12 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0010](./0010-evaluation-corpus-and-split.md) | Evaluation corpus: pre-registered sieve, trial clusters and a held-out split | Accepted | How eligible abstracts are chosen and split so dev tuning never sees test findings |
 | [0011](./0011-sieve-v2-and-sealed-dataset.md) | Sieve v2, own-split pools and the sealed dataset | Accepted | Which rules admitted each candidate; how any edit to the frozen dataset becomes visible; how test ids stay out of the code |
 
+## Model calls
+
+| ADR | Title | Status | Resolves |
+|---|---|---|---|
+| [0012](./0012-llm-engine-runner-and-cost.md) | LLM engine: one runner, one repair, a complete cache key and honest cost | Accepted | What every model call does, in which order; how repeats, failures and money are counted |
+
 ## Superseded / historical
 
 None yet.

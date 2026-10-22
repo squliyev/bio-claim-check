@@ -23,8 +23,8 @@ from pydantic import (
     model_validator,
 )
 
+from bio_claim_check.common.models import NonBlankStr
 from bio_claim_check.features.contracts.labels import Label, OverstatedReason
-from bio_claim_check.features.contracts.verdict import NonBlankStr
 
 _FROZEN = ConfigDict(frozen=True, extra="forbid")
 

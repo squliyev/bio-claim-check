@@ -17,9 +17,9 @@ from typing import Annotated
 
 from pydantic import Field
 
+from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.common.text import CleanedText, clean_abstract
 from bio_claim_check.features.contracts.ids import SourceId
-from bio_claim_check.features.contracts.verdict import NonBlankStr, ValidatedModel
 
 
 class Paper(ValidatedModel):

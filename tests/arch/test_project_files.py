@@ -11,6 +11,9 @@ import pytest
 import yaml
 
 from bio_claim_check.engine.cache.policy import CacheMode
+from bio_claim_check.engine.llm.errors import LlmFailureKind
+from bio_claim_check.engine.llm.messages import FinishReason
+from bio_claim_check.engine.llm.model_spec import Provider
 from bio_claim_check.features.contracts.corpus import CorpusSplit, NeverReason
 from bio_claim_check.features.contracts.finding import FindingKind
 from bio_claim_check.features.contracts.labels import (
@@ -190,6 +193,9 @@ def test_glossary_matches_the_enums() -> None:
         FindingKind,
         CorpusSplit,
         NeverReason,
+        Provider,
+        FinishReason,
+        LlmFailureKind,
     ]
     tables = _glossary_tables((DOCS / "glossary.md").read_text(encoding="utf-8"))
     assert set(tables) == {e.__name__ for e in enums}

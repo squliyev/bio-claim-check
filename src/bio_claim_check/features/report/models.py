@@ -17,15 +17,14 @@ from typing import Annotated, Any, Final, Literal, Self, cast
 from pydantic import Field, ModelWrapValidatorHandler, computed_field, model_validator
 from pydantic_core import to_jsonable_python
 
+from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.features.contracts.finding import Finding, FindingKind
 from bio_claim_check.features.contracts.labels import AnswerMode, Disposition, NegationCheck
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.verdict import (
     CitationNotRetrieved,
     Claim,
-    NonBlankStr,
     PairOutcome,
-    ValidatedModel,
     Verdict,
     VerifierFailure,
     claim_disposition,

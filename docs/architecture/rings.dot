@@ -9,6 +9,7 @@ digraph {
     ".app" ->  ".engine"
     ".app" ->  ".features"
     ".app" ->  ".infrastructure"
+    ".engine" ->  ".common"
     ".features" ->  ".common"
     ".features" ->  ".engine"
 }

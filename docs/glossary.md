@@ -1,7 +1,7 @@
 # Glossary
 
 The words this project counts with. Each table below lists the exact values of one enum (`labels` and
-`finding` and `corpus` in `bio_claim_check.features.contracts`, `CacheMode` in `bio_claim_check.engine.cache`); a test
+`finding` and `corpus` in `bio_claim_check.features.contracts`, `CacheMode` in `bio_claim_check.engine.cache`, `Provider`, `FinishReason` and `LlmFailureKind` in `bio_claim_check.engine.llm`); a test
 fails if a table and its enum drift apart. Meaning and
 counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md).
 
@@ -37,6 +37,15 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
 - **Prior finding:** the sieve rule for `background_as_result`: an early sentence reports prior evidence
   with an effect verb, and a later sentence reports this study's results.
 - **Split:** `dev` (for tuning prompts and rule packs) or `test` (sealed, for reported numbers only).
+- **Repeat:** one of several identical model requests made on purpose to measure instability. Its
+  `repeat_idx` is part of the cache key, so repeats are distinct provider calls and replay keeps them
+  apart ([ADR 0012](./adr/0012-llm-engine-runner-and-cost.md)).
+- **Usage:** the token counts the provider reported for one call (input, output, reasoning, cached
+  input). Never estimated. Reasoning tokens are part of output tokens; cached input is part of input.
+- **Spend:** what a run actually paid: live calls, replayed calls (cache hits), the usage of the live
+  calls and their cost. A cache hit adds no cost.
+- **Unpriced:** a model has no price on record, so the cost is unknown (`None`), never shown as 0.
+  Prices are entered by hand, with the date and the page they came from.
 - **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
   report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
 
@@ -151,3 +160,35 @@ Why a source can never be a trap candidate. The source stays in the pool, so ret
 | `unknown_publication_types` | No publication type is recorded, so the sieve cannot prove what the study is |
 | `mesh_not_indexed` | No MeSH headings yet; only the MeSH-based kinds are blocked |
 | `protocol` | A trial protocol: it has no results to overstate |
+
+## Provider
+
+Who serves a model deployment (ADR 0012). Each needs its own settings (`BCC_FOUNDRY__*`, `BCC_ANTHROPIC__*`,
+`BCC_OLLAMA__*`) unless the run is a read-only replay.
+
+| Value | Meaning |
+|---|---|
+| `foundry_openai` | A model on Azure AI Foundry, called through its OpenAI-compatible endpoint |
+| `foundry_anthropic` | A Claude model on Azure AI Foundry, called through the Anthropic SDK |
+| `anthropic` | A Claude model called through the Anthropic API directly |
+| `ollama` | A local model, pinned by digest |
+
+## FinishReason
+
+Why the provider stopped generating, normalised across providers.
+
+| Value | Meaning |
+|---|---|
+| `stop` | The model finished its reply |
+| `length` | The reply hit the output-token limit and is truncated; never repaired |
+| `content_filter` | A provider content filter blocked the reply; never repaired, always counted |
+
+## LlmFailureKind
+
+Why a structured model call produced no usable output. S12 maps each kind to a `FailureKind`.
+
+| Value | Meaning |
+|---|---|
+| `invalid_output` | The reply did not validate against the schema, even after one repair |
+| `truncated` | The reply hit the output-token limit |
+| `content_filtered` | A provider content filter blocked the request or the reply |

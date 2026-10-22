@@ -5,6 +5,7 @@ only `app` may (ADR 0002). It is also the only app module that imports infrastru
 adapters (CLI, UI) call the composers below instead (contract `driving-adapters-use-the-container`).
 The fake run wiring is S05; retrieval (S06) is the first live wiring: an httpx client with the
 User-Agent and timeouts, and the SQLite cache under `var_dir` in the configured mode (ADR 0009).
+`build_models` (S08) resolves each LLM role through the catalogue and checks its provider settings.
 Must not: hold logic. It builds objects, composes infrastructure with pure parsers, and normalises
 infrastructure errors into the domain's error types.
 """
@@ -13,18 +14,20 @@ import hashlib
 import time
 from collections.abc import Callable, Generator
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
 from bio_claim_check import __version__
-from bio_claim_check.app.settings import Settings
+from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
 from bio_claim_check.engine.cache.base_cache import BaseCache
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
+from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
 from bio_claim_check.features.contracts.corpus import (
     CorpusSpec,
@@ -230,3 +233,47 @@ def build_retrieval(
             )
         )
         yield EuropePmcLiteratureSource(client, cache, settings.cache_mode, sleep=sleep)
+
+
+class MissingProviderError(Exception):
+    """A live LLM role whose provider has no settings; the message names the role and the settings."""
+
+
+_PROVIDER_SETTINGS: dict[Provider, str] = {
+    Provider.FOUNDRY_OPENAI: "foundry",
+    Provider.FOUNDRY_ANTHROPIC: "foundry",
+    Provider.ANTHROPIC: "anthropic",
+    Provider.OLLAMA: "ollama",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class RoleModels:
+    """The model spec behind each LLM role."""
+
+    answer: ModelSpec
+    verifier: ModelSpec
+    trap: ModelSpec
+
+
+def build_models(settings: Settings, catalog: ModelCatalog) -> RoleModels:
+    """Each role's spec from the catalogue (an unknown deployment raises `UnknownDeploymentError`).
+
+    Outside `read-only`, a role whose provider is not configured raises `MissingProviderError` naming the
+    role, before any call is made. A read-only replay needs no provider: it never reaches one (ADR 0009).
+    """
+    roles = {
+        "answer": catalog.lookup(settings.answer_model),
+        "verifier": catalog.lookup(settings.verifier_model),
+        "trap": catalog.lookup(settings.trap_model),
+    }
+    if settings.cache_mode is not CacheMode.READ_ONLY:
+        configured = set(settings.configured_providers)
+        for role, spec in roles.items():
+            needed = _PROVIDER_SETTINGS[spec.provider]
+            if needed not in configured:
+                raise MissingProviderError(
+                    f"the {role} model {spec.deployment!r} needs {needed} settings "
+                    f"({ENV_PREFIX}{needed.upper()}__*); use {ENV_PREFIX}CACHE_MODE=read-only to replay"
+                )
+    return RoleModels(answer=roles["answer"], verifier=roles["verifier"], trap=roles["trap"])
