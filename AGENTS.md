@@ -3,6 +3,9 @@
 This is research software whose numbers other scientists may rely on. Correctness and honesty come
 before speed.
 
+**Start here:** [docs/HANDOFF.md](docs/HANDOFF.md) (state and next session) and
+[docs/roadmap.md](docs/roadmap.md) (the plan).
+
 ## Gate
 
 - Run `make verify` before every commit; it must be green. It runs ruff, ruff format, pyright strict,

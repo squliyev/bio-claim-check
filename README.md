@@ -35,6 +35,8 @@ flowchart LR
   and never call a model ([ADR 0003](docs/adr/0003-structure-in-code-judgement-in-llm.md)).
 - Decisions are recorded in [docs/adr](docs/adr/README.md). The rules that must never break, and the
   tests that prove them, are in [docs/invariants.md](docs/invariants.md).
+- The plan is in [docs/roadmap.md](docs/roadmap.md); contributors and coding agents start at
+  [docs/HANDOFF.md](docs/HANDOFF.md).
 
 ## Quick start (development)
 
