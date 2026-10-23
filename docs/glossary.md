@@ -43,7 +43,7 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   disposition), the `rapidfuzz` version and both model
   specs. Any edit, even to a docstring, makes a new judge.
 - **Prompt freeze:** `freeze/<name>.json`, which binds one judge fingerprint to the committed challenge
-  result. `app/freeze.py` pins its bytes and names the active one. A test-split audit records the active
+  result. `app/freeze.py` pins its bytes and names the active one (v2, ADR 0021). A test-split audit records the active
   `freeze_sha256` as its `prompts_sha256`. A dev audit's `prompts_sha256` is typed by the author.
 - **Split:** `dev` (for tuning prompts and rule packs) or `test` (sealed, for reported numbers only).
 - **Repeat:** one of several identical model requests made on purpose to measure instability. Its

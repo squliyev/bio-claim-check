@@ -130,7 +130,7 @@ def test_a_missing_judge_file_is_an_error(monkeypatch: pytest.MonkeyPatch) -> No
         current_judge(make_settings())
 
 
-RECORDED = ROOT / "challenge" / "dev-v1.result.json"
+RECORDED = ROOT / "challenge" / "results" / f"{ACTIVE_FREEZE}.json"
 
 
 def test_the_active_freeze_is_recomputed_from_the_code_and_committed_files() -> None:
@@ -146,7 +146,7 @@ def test_the_active_freeze_refuses_a_missing_record(tmp_path: Path) -> None:
 def test_the_active_freeze_refuses_another_challenge_result(tmp_path: Path) -> None:
     other = tmp_path / "result.json"
     other.write_bytes(RECORDED.read_bytes() + b"\n")
-    with pytest.raises(FreezeError, match="the challenge result changed since freeze v1"):
+    with pytest.raises(FreezeError, match=f"the challenge result changed since freeze {ACTIVE_FREEZE}"):
         active_freeze_sha256(make_settings(), ROOT / "freeze", other)
 
 

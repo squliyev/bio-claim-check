@@ -18,6 +18,7 @@ from tests.support.settings import make_settings
 from bio_claim_check.app import cli
 from bio_claim_check.app.cli import ExitCode
 from bio_claim_check.app.container import build_challenge_ports, default_rulepack
+from bio_claim_check.app.freeze import ACTIVE_FREEZE
 from bio_claim_check.app.settings import Settings
 from bio_claim_check.app.usecases.challenge import ChallengePorts
 from bio_claim_check.engine.cache.policy import CacheMode
@@ -101,6 +102,10 @@ def _challenge(tmp_path: Path, folder: Path, source_11: str = "MED:11") -> Path:
     return path
 
 
+def _recorded(tmp_path: Path) -> Path:
+    return tmp_path / "challenge" / "results" / f"{ACTIVE_FREEZE}.json"
+
+
 def _args(tmp_path: Path, *extra: str) -> list[str]:
     folder = _dataset(tmp_path)
     return ["--challenge", str(_challenge(tmp_path, folder)), "--dataset", str(folder), *extra]
@@ -116,10 +121,10 @@ def test_run_keeps_the_attempt_and_record_publishes_once(
     assert "agree 2/2; unsafe passes 0" in out
     assert "challenge rule: met (author-confirmed, single rater; not accuracy)" in out
     (attempt,) = (tmp_path / "var" / "challenge").iterdir()
-    assert not (tmp_path / "challenge" / "dev-v1.result.json").exists()
+    assert not _recorded(tmp_path).exists()
     code, out, err = invoke(tmp_path, "challenge", "run", *args, "--record")
     assert code == 0, err
-    recorded = tmp_path / "challenge" / "dev-v1.result.json"
+    recorded = _recorded(tmp_path)
     assert recorded.read_bytes() == attempt.read_bytes()
     assert invoke(tmp_path, "challenge", "run", *args, "--record")[0] == 0  # same bytes: idempotent
 
@@ -130,7 +135,7 @@ def test_record_refuses_a_failing_rule(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert code == ExitCode.INPUT
     assert "challenge rule: NOT met" in out
     assert "nothing recorded" in err
-    assert not (tmp_path / "challenge" / "dev-v1.result.json").exists()
+    assert not _recorded(tmp_path).exists()
 
 
 def test_bad_input_and_a_missing_source_have_their_exit_codes(
@@ -179,14 +184,14 @@ def test_freeze_write_needs_an_attesting_record_and_writes_once(
     args = _args(tmp_path)
     out_dir = tmp_path / "freeze"
     code, _, err = invoke(tmp_path, "freeze", "write", *args, "--out", str(out_dir))
-    assert (code, "dev-v1.result.json" in err) == (ExitCode.INPUT, True)  # nothing recorded yet
+    assert (code, f"results/{ACTIVE_FREEZE}.json" in err) == (ExitCode.INPUT, True)  # nothing recorded yet
     assert invoke(tmp_path, "challenge", "run", *args, "--record")[0] == 0
     code, out, err = invoke(tmp_path, "freeze", "write", *args, "--out", str(out_dir))
     assert code == 0, err
-    written = (out_dir / "v1.json").read_bytes()
+    written = (out_dir / f"{ACTIVE_FREEZE}.json").read_bytes()
     assert f"file sha256 (pin it in app/freeze.py FROZEN): {hashlib.sha256(written).hexdigest()}" in out
     record = json.loads(written)
-    result = (tmp_path / "challenge" / "dev-v1.result.json").read_bytes()
+    result = _recorded(tmp_path).read_bytes()
     assert record["challenge_result_sha256"] == hashlib.sha256(result).hexdigest()
     assert invoke(tmp_path, "freeze", "write", *args, "--out", str(out_dir))[0] == 0  # same bytes
 

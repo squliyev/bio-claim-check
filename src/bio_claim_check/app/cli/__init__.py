@@ -54,7 +54,7 @@ from bio_claim_check.app.container import (
     run_path,
     write_seal,
 )
-from bio_claim_check.app.freeze import FREEZE_DIR, freeze_record
+from bio_claim_check.app.freeze import ACTIVE_FREEZE, FREEZE_DIR, freeze_record
 from bio_claim_check.app.logging_setup import configure_logging
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import RunDetails, RunInputs, RunRecorder
@@ -713,7 +713,8 @@ DEFAULT_AUDIT_DIR = Path("var/audit")  # git-ignored: sheets hold abstract text 
 def _test_freeze(settings: Settings) -> str:
     """The recomputed active freeze hash that gates a test audit (never typed; I74)."""
     try:
-        return active_freeze_sha256(settings, Path(FREEZE_DIR), _result_path(DEFAULT_CHALLENGE))
+        result = _result_path(DEFAULT_CHALLENGE, ACTIVE_FREEZE)
+        return active_freeze_sha256(settings, Path(FREEZE_DIR), result)
     except FreezeError as err:
         _print_problems("The test split is closed: this code is not the active frozen judge", err.problems)
         raise typer.Exit(code=ExitCode.INPUT) from None
@@ -806,8 +807,12 @@ ChallengeFile = Annotated[Path, typer.Option("--challenge", help="The challenge 
 CHALLENGE_DIR = "challenge"  # attempts under the var dir, by judge
 
 
-def _result_path(challenge: Path) -> Path:
-    return challenge.with_name(challenge.name.removesuffix(".jsonl") + ".result.json")
+FreezeName = Annotated[str, typer.Option("--name", help="Freeze name the result belongs to, e.g. v2.")]
+
+
+def _result_path(challenge: Path, name: str) -> Path:
+    """The recorded result of one freeze: results/<name>.json beside the set (ADR 0021)."""
+    return challenge.parent / "results" / f"{name}.json"
 
 
 def _read_input(path: Path) -> bytes:
@@ -821,8 +826,9 @@ def _read_input(path: Path) -> bytes:
 def challenge_run_command(
     challenge: ChallengeFile = DEFAULT_CHALLENGE,
     record: Annotated[
-        bool, typer.Option("--record", help="Also publish <set>.result.json beside the set, once.")
+        bool, typer.Option("--record", help="Also publish results/<name>.json beside the set, once.")
     ] = False,
+    name: FreezeName = ACTIVE_FREEZE,
     dataset: DatasetDir = Path("datasets"),
     env_file: EnvFile = Path(".env"),
 ) -> None:
@@ -862,7 +868,8 @@ def challenge_run_command(
         if not result.score.passed:
             _fail(ExitCode.INPUT, "the challenge rule is not met; nothing recorded")
         try:
-            path = publish_document(challenge.parent, _result_path(challenge).name, out)
+            target = _result_path(challenge, name)
+            path = publish_document(target.parent, target.name, out)
         except OutputConflictError as err:
             _fail(ExitCode.OUTPUT, str(err))
         typer.echo(f"recorded: {path}")
@@ -888,7 +895,7 @@ app.add_typer(freeze_app, name="freeze")
 
 @freeze_app.command("write")
 def freeze_write_command(
-    name: Annotated[str, typer.Option("--name", help="Freeze name, e.g. v1.")] = "v1",
+    name: FreezeName = ACTIVE_FREEZE,
     challenge: ChallengeFile = DEFAULT_CHALLENGE,
     dataset: DatasetDir = Path("datasets"),
     out: Annotated[Path, typer.Option(help="Folder for freeze records.")] = Path(FREEZE_DIR),
@@ -898,7 +905,7 @@ def freeze_write_command(
     settings = _settings(env_file)
     files, _ = _dataset(dataset)
     data = _read_input(challenge)
-    result = _read_input(_result_path(challenge))
+    result = _read_input(_result_path(challenge, name))
     try:
         judge = current_judge(settings)
     except JudgeReadError as err:

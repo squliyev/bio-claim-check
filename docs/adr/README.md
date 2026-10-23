@@ -49,6 +49,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0018](./0018-run-record.md) | The run record: canonical result, trace, ledger and live-call budget | Accepted | What a run leaves behind; how the run id is derived; how every attempt and its usage is recorded, including failures; how live calls are capped |
 | [0019](./0019-llm-verifier-and-live-run.md) | The LLM verifier, the first live `run` and the retraction re-check | Accepted | What the verifier may see; which LLM failures count per pair and which stop the run; model families; declared prompts; the live and dev `run`; re-checking a run's citations for retractions |
 | [0020](./0020-challenge-set-and-judge-freeze.md) | The verifier challenge set and the judge freeze | Accepted | How the verifier is checked on dev; the narrow reading of ADR 0008 for authored claims; the judge fingerprint; the freeze that gates the test split |
+| [0021](./0021-neutral-few-shot-examples.md) | Few-shot examples off the benchmark's topics, and freeze v2 | Accepted | Rule-pack examples share no topic with any question (I75); freeze v2 is active |
 
 ## Superseded / historical
 

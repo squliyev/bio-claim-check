@@ -90,7 +90,7 @@ def test_validate_default_pack_is_byte_exact() -> None:
         "certainty_inflation",
     ]
     assert result.stdout == (
-        "rule pack 0.1.0 (schema 1) by Samir Guliyev\nrules: 9\n"
+        "rule pack 0.2.0 (schema 1) by Samir Guliyev\nrules: 9\n"
         + "".join(f"  - {r} ({r}): 2 example(s)\n" for r in reasons)
         + "examples: 18 (18 author-written, 0 reviewed)\n"
     )
@@ -101,14 +101,14 @@ def test_validate_default_pack_is_byte_exact() -> None:
     [
         (
             "strict",
-            "23f7a0fefb2e9d93",
+            "e109c1af676a8bc8",
             "2, needs_review=1, failed=0, flagged=1",
             "1, needs_review=1, failed=0, flagged=1",
             "invented_citation=0, dangling_reference=0",
         ),
         (
             "over_eager",
-            "7d8491af38a7dba8",
+            "53af9d77c6c04a54",
             "0, needs_review=1, failed=1, flagged=4",
             "0, needs_review=1, failed=1, flagged=4",
             "invented_citation=1, dangling_reference=0",

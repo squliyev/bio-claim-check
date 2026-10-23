@@ -1,0 +1,49 @@
+{
+  "challenge_result_sha256": "2f3f1977fb59d34d4b8debf69cb82c7401a7880c9a3dd10fdd1621d5e03e39fa",
+  "freeze_sha256": "6e8e57c4a24c7e74f1635121ba82dae32149e9c3a370c6dc0202060fd96bcf60",
+  "judge": {
+    "answerer": {
+      "deployment": "gpt-6.1-sol",
+      "family": "openai",
+      "model_version": "2026-09-29",
+      "params": {},
+      "provider": "foundry_openai"
+    },
+    "files": {
+      "common/canonical_json.py": "ec2d8371513cda89dcb5ab5449fa917d26e7445c50f884640a72f954d8e678e1",
+      "common/negation.py": "7d9a6f0b87d4279ac1262c4b9dff81268d7b58f72c3904357d6525aee705146f",
+      "common/text.py": "cf9255694183cd6de1b81d96230e69f3c4993561f3ae3f3ea14d81024c575e64",
+      "data/rulepacks/default.yaml": "c520c650a6e90b8e85c9e6f86ee083a303fa4fad2fe0fa634b75326babc00983",
+      "engine/agent/base_llm_agent.py": "dfc92b2cebf0137ee54901f62e9a538990d65a010d271496a461e13c36d99079",
+      "engine/llm/anthropic_messages_codec.py": "b6a70a24a26a7d4ff8510904a3981e9aed01268dd93125bf432f952543119a02",
+      "engine/llm/codec_support.py": "689279f355a2fbacb1d7f79af0fdb4a93d74f967f3ee6cb07268a763dc35e128",
+      "engine/llm/messages.py": "7f41a4b9c42600d0cccb4727458f494aaf8ab0193be140b3ac3a96ddd00f5820",
+      "engine/llm/openai_responses_codec.py": "da7bdda659a33e9829aab926dc00ca0b3a56ef1db9bbdf90e6217858df8c1ad5",
+      "engine/pipeline/llm_runner.py": "053f1e5a7aa1075a72d491ee5efa08f7b5f45b04c5419d64b28c101116615a2f",
+      "engine/prompts/prompt_template.py": "f3f7dfcc78989904bf449631a2eb0e5f846cdb066435f1a2e8a3e446f47782af",
+      "features/answer/answer_models.py": "731bce0e373e6a14d268cc5f6fd766cf38d51d9088b0b825a4f823c496bbd502",
+      "features/answer/answer_prompts.py": "863e12362cb84f4ca28a5a2f0a82b3a4d6a8c3b39840da8157ad87dac18c4239",
+      "features/answer/over_eager_answer_llm_agent.py": "a024e72b0440425c86829902ddc728ebfe0eaf0852dd0b04192176b4da725cf5",
+      "features/answer/strict_answer_llm_agent.py": "803cebec70ad7bf8055e4c4e71989e508399f39e4b1a2dbbe2139d0c1e7bf4da",
+      "features/contracts/labels.py": "110ff483dce3725b1a5647bd4a069bc2bdb4d6c4465ab7c4177316ce4895ab74",
+      "features/contracts/rulepack.py": "e534831168a0f4a757c752f1a0fced56513c099806d839a5f1c9a4b922e1c353",
+      "features/contracts/verdict.py": "7b05a4e5d8e2cde90ae4a88c43cb2ee0e8c2fcc5e23c5e03c568ba00703aac78",
+      "features/verify/llm_verifier.py": "c7958f4b0e0943d2e6d0033379efc435e738ff499659d876defe128d53f7488b",
+      "features/verify/verify_llm_agent.py": "ca95c15ada7eb1579fee59abd73ac4302a286d972c73d3930753efe942d0c7d3",
+      "features/verify/verify_models.py": "8c541d73e93b2b94ebe645e950e6e9f59fdd9e363782f413b0239a45b536e8fd",
+      "features/verify/verify_prompts.py": "1c7302a7625bf71b3fb9068aae329e573f1faec88958f3def15eb114a502b049"
+    },
+    "rapidfuzz": "3.14.6",
+    "verifier": {
+      "deployment": "claude-opus-4-8",
+      "family": "anthropic",
+      "model_version": "claude-opus-4-8",
+      "params": {
+        "max_output_tokens": 8192
+      },
+      "provider": "foundry_anthropic"
+    }
+  },
+  "judge_sha256": "9ce2d728a67ae062ca294d6a66aef2a07b9c26f2a9a4930dca25a812b4975e11",
+  "name": "v2"
+}

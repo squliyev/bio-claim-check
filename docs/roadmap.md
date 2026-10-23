@@ -5,7 +5,7 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S12b done):** S01–S12b are done; tag `prompts-frozen-v1`. Next: the maintainer's test-split audit, then
+**Status (S12c done):** S01–S12c are done; tag `prompts-frozen-v2`. Next: the maintainer's test-split audit, then
 **S13** (trap generator).
 
 ## Product
@@ -88,12 +88,13 @@ can be contributed here as their own credited rule pack. No results from this re
 | S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | ✅ |
 | S12a | LLM verifier (one isolated call per pair), failure mapping, model-family flag, first live `run` and `run --dev`, retraction re-check (ADR 0019) | ✅ |
 | S12b | Verifier challenge set attested in CI, tuning on dev (none needed), freeze record and test export (ADR 0011, 0020); tag `prompts-frozen-v1` | ✅ |
+| S12c | Prompt overfitting audit: few-shot examples moved off the benchmark's topics, neutrality guard (I75), freeze v2 (ADR 0021); tag `prompts-frozen-v2` | ✅ |
 
 ### Phase C — Measurement
 
 | Session | Scope |
 |---|---|
-| (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v1` |
+| (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2` |
 | S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test |
 | Proof checkpoint | Catch and false-alarm rate per trap kind on dev (exploratory, go / adjust) |
 | S14 | Baselines: AlwaysFlag, MeSH-cue, optional NLI; shared verifier contract suite |
@@ -163,7 +164,7 @@ can be contributed here as their own credited rule pack. No results from this re
 ## Dependencies
 
 ```
-S01 → … → S07b → S08 → S08b → S09 → S10 → S11 → S12a → S12b → (test audit) → S13 → proof → S14 → S15 → S16
+S01 → … → S07b → S08 → S08b → S09 → S10 → S11 → S12a → S12b → S12c → (test audit) → S13 → proof → S14 → S15 → S16
     → {S17, S18} → S19 → S20 → S21 → S22 → S23 → S24
 ```
 

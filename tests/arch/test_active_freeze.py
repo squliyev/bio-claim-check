@@ -23,7 +23,7 @@ from tests.support.settings import make_settings
 pytestmark = pytest.mark.arch
 
 RECORDS = ROOT / FREEZE_DIR
-RESULT = ROOT / "challenge" / "dev-v1.result.json"
+RESULT = ROOT / "challenge" / "results" / f"{ACTIVE_FREEZE}.json"
 
 
 def test_every_freeze_record_is_pinned_and_unchanged() -> None:

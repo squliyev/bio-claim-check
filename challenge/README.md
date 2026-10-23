@@ -2,6 +2,8 @@
 
 `dev-v1.jsonl` contains 16 curated (claim, source) items for the LLM verifier. They come only from
 **dev** questions and sources. See [ADR 0020](../docs/adr/0020-challenge-set-and-judge-freeze.md).
+The recorded result of each freeze is `results/<freeze>.json`: v1 and v2 (the active one, ADR 0021).
+The set has run twice, its limit.
 
 ## What it is
 

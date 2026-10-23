@@ -48,7 +48,8 @@ Abstracts cannot be committed (ADR 0008), and CI has no cache and no keys, so CI
    - the full answerer and verifier `ModelSpec`s.
 
    Any edit to a listed file changes it. This is fail-closed by design.
-6. **The attestation.** `challenge run --record` publishes `challenge/dev-v1.result.json` once. CI checks
+6. **The attestation.** `challenge run --record` publishes the result once (`challenge/results/<freeze>.json` since
+   ADR 0021). CI checks
    that its challenge and judge hashes match the recomputed values, that every item is a sealed dev pair,
    and that the recomputed score passes.
 
@@ -89,3 +90,6 @@ Abstracts cannot be committed (ADR 0008), and CI has no cache and no keys, so CI
   edit to a judge file forces a new freeze.
 - **Follow-ups:** repeats and majority vote (S16). Possible changes to the negation or near-match threshold
   after the measured adjudications, each with its own ADR.
+
+> **Later (S12c):** [ADR 0021](./0021-neutral-few-shot-examples.md) moved the few-shot examples off the
+> benchmark's topics. Freeze v2 is now active; v1 stays as history.

@@ -7,6 +7,7 @@ judge code and the configured models, not that a model produced it. No skip: the
 import pytest
 
 from bio_claim_check.app.container import current_judge, read_dataset
+from bio_claim_check.app.freeze import ACTIVE_FREEZE
 from bio_claim_check.app.usecases.challenge import attestation_problems
 from tests.support.paths import ROOT
 from tests.support.settings import make_settings
@@ -14,7 +15,7 @@ from tests.support.settings import make_settings
 pytestmark = pytest.mark.arch
 
 CHALLENGE = ROOT / "challenge" / "dev-v1.jsonl"
-RESULT = ROOT / "challenge" / "dev-v1.result.json"
+RESULT = ROOT / "challenge" / "results" / f"{ACTIVE_FREEZE}.json"
 
 
 def test_the_committed_challenge_result_attests_this_judge() -> None:

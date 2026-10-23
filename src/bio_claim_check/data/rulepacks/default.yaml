@@ -4,7 +4,7 @@
 # benchmark. `reviewed_by: []` means author-written; such examples are never described as expert-labelled.
 # The literature mapping is a starting point and is re-verified in the related-work review.
 schema_version: 1
-version: "0.1.0"
+version: "0.2.0"
 authors:
   - "Samir Guliyev"
 rules:
@@ -15,14 +15,14 @@ rules:
       - "the source mentions mice, rats, cell lines, organoids or in vitro, but the claim names patients or people"
       - "the claim says 'treats', 'cures' or 'prevents' a human disease"
     examples:
-      - claim: "XR-417 slows memory decline in people with Alzheimer's disease."
-        source_excerpt: "In APP/PS1 transgenic mice, XR-417 reduced hippocampal plaque load and improved water-maze performance."
+      - claim: "XR-417 prevents gout flares in patients."
+        source_excerpt: "In rabbits with hyperuricaemia, XR-417 lowered serum urate and reduced joint swelling."
         label: overstated
         overstated_reason: preclinical_to_clinical
-        note: "Mouse behaviour and plaque load are not memory decline in patients."
+        note: "Serum urate and joint swelling in rabbits are not gout flares in patients."
         reviewed_by: []
-      - claim: "In a mouse model of Alzheimer's disease, XR-417 reduced hippocampal plaque load."
-        source_excerpt: "In APP/PS1 transgenic mice, XR-417 reduced hippocampal plaque load and improved water-maze performance."
+      - claim: "In rabbits with hyperuricaemia, XR-417 lowered serum urate."
+        source_excerpt: "In rabbits with hyperuricaemia, XR-417 lowered serum urate and reduced joint swelling."
         label: supported
         overstated_reason: null
         note: "The claim keeps the model organism."
@@ -79,14 +79,14 @@ rules:
       - "the source is a cohort, case-control, cross-sectional or registry study"
       - "the source says 'associated with'; the claim says 'reduces', 'causes' or 'protects'"
     examples:
-      - claim: "Taking CV-551 prevents colorectal cancer."
-        source_excerpt: "In a registry cohort of 48 000 adults, CV-551 use was associated with lower colorectal cancer incidence (HR 0.82)."
+      - claim: "Taking CV-551 prevents asthma attacks."
+        source_excerpt: "In a registry cohort of 48 000 adults with asthma, CV-551 use was associated with fewer severe exacerbations (HR 0.82)."
         label: overstated
         overstated_reason: correlation_as_causation
         note: "An observational association does not show prevention."
         reviewed_by: []
-      - claim: "In a registry cohort, CV-551 use was associated with lower colorectal cancer incidence."
-        source_excerpt: "In a registry cohort of 48 000 adults, CV-551 use was associated with lower colorectal cancer incidence (HR 0.82)."
+      - claim: "In a registry cohort of adults with asthma, CV-551 use was associated with fewer severe exacerbations."
+        source_excerpt: "In a registry cohort of 48 000 adults with asthma, CV-551 use was associated with fewer severe exacerbations (HR 0.82)."
         label: supported
         overstated_reason: null
         note: "The claim keeps the associational wording."
@@ -167,14 +167,14 @@ rules:
     cues:
       - "the source restricts age, sex, disease stage, genotype or setting; the claim does not"
     examples:
-      - claim: "BT-77 improves glycaemic control in people with diabetes."
-        source_excerpt: "In 140 adults with type 2 diabetes and stage 3 chronic kidney disease, BT-77 lowered HbA1c by 0.6%."
+      - claim: "BT-77 clears eczema in people of all ages."
+        source_excerpt: "In 140 teenagers with moderate atopic dermatitis, BT-77 reduced EASI by 60%."
         label: overstated
         overstated_reason: population_extrapolation
-        note: "A trial in type 2 diabetes with kidney disease is generalised to all diabetes."
+        note: "A trial in teenagers with moderate atopic dermatitis is generalised to all ages."
         reviewed_by: []
-      - claim: "In adults with type 2 diabetes and stage 3 chronic kidney disease, BT-77 lowered HbA1c."
-        source_excerpt: "In 140 adults with type 2 diabetes and stage 3 chronic kidney disease, BT-77 lowered HbA1c by 0.6%."
+      - claim: "In teenagers with moderate atopic dermatitis, BT-77 reduced EASI."
+        source_excerpt: "In 140 teenagers with moderate atopic dermatitis, BT-77 reduced EASI by 60%."
         label: supported
         overstated_reason: null
         note: "The claim keeps the population."

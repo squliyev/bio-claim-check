@@ -8,13 +8,13 @@ the repo; ask the maintainer for the rows relevant to your session.
 ## 1. Where things stand
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
-  S12b (tag `prompts-frozen-v1`).
+  S12b, S12c (tag `prompts-frozen-v2`).
   CI is green on `main`.
 - **Next: the maintainer's test-split audit, then S13 (trap generator)** (section 4).
-- Next free ids: invariant **I75**, ADR **0021**.
+- Next free ids: invariant **I76**, ADR **0022**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
-- The judge is **frozen** (`freeze/v1.json`, ADR 0020). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
+- The judge is **frozen** (`freeze/v2.json` active, ADR 0020, 0021). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
   either model spec or `rapidfuzz` fails `tests/arch/test_active_freeze.py`. A new judge needs a new freeze
   record, a new pin and an ADR.
 
@@ -47,16 +47,17 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
 check. The test audit is gated on the active freeze (I74):
 
 ```bash
-uv run bio-claim-check corpus audit-sheet --kind <kind> --split test   # recomputes freeze v1, refuses if stale
+uv run bio-claim-check corpus audit-sheet --kind <kind> --split test   # recomputes freeze v2, refuses if stale
 uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var/audit/test-<kind>.csv
 ```
 
 **S13 goal:** see the roadmap row (rule floor + model traps within eligibility, validity gate, audit
 sheet, parent pairing, structural leakage test).
 
-**Bindings from S12b (must hold):**
+**Bindings from S12b and S12c (must hold):**
 - Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside
-  `JUDGE_FILES`. If S13 must touch one, plan a freeze v2 with its own challenge run and ADR.
+  `JUDGE_FILES`. The challenge set has run twice, its limit, so a new judge also needs a new set or an ADR.
+- Prompt and rule-pack text must not name a question's topic (I75, ADR 0021).
 - The challenge set is a regression check, not accuracy. Never report its 15/16 as an accuracy figure.
 - Negation: `claim_shares_negation` false blocks are known (backlog C4). They are safe (`needs_review`).
 - Dev numbers stay exploratory; test numbers come only after `protocol-v1` (S15).
@@ -113,7 +114,7 @@ sheet, parent pairing, structural leakage test).
 - **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
   records the active `freeze_sha256` (computed, never typed).
 - **S17:** layered Streamlit UI (backlog B4).
-- **S15:** protocol hashes must equal `prompts-frozen-v1`, or each deviation is disclosed.
+- **S15:** protocol hashes must equal `prompts-frozen-v2`, or each deviation is disclosed.
 - **S16/S19:** a pre-flight token estimate is a labelled heuristic range, never mixed with measured usage
   and never turned into a money estimate without a defensible price.
 

@@ -54,10 +54,11 @@ JUDGE_FILES: Final[tuple[str, ...]] = (
 
 FROZEN: Final[Mapping[str, str]] = {
     "v1": "17705069d842806ebe64fd7160496f83bdc35e5784629cafb13e274a7168edc1",
+    "v2": "b1a5fc3278b52a81b3a903fbf17f5f61f43846288f32c478bce6b3ec8d1923a6",
 }
 """sha256 of each committed freeze record's exact bytes, by name. Records are never edited."""
 
-ACTIVE_FREEZE: Final[str] = "v1"
+ACTIVE_FREEZE: Final[str] = "v2"
 """The freeze the code must match (I73)."""
 
 FREEZE_DIR: Final = "freeze"
