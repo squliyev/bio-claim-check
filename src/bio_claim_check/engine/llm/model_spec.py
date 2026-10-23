@@ -16,6 +16,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from bio_claim_check.common.errors import BccError
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.common.models import FrozenJson, NonBlankStr, ValidatedModel
 from bio_claim_check.engine.llm.usage import Price
 
@@ -38,11 +39,13 @@ class ModelIdentity(ValidatedModel):
 
 
 class ModelSpec(ValidatedModel):
-    """One deployment: who serves it, which model it is, its default parameters and its price (if known)."""
+    """One deployment: who serves it, which model it is and who trained it, its default parameters and its
+    price (if known)."""
 
     deployment: NonBlankStr
     provider: Provider
     model_version: NonBlankStr
+    family: ModelFamily
     params: FrozenJson = Field(default_factory=dict, validate_default=True)
     price: Price | None
 

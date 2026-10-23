@@ -267,6 +267,7 @@ def test_cli_records_the_answer_the_manifest_the_trace_and_one_ledger_row(tmp_pa
     assert manifest["artifact"]["name"] == "answer.json"
     assert manifest["inputs"] == {"question_id": DEV_Q, "mode": "strict", "k": 8, "question_sha256": None}
     assert [u["agent"] for u in manifest["llm"]] == ["answer_strict"]
+    assert [d["agent"] for d in manifest["declared_llm"]] == ["answer_strict"]
     assert json.loads((run / "answer.json").read_text())["question_id"] == DEV_Q
     trace = (tmp_path / "var" / "events" / str(row["events"])).read_text().splitlines()
     assert json.loads(trace[0]) | {"at": None} == {"at": None, "type": "stage.started", "stage": "run"}

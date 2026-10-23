@@ -2,30 +2,41 @@
 
 Why: deployment names, providers and pinned model ids are configuration of *this* project, not engine
 code (the engine owns only the shape, ADR 0012). `model_version` is the provider's pinned version as the
-Foundry portal shows it (S09, ADR 0014); a deployment not yet pinned keeps its name until it is. Prices
-are `None` ("unpriced", never 0) until the author copies them from the provider's pricing page with a
-date and source. `max_output_tokens` for Claude is our budget (the Messages API requires one), not a
+Foundry portal shows it (S09, ADR 0014); a deployment not yet pinned keeps its name until it is.
+`family` is who trained the model (the independence flag, ADR 0019). Prices are `None` ("unpriced",
+never 0) until the author copies them from the provider's pricing page with a date and source.
+`max_output_tokens` for Claude is our budget (the Messages API requires one), not a
 model limit.
 Must not: invent a number (price, context window, token limit) or read configuration.
 """
 
 from typing import Final
 
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider
 
 MODEL_SPECS: Final = (
     ModelSpec(
-        deployment="gpt-6.1-sol", provider=Provider.FOUNDRY_OPENAI, model_version="2026-09-29", price=None
+        deployment="gpt-6.1-sol",
+        provider=Provider.FOUNDRY_OPENAI,
+        model_version="2026-09-29",
+        family=ModelFamily.OPENAI,
+        price=None,
     ),
     ModelSpec(
         deployment="claude-opus-4-8",
         provider=Provider.FOUNDRY_ANTHROPIC,
         model_version="claude-opus-4-8",  # Foundry shows no separate Claude version: the id is the pin
+        family=ModelFamily.ANTHROPIC,
         params={"max_output_tokens": 8192},
         price=None,
     ),
     ModelSpec(
-        deployment="Kimi-K2.6-1", provider=Provider.FOUNDRY_OPENAI, model_version="Kimi-K2.6-1", price=None
+        deployment="Kimi-K2.6-1",
+        provider=Provider.FOUNDRY_OPENAI,
+        model_version="Kimi-K2.6-1",
+        family=ModelFamily.MOONSHOT,
+        price=None,
     ),
 )
 

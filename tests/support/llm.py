@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.engine.llm.messages import FinishReason, LlmRequest, LlmResponse, Message
 from bio_claim_check.engine.llm.model_spec import ModelIdentity, ModelSpec, Provider
 from bio_claim_check.engine.llm.usage import Price, Usage
@@ -44,6 +45,7 @@ def spec(deployment: str = "model-a", *, price: Price | None = PRICE) -> ModelSp
         deployment=deployment,
         provider=Provider.FOUNDRY_OPENAI,
         model_version=f"{deployment}-v1",
+        family=ModelFamily.OPENAI,
         params={"temperature": 0, "nested": {"top_p": 1}},
         price=price,
     )

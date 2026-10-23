@@ -294,3 +294,55 @@ def test_the_response_hash_of_an_unmade_search_is_a_key_error(question: str, lim
     h.source.search("plaque", limit=25)
     with pytest.raises(KeyError):
         h.source.response_sha256(question, limit)
+
+
+def _med(pmid: str, *, source: str = "MED") -> dict[str, object]:
+    record = good_record()
+    record.update(pmid=pmid, source=source)
+    return record
+
+
+def test_retraction_status_asks_for_exact_ids_without_the_citable_filters_or_the_cache() -> None:
+    h = harness(ok(envelope([_med("90000001")])), ok(envelope([_med("90000001")])))
+    for _ in range(2):
+        h.source.retraction_status(("MED:90000001", "MED:90000002"))
+    assert len(h.server.requests) == 2  # never cached
+    params = dict(h.server.requests[0].url.params)
+    assert params["query"] == "(EXT_ID:90000001 AND SRC:MED) OR (EXT_ID:90000002 AND SRC:MED)"
+    assert QUERY_FILTERS not in params["query"]
+    assert params["pageSize"] == "100"
+
+
+def test_retraction_status_chunks_ids_by_one_hundred_and_skips_non_med_ids() -> None:
+    ids = tuple(f"MED:{90000000 + i}" for i in range(201))
+    h = harness(ok(envelope([])), ok(envelope([])), ok(envelope([])))
+    rows = h.source.retraction_status(("FAKE:1", *ids))
+    assert [len(r.url.params["query"].split(" OR ")) for r in h.server.requests] == [100, 100, 1]
+    assert {r.retracted for r in rows} == {None}
+    assert rows[0].source_id == "FAKE:1"
+
+
+def test_retraction_status_of_only_non_med_ids_makes_no_request() -> None:
+    h = harness()
+    assert [r.retracted for r in h.source.retraction_status(("FAKE:1",))] == [None]
+
+
+@pytest.mark.parametrize(
+    ("records", "match"),
+    [
+        ([_med("90000009")], "not asked for"),
+        ([_med("90000001", source="PMC")], "not asked for"),
+        ([_med("90000001"), _med("90000001")], "twice"),
+    ],
+    ids=["unexpected_id", "wrong_source", "duplicate"],
+)
+def test_retraction_status_refuses_an_answer_it_did_not_ask_for(
+    records: list[dict[str, object]], match: str
+) -> None:
+    with pytest.raises(RetrievalError, match=match):
+        harness(ok(envelope(records))).source.retraction_status(("MED:90000001",))
+
+
+def test_retraction_status_refuses_a_second_page() -> None:
+    with pytest.raises(RetrievalError, match="more hits"):
+        harness(ok(envelope([_med("90000001")], hit_count=2))).source.retraction_status(("MED:90000001",))

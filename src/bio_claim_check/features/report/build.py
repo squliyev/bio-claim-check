@@ -13,7 +13,7 @@ from bio_claim_check.features.contracts.finding import Finding
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.verdict import PairOutcome
-from bio_claim_check.features.report.models import ClaimReport, Provenance, Report, pair_report
+from bio_claim_check.features.report.models import ClaimReport, Provenance, Report, RunModels, pair_report
 
 
 def build_report(
@@ -23,6 +23,7 @@ def build_report(
     papers: tuple[Paper, ...],
     findings: tuple[Finding, ...],
     outcomes: Mapping[ClaimId, Mapping[SourceId, PairOutcome]],
+    models: RunModels | None,
 ) -> Report:
     """Every claim needs exactly one outcome per cited source; anything missing or extra raises."""
     if extra := outcomes.keys() - {c.id for c in answer.claims}:
@@ -40,4 +41,5 @@ def build_report(
         papers=papers,
         claims=tuple(claims),
         findings=findings,
+        models=models,
     )

@@ -7,6 +7,8 @@ instead of becoming a number. A cite outside the retrieved set is never sent to 
 recorded as CitationNotRetrieved (FLAGGED) and as a finding (invariant I18). Claims that refer to
 something outside themselves are flagged after the invented citations; they are still verified.
 Stage events (`retrieve`, `answer`, `verify`) go to the ports' emitter when one is given (S11).
+`check_answer` is everything after retrieval, shared with the dev path (`run_dev`, S12a), so live and dev
+answers are checked by one flow.
 Must not: do I/O (the caller writes the report), catch errors to keep going, or import the container,
 the driving adapters or infrastructure: it receives its ports in `RunPorts` (S05b).
 """
@@ -21,10 +23,11 @@ from bio_claim_check.features.checks.citations import invented_citations
 from bio_claim_check.features.checks.self_containment import dangling_claims
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack
 from bio_claim_check.features.contracts.verdict import CitationNotRetrieved, PairOutcome, Verdict
 from bio_claim_check.features.report.build import build_report
-from bio_claim_check.features.report.models import Provenance, Report
+from bio_claim_check.features.report.models import Provenance, Report, RunModels
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 from bio_claim_check.features.verify.base_verifier import BaseVerifier
 
@@ -38,7 +41,8 @@ class RunInputError(BccError):
 @dataclass(frozen=True, slots=True)
 class RunPorts:
     """Everything one run needs, chosen by the composition root. `rules_sha256` is the hash of the rule
-    pack's file bytes, for the run manifest; `emitter` receives the stage events (S11)."""
+    pack's file bytes, for the run manifest; `emitter` receives the stage events (S11). `models` names the
+    answerer and verifier of a live run and is `None` for a fake one (I71)."""
 
     literature: BaseLiteratureSource
     answerer: BaseAnswerer
@@ -46,6 +50,7 @@ class RunPorts:
     rules: RulePack
     provenance: Provenance
     rules_sha256: str
+    models: RunModels | None = None
     emitter: EventEmitter | None = None
 
 
@@ -60,6 +65,11 @@ def run_question(c: RunPorts, question: str, mode: AnswerMode, *, k: int) -> Rep
         papers = c.literature.search(question, limit=k)
     if len(papers) > k:
         raise ValueError(f"literature source returned {len(papers)} papers for limit={k}")
+    return check_answer(c, question, papers, mode)
+
+
+def check_answer(c: RunPorts, question: str, papers: tuple[Paper, ...], mode: AnswerMode) -> Report:
+    """Answer from exactly `papers`, run the deterministic checks, verify each pair, build the report."""
     by_id = {p.source_id: p for p in papers}
     if len(by_id) != len(papers):
         raise ValueError("literature source returned duplicate source ids")
@@ -90,4 +100,5 @@ def run_question(c: RunPorts, question: str, mode: AnswerMode, *, k: int) -> Rep
         papers=papers,
         findings=(*invented_citations(answer, by_id.keys()), *dangling_claims(answer)),
         outcomes=outcomes,
+        models=c.models,
     )

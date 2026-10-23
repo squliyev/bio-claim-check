@@ -7,12 +7,12 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 ## 1. Where things stand
 
-- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11.
+- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a.
   CI is green on `main`.
-- **Next session: S12, the verifier and the first live `run`** (section 4).
-- Next free ids: invariant **I69**, ADR **0019**.
+- **Next session: S12b, verifier tuning on dev and the prompt freeze** (section 4).
+- Next free ids: invariant **I72**, ADR **0020**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
-  edit it. Prompt and rule-pack tuning (S10, S12) may use **dev-split sources only**.
+  edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
 
 ## 2. Start checklist
 
@@ -37,22 +37,25 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S12 — the verifier and the first live `run`
+## 4. Next: S12b — verifier tuning and the prompt freeze
 
-**Goal:** the verifier agent and the first live `run`: verifier prompt, context isolation, a dev smoke
-gold set in CI, model-family independence, a retraction re-check; ends with the tag `prompts-frozen-v1`.
+**Goal:** a dev smoke gold set that runs in CI, verifier and near-threshold tuning on dev sources only, the
+freeze record and test export (ADR 0011), and the tag `prompts-frozen-v1`.
 
 **Bindings from earlier sessions (must hold):**
-- Dev-split sources only; drop and count anything else (reuse `dev_pool`).
-- The verifier subclasses `BaseLlmAgent`; map `llm.*` errors (including `llm.prompt_filtered`) to
-  `FailureKind`. Context isolation: a sentinel in the payload never appears in the request.
-- A live `run` records through `record_run` like `answer dev` (ADR 0018): its manifest names the models
-  and prompt hashes; the shared `CallBudget` wraps every live client; replay must be byte-identical.
-- A change to the negation rules bumps `NEGATION_RULES`. Revisit Claude's `max_output_tokens=8192`.
-- Re-check retraction of every cited paper uncached.
+- Dev-split sources only (`run --dev QUESTION_ID`, `dev_papers`); drop and count anything else.
+- A change to `VERIFY_PROMPT`, an answer prompt or the rule pack changes the run id (declared LLMs, I71);
+  a change to the negation rules bumps `NEGATION_RULES`.
+- The verifier sees only `VerifyPayload` (I69); keep the failure mapping of ADR 0019 (I70).
+- S12a live observation: on a metformin question the verifier said `supported` with a located quote, and
+  the pair still went to `needs_review`: the sentence-level negation detector (conservative by design) saw
+  "no effect was observed for insulin…" in the same sentence. Measure how often this happens on dev before
+  deciding whether a clause-level rule (a `NEGATION_RULES` bump) is worth it.
+- Claude's `max_output_tokens=8192` was kept: verifier replies were ~200 tokens; revisit if tuning
+  changes the output.
 - Money stays "unpriced" while `ModelSpec.price is None`; never 0.
 
-**Exit:** the roadmap's S12 row; `make verify` and CI green.
+**Exit:** the roadmap's S12b row; `make verify` and CI green.
 
 ## 5. Engine contracts you build on (S08–S11)
 
@@ -85,17 +88,20 @@ gold set in CI, model-family independence, a retraction re-check; ends with the 
   `engine/llm/budgeted_llm_client.py` (`CallBudget`); `infrastructure/line_files.py`. Every attempt of
   both commands writes `var/events/*.jsonl` and a `var/ledger.jsonl` row; a success also publishes
   `var/runs/<run_id>/{artifact, manifest.json}` (ADR 0018).
+- **S12a:** `features/verify/{verify_models, verify_prompts, verify_llm_agent, llm_verifier}.py`
+  (`VerifyPayload`, `VERIFY_PROMPT`, `VerifyLlmAgent`, `LlmVerifier`); `common/model_family.py`
+  (`ModelFamily`) and `ModelSpec.family`;
+  `Report.provenance` (`fake`/`live`), `LIVE_NOTICE`, `Report.models` (`RunModels.same_family`);
+  `RunDetails.declared_llm`; `app/usecases/run.py::check_answer`, `run_dev.py` (`DevRunRecord`),
+  `answer_dev.py::dev_papers`; `BaseLiteratureSource.retraction_status`; `app/usecases/retractions.py`;
+  `app/container.py::build_live_run_ports`. Commands: `run QUESTION`, `run --dev QUESTION_ID`,
+  `retractions RUN_ID` (ADR 0019).
 
 ## 6. Bindings for later sessions
 
-- **S12:** use dev-split sources only; drop and count anything else (reuse `dev_pool`). A change to the
-  negation rules bumps `NEGATION_RULES` (stored verdicts then refuse to load). S12 maps LLM failure kinds to `FailureKind`, adds
-  context isolation (a sentinel in the payload never appears in the request), re-checks retraction of
-  every cited paper uncached, and ends with the tag `prompts-frozen-v1`.
+- **S12b:** see section 4. Tag `prompts-frozen-v1` only after the dev smoke gold set is green in CI.
 - **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
   records the frozen prompts hash.
-- **S12:** the verifier agent subclasses `BaseLlmAgent`; map `llm.*` errors (including
-  `llm.prompt_filtered`) to `FailureKind`; revisit Claude's `max_output_tokens=8192` budget.
 - **S17:** layered Streamlit UI (backlog B4).
 - **S15:** protocol hashes must equal `prompts-frozen-v1`, or each deviation is disclosed.
 - **S16/S19:** a pre-flight token estimate is a labelled heuristic range, never mixed with measured usage
@@ -120,6 +126,9 @@ make record-llm      # re-record scrubbed LLM fixtures (live, fictional text)
 uv run bio-claim-check llm ping
 uv run bio-claim-check answer dev glp1-q1 --mode strict   # live; BCC_CACHE_MODE=read-only replays free
 uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake
+uv run bio-claim-check run glp1-q1 --dev --mode strict   # live over the dev pool; read-only replays free
+uv run bio-claim-check run "<question>"                   # live answer + LLM verifier, recorded
+uv run bio-claim-check retractions RUN_ID                 # re-check a live run's citations, uncached
 uv run bio-claim-check corpus verify
 gh run list --limit 3
 ```

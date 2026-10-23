@@ -10,7 +10,9 @@ No LLM is involved in this module.
 """
 
 import unicodedata
+from collections.abc import Sequence
 
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.retrieval.citable import QUERY_FILTERS
 
 MAX_LIMIT = 100
@@ -30,3 +32,14 @@ def validate_search(question: str, limit: int) -> None:
 def build_query(question: str) -> str:
     """The exact query sent: `(<question>) AND <citable filters>`."""
     return f"({question}) AND {QUERY_FILTERS}"
+
+
+def validate_retraction_ids(source_ids: Sequence[SourceId]) -> None:
+    """Raise `ValueError` for duplicate ids (the answer is one status per id)."""
+    if len(set(source_ids)) != len(source_ids):
+        raise ValueError("source ids must be unique")
+
+
+def build_id_query(pmids: Sequence[str]) -> str:
+    """The exact by-id query: `EXT_ID:<pmid> AND SRC:MED`, OR-joined, with no citable filters."""
+    return " OR ".join(f"(EXT_ID:{p} AND SRC:MED)" for p in pmids)

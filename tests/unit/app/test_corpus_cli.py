@@ -1,7 +1,7 @@
 """`bio-claim-check corpus build`: files, notice and every exit code, with a fictional literature source."""
 
 import contextlib
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from typing import override
 
@@ -14,10 +14,12 @@ from bio_claim_check.app import cli
 from bio_claim_check.app.settings import Settings
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
 from bio_claim_check.features.contracts.corpus import NLM_NOTICE, CorpusManifest
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.corpus.layout import DEV_SOURCES, MANIFEST, QUESTIONS, TEST_SOURCES
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 from bio_claim_check.features.retrieval.errors import RetrievalError
+from bio_claim_check.features.retrieval.models import RetractionStatus
 
 pytestmark = pytest.mark.unit
 runner = CliRunner()
@@ -35,6 +37,10 @@ class RaisingSource(BaseLiteratureSource):
     def response_sha256(self, question: str, limit: int) -> str:
         """Never reached: `search` raises first. Present because the CLI reads it like the real source."""
         raise AssertionError((question, limit))
+
+    @override
+    def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
+        raise NotImplementedError  # never asked: these tests only search
 
 
 @pytest.fixture(autouse=True)

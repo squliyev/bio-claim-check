@@ -5,7 +5,7 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S11 done):** S01–S11 are done. Next is **S12**, the verifier and the first live `run`.
+**Status (S12a done):** S01–S12a are done. Next is **S12b**, verifier tuning on dev and the prompt freeze.
 
 ## Product
 
@@ -85,7 +85,8 @@ can be contributed here as their own credited rule pack. No results from this re
 | S09 | Provider adapters, the LLM agent base and the pipeline event vocabulary (see below) | ✅ |
 | S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | ✅ |
 | S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | ✅ |
-| S12 | Verifier prompt, context isolation, dev smoke gold set in CI, model-family independence, first live `run`, retraction re-check; tag `prompts-frozen-v1` | ⏳ next |
+| S12a | LLM verifier (one isolated call per pair), failure mapping, model-family flag, first live `run` and `run --dev`, retraction re-check (ADR 0019) | ✅ |
+| S12b | Dev smoke gold set in CI, verifier and near-threshold tuning on dev, freeze record and test export (ADR 0011); tag `prompts-frozen-v1` | ⏳ next |
 
 ### Phase C — Measurement
 
@@ -161,13 +162,13 @@ can be contributed here as their own credited rule pack. No results from this re
 ## Dependencies
 
 ```
-S01 → … → S07b → S08 → S08b → S09 → S10 → S11 → S12 → (test audit) → S13 → proof → S14 → S15 → S16
+S01 → … → S07b → S08 → S08b → S09 → S10 → S11 → S12a → S12b → (test audit) → S13 → proof → S14 → S15 → S16
     → {S17, S18} → S19 → S20 → S21 → S22 → S23 → S24
 ```
 
 - The sealed split (S07b) precedes any prompt tuning (S10).
 - `protocol-v1` (S15) precedes the study run (S19).
-- Demoable points: S05 (fakes), S12 (real product), S17 (UI).
+- Demoable points: S05 (fakes), S12a (real product), S17 (UI).
 
 ## Risks and mitigations
 

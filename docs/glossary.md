@@ -76,6 +76,18 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   trace name, cache mode and usage per model. It is the run's money record.
 - **Unmeasured attempt:** an attempt that may have reached the provider but reported no usage (a failed
   call, or a start with no end). Counted apart, never as 0 tokens.
+- **Model family:** who trained a deployment (`openai`, `anthropic`, `moonshot`), apart from the
+  provider that serves it. A live report flags `same_family` when the answerer and the verifier share
+  one, since they may share blind spots ([ADR 0019](./adr/0019-llm-verifier-and-live-run.md)).
+- **Live notice:** the notice on a live report: each claim, if any, was checked by an LLM verifier
+  against the retrieved abstracts it cites, and the labels are model judgements, not expert review.
+- **Declared LLM:** a role's agent, provider, deployment, model version and prompt hash, recorded in the
+  manifest from the wiring, so the run id names a prompt even if no call of that role finished.
+- **Dev run:** `run --dev QUESTION_ID`: the live flow over the sealed dev pool of one dev question, for
+  tuning only. Its artifact also counts the dropped sources by reason; it is never re-checked or reported.
+- **Retraction re-check:** `retractions RUN_ID` asks Europe PMC again, uncached, whether each paper a live
+  run cited is retracted now, beside its status in the run. It writes `var/retractions/…` and never
+  changes the run.
 - **`run.cancelled` / `run.internal`:** ledger codes for an interrupted attempt and for an unexpected
   exception (a bug). They are run codes, not error classes, so they are not in `error-codes.md`.
 

@@ -7,7 +7,7 @@ paper to the held-out domain, a retracted paper and ids whose numeric and string
 """
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from pathlib import Path
 from typing import override
@@ -22,11 +22,13 @@ from bio_claim_check.features.contracts.corpus import (
     QuestionRank,
     SourceEntry,
 )
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.corpus.layout import MANIFEST, SPEC
 from bio_claim_check.features.corpus.serialise import sha256_hex
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.retrieval.models import RetractionStatus
 from tests.support.papers import paper
 
 SPEC_FILE = Path(__file__).parents[1] / "fixtures" / "corpus" / "spec_valid.yaml"
@@ -50,6 +52,10 @@ class QueryLiteratureSource(BaseLiteratureSource):
         """A stand-in for the raw response hash: the ranked ids served, so a changed pool changes it."""
         served = " ".join(p.source_id for p in self._pools.get(question, ())[:limit])
         return hashlib.sha256(f"{question}|{limit}|{served}".encode()).hexdigest()
+
+    @override
+    def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
+        raise NotImplementedError  # never asked: these tests only search
 
 
 ANIMAL = paper(1, mesh=("Animals", "Mice"))

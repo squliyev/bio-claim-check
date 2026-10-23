@@ -8,7 +8,8 @@ infrastructure only through ``app.container`` (contract ``driving-adapters-use-t
 import hashlib
 import re
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 from datetime import date
 from enum import IntEnum
 from pathlib import Path
@@ -26,9 +27,12 @@ from bio_claim_check.app.container import (
     UnsupportedProviderError,
     build_dev_answer_ports,
     build_fake_run_ports,
+    build_live_run_ports,
     build_llm_clients,
     build_replay,
+    build_retraction_source,
     build_retrieval,
+    declared_answerer,
     default_rulepack,
     file_sha256,
     load_corpus_spec,
@@ -36,8 +40,10 @@ from bio_claim_check.app.container import (
     logging_emitter,
     publish_audit,
     publish_corpus,
+    publish_retraction_check,
     publish_sheet,
     read_dataset,
+    read_run_files,
     record_run,
     run_path,
     write_seal,
@@ -45,7 +51,7 @@ from bio_claim_check.app.container import (
 from bio_claim_check.app.logging_setup import configure_logging
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import RunDetails, RunInputs, RunRecorder
-from bio_claim_check.app.settings import Settings, load_settings
+from bio_claim_check.app.settings import ENV_PREFIX, Settings, load_settings
 from bio_claim_check.app.usecases.answer_dev import (
     DevAnswer,
     DevAnswerInputError,
@@ -62,9 +68,18 @@ from bio_claim_check.app.usecases.corpus_audit import (
     export_sheet,
 )
 from bio_claim_check.app.usecases.llm_ping import PingResult, ping
+from bio_claim_check.app.usecases.retractions import (
+    RetractionCheck,
+    RetractionInputError,
+    cited_ids,
+    load_checked_run,
+    retraction_check,
+)
 from bio_claim_check.app.usecases.run import RunInputError, run_question
+from bio_claim_check.app.usecases.run_dev import DevRunRecord, run_dev
 from bio_claim_check.common.canonical_json import pretty_json_bytes
 from bio_claim_check.common.negation import NEGATION_RULES
+from bio_claim_check.common.system_clock import SystemClock
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
 from bio_claim_check.engine.events.call_tally import summed, tally_calls
 from bio_claim_check.engine.events.pipeline_event import PipelineEvent
@@ -88,6 +103,7 @@ from bio_claim_check.features.corpus.audit_sheet import AuditSheetError
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, SPEC
 from bio_claim_check.features.corpus.seal import dataset_problems
 from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes
+from bio_claim_check.features.report.models import Report
 from bio_claim_check.features.retrieval.errors import RetrievalError
 
 DEFAULT_K = 4
@@ -203,20 +219,58 @@ def _print_summary(pack: RulePack) -> None:
 
 @app.command("run")
 def run(
-    question: Annotated[str, typer.Argument(help="The research question to answer and check.")],
+    question: Annotated[
+        str, typer.Argument(help="The research question to answer and check; with --dev, a dev question id.")
+    ],
     fake: Annotated[
         bool, typer.Option("--fake", help="Fictional papers, scripted answer and verdicts (offline demo).")
     ] = False,
+    dev: Annotated[
+        bool, typer.Option("--dev", help="QUESTION is a dev question id; answer from its sealed dev pool.")
+    ] = False,
     mode: Annotated[AnswerMode, typer.Option(help="How the answering agent behaves.")] = AnswerMode.STRICT,
-    k: Annotated[int, typer.Option("--k", min=1, help="Number of papers to retrieve.")] = DEFAULT_K,
+    k: Annotated[int, typer.Option("--k", min=1, help="Number of papers to answer from.")] = DEFAULT_K,
     var_dir: Annotated[
-        Path, typer.Option("--var-dir", help="Root for runs/<run_id>/, events/ and ledger.jsonl.")
-    ] = DEFAULT_VAR_DIR,
+        Path | None,
+        typer.Option(
+            "--var-dir", help="--fake only: root for runs/, events/ and ledger.jsonl [default: var]."
+        ),
+    ] = None,
+    dataset: Annotated[
+        Path | None, typer.Option("--dataset", help="--dev only: dataset folder [default: datasets].")
+    ] = None,
+    env_file: Annotated[
+        Path | None, typer.Option(help="Live and --dev: dotenv file to read [default: .env].")
+    ] = None,
 ) -> None:
-    """Answer a question, check every claim against the paper it cites, and record the run."""
-    if not fake:
-        typer.echo("Live runs arrive in S12; use --fake for the offline demo.", err=True)
-        raise typer.Exit(code=ExitCode.INPUT)
+    """Answer a question, check every claim against the paper it cites, and record the run.
+
+    Live and --dev runs cost tokens and use the var dir from settings (one root for the cache and the
+    record); --fake is offline and reads no settings.
+    """
+    if problem := _run_flag_problem(fake=fake, dev=dev, var_dir=var_dir, dataset=dataset, env_file=env_file):
+        _fail(ExitCode.INPUT, problem)
+    if fake:
+        _run_fake(question, mode, k, var_dir or DEFAULT_VAR_DIR)
+    else:
+        _run_live(question, mode, k, dev=dev, dataset=dataset or Path("datasets"), env_file=env_file)
+
+
+def _run_flag_problem(
+    *, fake: bool, dev: bool, var_dir: Path | None, dataset: Path | None, env_file: Path | None
+) -> str | None:
+    if fake and dev:
+        return "--fake and --dev cannot be combined"
+    if fake and (dataset is not None or env_file is not None):
+        return "--fake reads no dataset or settings; drop --dataset and --env-file"
+    if not fake and var_dir is not None:
+        return f"--var-dir is for --fake; live runs use {ENV_PREFIX}VAR_DIR (one root for cache and record)"
+    if not dev and dataset is not None:
+        return "--dataset is for --dev"
+    return None
+
+
+def _run_fake(question: str, mode: AnswerMode, k: int, var_dir: Path) -> None:
     try:
         with record_run(var_dir, "run", None) as recorder:
             ports = build_fake_run_ports(recorder.emitter)
@@ -232,13 +286,105 @@ def run(
         _fail(ExitCode.INPUT, str(err))
     except RECORD_OUTPUT_ERRORS as err:
         _fail(ExitCode.OUTPUT, str(err))
+    _print_report(report, _run_file(var_dir, recorder, REPORT_FILE))
+
+
+def _run_live(
+    question: str, mode: AnswerMode, k: int, *, dev: bool, dataset: Path, env_file: Path | None
+) -> None:
+    settings = _settings(env_file or Path(".env"))
+    recorder: RunRecorder | None = None
+    dev_record: DevRunRecord | None = None
+    try:
+        with _live_exit_codes(dataset), record_run(settings.var_dir, "run", settings.cache_mode) as recorder:
+            files = read_dataset(dataset) if dev else None
+            spec = load_corpus_spec(dataset / SPEC) if dev else None
+            with build_live_run_ports(settings, mode, recorder.emitter) as live:
+                if files is not None and spec is not None:
+                    dev_record = run_dev(live.ports, files, spec, question, mode, k=k)
+                    report = dev_record.report
+                    artifact = pretty_json_bytes(dev_record.model_dump(mode="json"))
+                else:
+                    report = run_question(live.ports, question, mode, k=k)
+                    artifact = canonical_bytes(report)
+            details = RunDetails(
+                provenance="live",
+                inputs=(
+                    RunInputs(question_id=question, mode=mode, k=k)
+                    if dev
+                    else RunInputs(question_sha256=_sha256(question), mode=mode, k=k)
+                ),
+                negation_rules=NEGATION_RULES,
+                rulepack_sha256=live.ports.rules_sha256,
+                dataset_manifest_sha256=_sha256(files[MANIFEST]) if files is not None else None,
+                declared_llm=live.declared_llm,
+            )
+            recorder.prepare(REPORT_FILE, artifact, details)
+    finally:
+        if recorder is not None:
+            _print_usage(recorder.events)
+    if dev_record is not None:
+        dropped = ", ".join(f"{r.value}={n}" for r, n in dev_record.dropped.items() if n) or "none"
+        typer.echo(f"{dev_record.question_id}: {len(dev_record.papers)} dev paper(s); dropped: {dropped}")
+    _print_report(report, _run_file(settings.var_dir, recorder, REPORT_FILE))
+
+
+def _print_report(report: Report, path: Path) -> None:
     typer.echo(report.notice)
-    typer.echo(f"report: {_run_file(var_dir, recorder, REPORT_FILE)}")
+    if report.models is not None:
+        a, v = report.models.answerer, report.models.verifier
+        typer.echo(f"models: answerer={a.deployment} ({a.family}), verifier={v.deployment} ({v.family})")
+        if report.models.same_family:
+            typer.echo(
+                f"warning: answerer and verifier are both {a.family} models (not independent)", err=True
+            )
+    typer.echo(f"report: {path}")
     for name, counts in (("pairs", report.pair_counts), ("claims", report.claim_counts)):
         typer.echo(f"{name}: " + ", ".join(f"{d.value}={n}" for d, n in counts.items()))
     # Claim-level findings are not folded into the dispositions above, so they are always shown beside them.
     kinds = Counter(f.kind for f in report.findings)
     typer.echo("findings: " + ", ".join(f"{kind.value}={kinds[kind]}" for kind in FindingKind))
+
+
+@contextmanager
+def _live_exit_codes(dataset: Path) -> Generator[None]:
+    """The exit code of every typed failure of a live command (`answer dev`, `run` live and --dev)."""
+    try:
+        yield
+    except (DatasetReadError, RunInputError) as err:
+        _fail(ExitCode.INPUT, str(err))
+    except CorpusSpecError as err:
+        _print_problems("Invalid corpus spec", err.problems)
+        raise typer.Exit(code=ExitCode.INPUT) from None
+    except DevDatasetError as err:
+        _print_problems(f"{dataset} is not intact", err.problems)
+        raise typer.Exit(code=ExitCode.DATASET) from None
+    except DevAnswerInputError as err:
+        _print_problems("Cannot answer", err.problems)
+        raise typer.Exit(code=ExitCode.INPUT) from None
+    except (UnknownDeploymentError, MissingProviderError, UnsupportedProviderError) as err:
+        _fail(ExitCode.INPUT, str(err))
+    except EmptyDevPoolError as err:
+        _fail(ExitCode.DATASET, str(err))
+    except CacheMissError:
+        _fail(ExitCode.CACHE_MISS, "not in the cache and BCC_CACHE_MODE=read-only; run once with read-write")
+    except RetrievalError as err:
+        _fail(ExitCode.UPSTREAM, f"retrieval failed: {err}")
+    except CacheError as err:
+        _fail(ExitCode.LOCAL_CACHE, f"cache problem: {err}")
+    except (
+        LlmCallError,
+        LlmTransportError,
+        LlmProviderError,
+        LlmPromptFilteredError,
+        LlmRequestError,
+        LlmUnexpectedResponseError,
+        LlmBudgetExceededError,
+        AnswerClaimsError,
+    ) as err:
+        _fail(ExitCode.PROVIDER, f"{err.code}: {err}")
+    except RECORD_OUTPUT_ERRORS as err:
+        _fail(ExitCode.OUTPUT, str(err))
 
 
 @app.command("retrieve")
@@ -264,6 +410,47 @@ def retrieve(
     typer.echo("retraction status is as of the first fetch (cached snapshot)")
     for rank, paper in enumerate(papers, start=1):
         _print_paper(rank, paper)
+
+
+@app.command("retractions")
+def retractions_command(
+    run_id: Annotated[str, typer.Argument(help="The id of a recorded live `run` (16 hex characters).")],
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Re-check, uncached, whether the papers a recorded live run cited have been retracted since."""
+    settings = _settings(env_file)
+    try:
+        manifest, artifact = read_run_files(settings.var_dir, run_id)
+        report = load_checked_run(manifest, artifact, run_id)
+        with build_retraction_source(settings) as source:
+            statuses = source.retraction_status(cited_ids(report))
+        check = retraction_check(report, statuses, run_id, SystemClock().now())
+        path = publish_retraction_check(settings.var_dir, check)
+    except RetractionInputError as err:
+        _fail(ExitCode.INPUT, str(err))
+    except RetrievalError as err:
+        _fail(ExitCode.UPSTREAM, f"retrieval failed: {err}")
+    except RECORD_OUTPUT_ERRORS as err:
+        _fail(ExitCode.OUTPUT, str(err))
+    _print_retractions(check, path)
+
+
+def _print_retractions(check: RetractionCheck, path: Path) -> None:
+    def shown(value: bool | None, missing: str) -> str:
+        return missing if value is None else ("retracted" if value else "not retracted")
+
+    typer.echo(f"{len(check.papers)} cited paper(s) of run {check.run_id}, re-checked uncached")
+    for row in check.papers:
+        then = shown(row.retracted_in_run, "not retrieved")
+        now = shown(row.retracted_now, "not found")
+        changed = (
+            "  CHANGED"
+            if None not in (row.retracted_in_run, row.retracted_now)
+            and row.retracted_in_run != row.retracted_now
+            else ""
+        )
+        typer.echo(f"  {row.source_id}: in run {then}; now {now}{changed}")
+    typer.echo(f"check: {path}")
 
 
 llm_app = typer.Typer(help="Check the LLM providers (S09).", no_args_is_help=True)
@@ -331,7 +518,10 @@ def answer_dev_command(
     settings = _settings(env_file)
     recorder: RunRecorder | None = None
     try:
-        with record_run(settings.var_dir, "answer dev", settings.cache_mode) as recorder:
+        with (
+            _live_exit_codes(dataset),
+            record_run(settings.var_dir, "answer dev", settings.cache_mode) as recorder,
+        ):
             files = read_dataset(dataset)
             spec = load_corpus_spec(dataset / SPEC)
             model = model_catalog().lookup(settings.answer_model)
@@ -342,43 +532,10 @@ def answer_dev_command(
                 inputs=RunInputs(question_id=question_id, mode=mode, k=k),
                 negation_rules=NEGATION_RULES,
                 dataset_manifest_sha256=_sha256(files[MANIFEST]),
+                declared_llm=(declared_answerer(model, mode),),
             )
             record = pretty_json_bytes(dev_answer_record(result, k).model_dump(mode="json"))
             recorder.prepare(ANSWER_FILE, record, details)
-    except DatasetReadError as err:
-        _fail(ExitCode.INPUT, str(err))
-    except CorpusSpecError as err:
-        _print_problems("Invalid corpus spec", err.problems)
-        raise typer.Exit(code=ExitCode.INPUT) from None
-    except DevDatasetError as err:
-        _print_problems(f"{dataset} is not intact", err.problems)
-        raise typer.Exit(code=ExitCode.DATASET) from None
-    except DevAnswerInputError as err:
-        _print_problems("Cannot answer", err.problems)
-        raise typer.Exit(code=ExitCode.INPUT) from None
-    except (UnknownDeploymentError, MissingProviderError, UnsupportedProviderError) as err:
-        _fail(ExitCode.INPUT, str(err))
-    except EmptyDevPoolError as err:
-        _fail(ExitCode.DATASET, str(err))
-    except CacheMissError:
-        _fail(ExitCode.CACHE_MISS, "not in the cache and BCC_CACHE_MODE=read-only; run once with read-write")
-    except RetrievalError as err:
-        _fail(ExitCode.UPSTREAM, f"retrieval failed: {err}")
-    except CacheError as err:
-        _fail(ExitCode.LOCAL_CACHE, f"cache problem: {err}")
-    except (
-        LlmCallError,
-        LlmTransportError,
-        LlmProviderError,
-        LlmPromptFilteredError,
-        LlmRequestError,
-        LlmUnexpectedResponseError,
-        LlmBudgetExceededError,
-        AnswerClaimsError,
-    ) as err:
-        _fail(ExitCode.PROVIDER, f"{err.code}: {err}")
-    except RECORD_OUTPUT_ERRORS as err:
-        _fail(ExitCode.OUTPUT, str(err))
     finally:
         if recorder is not None:
             _print_usage(recorder.events)

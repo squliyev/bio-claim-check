@@ -4,12 +4,13 @@ import hashlib
 import json
 from collections.abc import Callable
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from tests.support.events import HASH, MODEL, T0, stepping_clock
 
 from bio_claim_check.app.run_record import (
+    DeclaredLlm,
     LlmUse,
     RecordIo,
     RunDetails,
@@ -29,9 +30,11 @@ from bio_claim_check.features.contracts.labels import AnswerMode
 
 pytestmark = pytest.mark.unit
 
-DETAILS = RunDetails(
-    provenance="live", inputs=RunInputs(question_id="q1", mode=AnswerMode.STRICT, k=3), negation_rules=1
+DECLARED = DeclaredLlm(
+    agent="answer_strict", provider="foundry_openai", deployment="d", model_version="v", prompt_sha256=HASH
 )
+INPUTS = RunInputs(question_id="q1", mode=AnswerMode.STRICT, k=3)
+DETAILS = RunDetails(provenance="live", inputs=INPUTS, negation_rules=1, declared_llm=(DECLARED,))
 BOOM = LlmTransportError(deployment="d", status=503, attempts=3, reason="unavailable")
 
 
@@ -264,3 +267,13 @@ def test_llm_uses_are_distinct_sorted_with_none_first_and_count_only_responses()
     ]
     assert [u.served_model for u in llm_uses(events)] == [None, "z"]
     assert all(isinstance(u, LlmUse) for u in llm_uses(events))
+
+
+@pytest.mark.parametrize(
+    ("provenance", "declared"), [("live", ()), ("fake", (DECLARED,))], ids=["live-without", "fake-with"]
+)
+def test_a_live_run_declares_its_roles_and_a_fake_run_none(
+    provenance: Literal["fake", "live"], declared: tuple[DeclaredLlm, ...]
+) -> None:
+    with pytest.raises(ValueError, match="declared_llm: required for a live run, empty for a fake one"):
+        RunDetails(provenance=provenance, inputs=INPUTS, negation_rules=1, declared_llm=declared)

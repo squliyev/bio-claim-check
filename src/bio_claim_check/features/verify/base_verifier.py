@@ -3,7 +3,9 @@
 Why: one call per (claim, source) pair keeps the verifier context-isolated (it sees one claim, one
 abstract and the rule pack, nothing else) and makes every pair a separate, countable outcome.
 Implementations subclass this base and sit beside it, named by backend (ADR 0007): `scripted_verifier`
-now, the LLM verifier in S12. Replaced the structural `ports.Verifier` Protocol in S05b.
+and `llm_verifier` (S12a). Replaced the structural `ports.Verifier` Protocol in S05b.
+Failure contract: a problem with this pair's output is returned as a counted `VerifierFailure`; any
+other error raises and stops the run (I70).
 Must not: hold any implementation, or import one.
 
 No LLM is involved in this module.
@@ -24,5 +26,6 @@ class BaseVerifier(ABC):
         """Judge `claim` against `paper` using `rules`.
 
         Returns:
-            A Verdict built with `Verdict.finalise` against `paper.abstract`, or a counted failure.
+            A Verdict built with `Verdict.finalise` against `paper.abstract`, or a counted failure for a
+            pair-level problem. Anything not attributable to the pair raises.
         """

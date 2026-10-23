@@ -92,6 +92,28 @@ def answer_dev(
     k: int,
 ) -> DevAnswer:
     """Seal check, dev-only pool, answer, then the deterministic checks. Bad input raises before any fetch."""
+    question, pool = dev_papers(ports.source, files, spec, question_id, k=k, emitter=ports.emitter)
+
+    with stage(ports.emitter, "answer"):
+        answer = ports.answerer.answer(question.text, pool.papers, mode)
+    if (answer.question, answer.mode) != (question.text, mode):
+        raise ValueError("the answer does not echo the question and mode it was asked")
+    retrieved = {p.source_id for p in pool.papers}
+    findings = (*invented_citations(answer, retrieved), *dangling_claims(answer))
+    return DevAnswer(question=question, pool=pool, answer=answer, findings=findings)
+
+
+def dev_papers(
+    source: BaseLiteratureSource,
+    files: Mapping[str, bytes],
+    spec: CorpusSpec,
+    question_id: str,
+    *,
+    k: int,
+    emitter: EventEmitter | None,
+) -> tuple[QuestionEntry, DevPool]:
+    """The dev preflight and pool shared by `answer dev` and `run --dev`: seal check, dev question only,
+    the recorded search, dev-split papers only. Bad input raises before any fetch; an empty pool raises."""
     if type(k) is not int or k < 1:
         raise ValueError(f"k must be a positive int, got {k!r}")
     if problems := dataset_problems(files, spec):
@@ -106,19 +128,12 @@ def answer_dev(
         )
     entries = [*_rows(files[DEV_SOURCES], SourceEntry), *_rows(files[TEST_SOURCES], SourceEntry)]
 
-    with stage(ports.emitter, "retrieve"):
-        fetched = ports.source.search(question.query, limit=spec.pool_hits)
+    with stage(emitter, "retrieve"):
+        fetched = source.search(question.query, limit=spec.pool_hits)
     pool = dev_pool(question, entries, fetched, k)
     if not pool.papers:
         raise EmptyDevPoolError(f"{question_id}: no paper of its dev pool came back usable")
-
-    with stage(ports.emitter, "answer"):
-        answer = ports.answerer.answer(question.text, pool.papers, mode)
-    if (answer.question, answer.mode) != (question.text, mode):
-        raise ValueError("the answer does not echo the question and mode it was asked")
-    retrieved = {p.source_id for p in pool.papers}
-    findings = (*invented_citations(answer, retrieved), *dangling_claims(answer))
-    return DevAnswer(question=question, pool=pool, answer=answer, findings=findings)
+    return question, pool
 
 
 class DevAnswerRecord(ValidatedModel):

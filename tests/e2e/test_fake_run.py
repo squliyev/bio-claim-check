@@ -120,10 +120,10 @@ def test_non_ascii_question_is_echoed_exactly(tmp_path: Path) -> None:
     assert first.parent.name == second.parent.name
 
 
-def test_live_run_is_refused_until_s12(tmp_path: Path) -> None:
+def test_var_dir_is_refused_for_a_live_run_before_anything_is_read(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", Q, "--var-dir", str(tmp_path)])
     assert result.exit_code == 2
-    assert "use --fake" in result.output
+    assert "--var-dir is for --fake" in result.output
     assert list(tmp_path.iterdir()) == []
 
 

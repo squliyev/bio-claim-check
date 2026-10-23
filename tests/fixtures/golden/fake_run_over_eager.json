@@ -175,6 +175,7 @@
     }
   ],
   "mode": "over_eager",
+  "models": null,
   "notice": "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result.",
   "pair_counts": {
     "failed": 1,

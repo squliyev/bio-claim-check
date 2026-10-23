@@ -8,7 +8,13 @@ from tests.support.settings import make_settings
 from bio_claim_check.app.container import MissingProviderError, build_models
 from bio_claim_check.app.models import MODEL_SPECS, model_catalog
 from bio_claim_check.app.settings import Settings
-from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider, UnknownDeploymentError
+from bio_claim_check.common.model_family import ModelFamily
+from bio_claim_check.engine.llm.model_spec import (
+    ModelCatalog,
+    ModelSpec,
+    Provider,
+    UnknownDeploymentError,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -46,7 +52,13 @@ def test_only_the_role_whose_provider_is_missing_is_named() -> None:
     catalog = ModelCatalog(
         [
             *MODEL_SPECS,
-            ModelSpec(deployment="local", provider=Provider.OLLAMA, model_version="m@sha256:0", price=None),
+            ModelSpec(
+                deployment="local",
+                provider=Provider.OLLAMA,
+                model_version="m@sha256:0",
+                family=ModelFamily.OPENAI,
+                price=None,
+            ),
         ]
     )
     with pytest.raises(
@@ -63,3 +75,12 @@ def test_a_read_only_replay_needs_no_provider() -> None:
 def test_an_unknown_deployment_fails_at_wiring_even_in_read_only() -> None:
     with pytest.raises(UnknownDeploymentError, match="'gpt-typo'"):
         build_models(settings(cache_mode="read-only", answer_model="gpt-typo"), model_catalog())
+
+
+def test_every_deployment_names_who_trained_it() -> None:
+    """The independence flag (ADR 0019): the family is the trainer, not the serving API."""
+    assert {spec.deployment: spec.family for spec in MODEL_SPECS} == {
+        "gpt-6.1-sol": ModelFamily.OPENAI,
+        "claude-opus-4-8": ModelFamily.ANTHROPIC,
+        "Kimi-K2.6-1": ModelFamily.MOONSHOT,
+    }

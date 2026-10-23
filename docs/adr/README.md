@@ -47,6 +47,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0016](./0016-pipeline-events-and-clock.md) | Pipeline events without content, and one injected clock | Accepted | What a run reports while it works; what an event may never contain; where time comes from |
 | [0017](./0017-answer-agent-and-deterministic-checks.md) | Answer agents, abstention, and checks code can make without a model | Accepted | How answers are produced and converted; which defects are refused, flagged or reported; how negation is decided and versioned; what a dev answer may see |
 | [0018](./0018-run-record.md) | The run record: canonical result, trace, ledger and live-call budget | Accepted | What a run leaves behind; how the run id is derived; how every attempt and its usage is recorded, including failures; how live calls are capped |
+| [0019](./0019-llm-verifier-and-live-run.md) | The LLM verifier, the first live `run` and the retraction re-check | Accepted | What the verifier may see; which LLM failures count per pair and which stop the run; model families; declared prompts; the live and dev `run`; re-checking a run's citations for retractions |
 
 ## Superseded / historical
 

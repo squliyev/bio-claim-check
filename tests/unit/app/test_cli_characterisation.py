@@ -101,14 +101,14 @@ def test_validate_default_pack_is_byte_exact() -> None:
     [
         (
             "strict",
-            "1532a5e1a5ab5d4a",
+            "23f7a0fefb2e9d93",
             "2, needs_review=1, failed=0, flagged=1",
             "1, needs_review=1, failed=0, flagged=1",
             "invented_citation=0, dangling_reference=0",
         ),
         (
             "over_eager",
-            "c104c9e38e804ef2",
+            "7d8491af38a7dba8",
             "0, needs_review=1, failed=1, flagged=4",
             "0, needs_review=1, failed=1, flagged=4",
             "invented_citation=1, dangling_reference=0",

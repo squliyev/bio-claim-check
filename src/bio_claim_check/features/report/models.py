@@ -5,7 +5,8 @@ findings) and derives every disposition and count. Derived values appear in the 
 must equal what the model recomputes, so a stored number can never be forged or stale (invariant I20).
 Integrity is checked on construction, not only by the use case: every verdict is re-located against its
 paper's cleaned abstract, every invented-citation finding matches a not-retrieved pair, every finding
-names a claim in the report, and a fake report may only cite `FAKE:` sources (I19).
+names a claim in the report, and a fake report may only cite `FAKE:` sources (I19). A live report names
+its answerer and verifier and flags when they share a family (I71).
 Must not: change or re-judge an outcome, or compute rates (counts only; denominators are explicit).
 
 No LLM is involved in this module.
@@ -17,6 +18,7 @@ from typing import Annotated, Any, Final, Literal, Self, cast
 from pydantic import Field, ModelWrapValidatorHandler, computed_field, model_validator
 from pydantic_core import to_jsonable_python
 
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.features.contracts.finding import Finding, FindingKind
 from bio_claim_check.features.contracts.labels import AnswerMode, Disposition
@@ -31,9 +33,13 @@ from bio_claim_check.features.contracts.verdict import (
 )
 
 FAKE_NOTICE: Final = "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result."
+LIVE_NOTICE: Final = (
+    "LLM answer; each claim, if any, checked by an LLM verifier against the retrieved abstracts it cites. "
+    "Labels are model judgements, not expert review."
+)
 FAKE_PREFIX: Final = "FAKE:"
 
-type Provenance = Literal["fake"]
+type Provenance = Literal["fake", "live"]
 
 
 class _Derived(ValidatedModel):
@@ -135,6 +141,26 @@ class ClaimReport(_Derived):
         return claim_disposition(self.claim, {p.result.source_id: p.result for p in self.pairs})
 
 
+class ModelUse(ValidatedModel):
+    """Which deployment played a role, and who trained it."""
+
+    deployment: NonBlankStr
+    family: ModelFamily
+
+
+class RunModels(_Derived):
+    """The answerer and the verifier of a live run. Same-family use is allowed but flagged (ADR 0019)."""
+
+    answerer: ModelUse
+    verifier: ModelUse
+
+    @computed_field
+    @property
+    def same_family(self) -> bool:
+        """True when one model family both answered and judged: its blind spots may agree."""
+        return self.answerer.family == self.verifier.family
+
+
 class Report(_Derived):
     """The full record of one run. Counts are over pairs and over claims; FAILED stays in both."""
 
@@ -144,9 +170,12 @@ class Report(_Derived):
     papers: tuple[Paper, ...]
     claims: tuple[ClaimReport, ...]
     findings: tuple[Finding, ...]
+    models: RunModels | None
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
+        if (self.models is None) != (self.provenance == "fake"):
+            raise ValueError("models: required for a live report and absent from a fake one")
         by_id = {p.source_id: p for p in self.papers}
         if len(by_id) != len(self.papers):
             raise ValueError("papers: source ids must be unique")
@@ -181,8 +210,9 @@ class Report(_Derived):
     @computed_field
     @property
     def notice(self) -> str:
-        """Printed first and stored in the artifact, so a fake report can never pass for a result."""
-        return FAKE_NOTICE
+        """Printed first and stored in the artifact, so a fake report can never pass for a result and a
+        live one says what its labels are."""
+        return FAKE_NOTICE if self.provenance == "fake" else LIVE_NOTICE
 
     @computed_field
     @property

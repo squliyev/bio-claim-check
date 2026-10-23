@@ -9,11 +9,14 @@ Must not: be wired into a live run, or contain any real paper.
 No LLM is involved in this module.
 """
 
+from collections.abc import Sequence
 from typing import override
 
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
-from bio_claim_check.features.retrieval.query import validate_search
+from bio_claim_check.features.retrieval.models import RetractionStatus
+from bio_claim_check.features.retrieval.query import validate_retraction_ids, validate_search
 
 FAKE_CORPUS: tuple[Paper, ...] = (
     Paper(
@@ -65,3 +68,9 @@ class InMemoryLiteratureSource(BaseLiteratureSource):
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
         validate_search(question, limit)  # the same input contract as every backend
         return self._corpus[:limit]
+
+    @override
+    def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
+        validate_retraction_ids(source_ids)
+        by_id = {p.source_id: p.retracted for p in self._corpus}
+        return tuple(RetractionStatus(source_id=s, retracted=by_id.get(s)) for s in source_ids)

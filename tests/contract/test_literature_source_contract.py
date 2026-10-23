@@ -4,12 +4,14 @@ from collections.abc import Callable
 
 import pytest
 
+from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import (
     FAKE_CORPUS,
     InMemoryLiteratureSource,
 )
+from bio_claim_check.features.retrieval.models import RetractionStatus
 from tests.support.europepmc import envelope, harness, mixed_records, ok
 
 pytestmark = pytest.mark.contract
@@ -68,3 +70,50 @@ def test_real_ids_are_medline_ids(make: Callable[[int], BaseLiteratureSource]) -
         if not paper.source_id.startswith("FAKE:"):
             namespace, _, pmid = paper.source_id.partition(":")
             assert (namespace, pmid.isdigit()) == ("MED", True)
+
+
+STATUS = {"MED:90000001": False, "MED:90000004": True}
+"""What each source holds: one current paper, one retracted. `MED:90000077` is held by neither."""
+
+
+def _europe_pmc_status() -> BaseLiteratureSource:
+    held = [r for r in mixed_records() if f"MED:{r.get('pmid')}" in STATUS and r.get("source") == "MED"]
+    return harness(ok(envelope(held[:2]))).source
+
+
+def _in_memory_status() -> BaseLiteratureSource:
+    return InMemoryLiteratureSource(
+        tuple(
+            Paper(source_id=s, title="T", year=2020, raw_abstract="A.", retracted=r)
+            for s, r in STATUS.items()
+        )
+    )
+
+
+_STATUS_FACTORIES: dict[type[BaseLiteratureSource], Callable[[], BaseLiteratureSource]] = {
+    EuropePmcLiteratureSource: _europe_pmc_status,
+    InMemoryLiteratureSource: _in_memory_status,
+}
+
+
+@pytest.fixture(params=IMPLEMENTATIONS, ids=lambda c: c.__name__)
+def status_source(request: pytest.FixtureRequest) -> BaseLiteratureSource:
+    return _STATUS_FACTORIES[request.param]()
+
+
+def test_retraction_status_is_one_row_per_id_in_input_order(status_source: BaseLiteratureSource) -> None:
+    ids = ("MED:90000077", "MED:90000004", "MED:90000001")
+    assert status_source.retraction_status(ids) == (
+        RetractionStatus(source_id="MED:90000077", retracted=None),
+        RetractionStatus(source_id="MED:90000004", retracted=True),
+        RetractionStatus(source_id="MED:90000001", retracted=False),
+    )
+
+
+def test_retraction_status_of_nothing_is_empty(status_source: BaseLiteratureSource) -> None:
+    assert status_source.retraction_status(()) == ()
+
+
+def test_duplicate_retraction_ids_are_a_value_error(status_source: BaseLiteratureSource) -> None:
+    with pytest.raises(ValueError, match="unique"):
+        status_source.retraction_status(("MED:90000001", "MED:90000001"))

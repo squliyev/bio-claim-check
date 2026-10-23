@@ -11,7 +11,8 @@ off (our `transport_policy` retries), URLs derived from the one Foundry resource
 `build_dev_answer_ports` (S10) wires the live dev answer flow: Europe PMC and the answer model share one
 cache in the configured mode, and a read-only replay needs no provider at all. From S11 every live client
 sits behind one `CallBudget` per command, inside the cache, and `record_run` wires the run record's file
-operations (`app.run_record` holds its logic).
+operations (`app.run_record` holds its logic). `build_live_run_ports` (S12a) wires a live or dev `run`:
+Europe PMC, the answerer and the LLM verifier share one cache and one budget (ADR 0019).
 Must not: hold logic. It builds objects, composes infrastructure with pure parsers, and normalises
 infrastructure errors into the domain's error types.
 """
@@ -29,21 +30,32 @@ import httpx
 import openai
 
 from bio_claim_check import __version__
+from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import (
     EVENTS_DIR,
     LEDGER_FILE,
+    MANIFEST_FILE,
     RUNS_DIR,
     TRACE_SUFFIX,
+    DeclaredLlm,
     RecordIo,
     RunRecorder,
     TraceHandle,
     recording,
+    trace_stem,
 )
 from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.answer_dev import DevAnswerPorts
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
+from bio_claim_check.app.usecases.retractions import (
+    REPORT_FILE,
+    RetractionCheck,
+    RetractionInputError,
+    validate_run_id,
+)
 from bio_claim_check.app.usecases.run import RunPorts
 from bio_claim_check.common.base_clock import BaseClock
+from bio_claim_check.common.canonical_json import compact_json
 from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.system_clock import SystemClock
 from bio_claim_check.engine.cache.base_cache import BaseCache
@@ -59,6 +71,7 @@ from bio_claim_check.engine.llm.budgeted_llm_client import BudgetedLlmClient, Ca
 from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient
 from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
+from bio_claim_check.engine.prompts.prompt_template import PromptTemplate
 from bio_claim_check.features.answer.llm_answerer import LlmAnswerer
 from bio_claim_check.features.answer.over_eager_answer_llm_agent import OverEagerAnswerLlmAgent
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
@@ -69,13 +82,16 @@ from bio_claim_check.features.contracts.corpus import (
     CorpusSplit,
     parse_corpus_spec,
 )
-from bio_claim_check.features.contracts.labels import OverstatedReason
+from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError, parse_rulepack
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, audit_file
 from bio_claim_check.features.corpus.seal import sealed_bytes
+from bio_claim_check.features.report.models import ModelUse, RunModels
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import InMemoryLiteratureSource
+from bio_claim_check.features.verify.llm_verifier import LlmVerifier
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
+from bio_claim_check.features.verify.verify_llm_agent import VerifyLlmAgent
 from bio_claim_check.infrastructure.line_files import AppendError, LineFile, append_line, create_numbered
 from bio_claim_check.infrastructure.publish import PublishError, publish_once
 from bio_claim_check.infrastructure.strict_yaml import StrictYamlError, load_strict_yaml
@@ -292,6 +308,39 @@ def run_path(var_dir: Path, run_id: str) -> Path:
     return var_dir / RUNS_DIR / run_id
 
 
+RETRACTIONS_DIR: Final = "retractions"
+
+
+def read_run_files(var_dir: Path, run_id: str) -> tuple[bytes, bytes]:
+    """The manifest and report bytes of a published run; `RetractionInputError` if either is unreadable."""
+    folder = run_path(var_dir, validate_run_id(run_id))
+    try:
+        return (folder / MANIFEST_FILE).read_bytes(), (folder / REPORT_FILE).read_bytes()
+    except OSError as err:
+        raise RetractionInputError(f"run {run_id}: cannot read {folder}: {err.strerror or err}") from None
+
+
+def publish_retraction_check(var_dir: Path, check: RetractionCheck) -> Path:
+    """Write `retractions/<run_id>-<UTC>-<n>.json` (one compact JSON line) by exclusive create, never
+    under `runs/`."""
+    stem = f"{check.run_id}-{trace_stem(check.checked_at)}"
+    try:
+        with create_numbered(var_dir / RETRACTIONS_DIR, stem, ".json") as file:
+            file.write_line(compact_json(check.model_dump(mode="json")).encode("utf-8"))
+            return file.path
+    except OSError as err:
+        raise PublishError(f"cannot write a retraction check under {var_dir / RETRACTIONS_DIR}: {err}") from (
+            None
+        )
+
+
+@contextmanager
+def build_retraction_source(settings: Settings) -> Generator[EuropePmcLiteratureSource]:
+    """Europe PMC with the cache off: the re-check always asks the database (ADR 0019)."""
+    with build_retrieval(settings.model_copy(update={"cache_mode": CacheMode.OFF})) as source:
+        yield source
+
+
 def build_fake_run_ports(emitter: EventEmitter | None = None) -> RunPorts:
     """Fictional papers, scripted answers and verdicts. Needs no settings, network or `.env`."""
     rules = default_rulepack_hashed()
@@ -502,3 +551,86 @@ def build_dev_answer_ports(
             live = BudgetedLlmClient(clients[spec.deployment], CallBudget(settings.max_live_llm_calls))
         client = CachingLlmClient(live, cache, settings.cache_mode)
         yield DevAnswerPorts(source=source, answerer=build_answerer(client, spec, emitter), emitter=emitter)
+
+
+@dataclass(frozen=True, slots=True)
+class LiveRun:
+    """The ports of a live or dev `run`, and the LLM roles it declares in its manifest (I71)."""
+
+    ports: RunPorts
+    declared_llm: tuple[DeclaredLlm, ...]
+
+
+def _declared(agent: str, prompt: PromptTemplate, spec: ModelSpec) -> DeclaredLlm:
+    return DeclaredLlm(
+        agent=agent,
+        provider=spec.provider.value,
+        deployment=spec.deployment,
+        model_version=spec.model_version,
+        prompt_sha256=prompt.sha256,
+    )
+
+
+def declared_answerer(spec: ModelSpec, mode: AnswerMode) -> DeclaredLlm:
+    """The answer role a live command declares: the agent of `mode` on `spec` (I71)."""
+    agent = StrictAnswerLlmAgent if mode is AnswerMode.STRICT else OverEagerAnswerLlmAgent
+    return _declared(agent.name, agent.prompt, spec)
+
+
+def _model_use(spec: ModelSpec) -> ModelUse:
+    return ModelUse(deployment=spec.deployment, family=spec.family)
+
+
+@contextmanager
+def build_live_run_ports(
+    settings: Settings,
+    mode: AnswerMode,
+    emitter: EventEmitter | None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    openai_http: openai.DefaultHttpxClient | None = None,
+    anthropic_http: anthropic.DefaultHttpxClient | None = None,
+) -> Generator[LiveRun]:
+    """Europe PMC, the answerer (`answer_model`) and the LLM verifier (`verifier_model`) through one
+    cache in the configured mode, every live client behind one shared `CallBudget` (ADR 0018, 0019).
+
+    A read-only replay builds no provider client. `transport`/`*_http` are for tests.
+    """
+    roles = build_models(settings, model_catalog())
+    answer, verifier = roles.answer, roles.verifier
+    rules = default_rulepack_hashed()
+    with ExitStack() as stack:
+        cache = _cache(settings, stack)
+        source = _europe_pmc(settings, stack, cache, transport, sleep)
+        budget = CallBudget(settings.max_live_llm_calls)
+        live: dict[str, BaseLlmClient | None] = {answer.deployment: None, verifier.deployment: None}
+        if settings.cache_mode is not CacheMode.READ_ONLY:
+            clients = stack.enter_context(
+                build_llm_clients(
+                    settings,
+                    [answer, verifier],
+                    sleep=sleep,
+                    emitter=emitter,
+                    openai_http=openai_http,
+                    anthropic_http=anthropic_http,
+                )
+            )
+            live = {name: BudgetedLlmClient(client, budget) for name, client in clients.items()}
+        answer_client = CachingLlmClient(live[answer.deployment], cache, settings.cache_mode)
+        verifier_client = CachingLlmClient(live[verifier.deployment], cache, settings.cache_mode)
+        ports = RunPorts(
+            literature=source,
+            answerer=build_answerer(answer_client, answer, emitter),
+            verifier=LlmVerifier(VerifyLlmAgent(verifier_client, verifier, emitter=emitter)),
+            rules=rules.pack,
+            provenance="live",
+            rules_sha256=rules.sha256,
+            models=RunModels(answerer=_model_use(answer), verifier=_model_use(verifier)),
+            emitter=emitter,
+        )
+        declared = (
+            declared_answerer(answer, mode),
+            _declared(VerifyLlmAgent.name, VerifyLlmAgent.prompt, verifier),
+        )
+        yield LiveRun(ports=ports, declared_llm=tuple(sorted(declared, key=lambda d: d.agent)))

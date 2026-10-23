@@ -1,5 +1,6 @@
 """`run_question`: the use case distrusts every port (I18)."""
 
+from collections.abc import Sequence
 from dataclasses import replace
 from typing import override
 
@@ -10,6 +11,7 @@ from bio_claim_check.app.usecases.run import RunInputError, RunPorts, run_questi
 from bio_claim_check.features.answer.base_answerer import BaseAnswerer
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
 from bio_claim_check.features.contracts.answer import Answer
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import AnswerMode, Disposition, EvidenceStatus, Label
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack
@@ -25,6 +27,7 @@ from bio_claim_check.features.retrieval.in_memory_literature_source import (
     FAKE_CORPUS,
     InMemoryLiteratureSource,
 )
+from bio_claim_check.features.retrieval.models import RetractionStatus
 from bio_claim_check.features.verify.base_verifier import BaseVerifier
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
 
@@ -64,6 +67,10 @@ class FixedSource(BaseLiteratureSource):
     @override
     def search(self, question: str, *, limit: int) -> tuple[Paper, ...]:
         return self._papers
+
+    @override
+    def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
+        raise NotImplementedError  # never asked: these tests only search
 
 
 def _container(**changes: object) -> RunPorts:

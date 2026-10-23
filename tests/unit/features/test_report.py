@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.features.contracts.answer import Answer
 from bio_claim_check.features.contracts.finding import Finding, FindingKind
 from bio_claim_check.features.contracts.labels import AnswerMode, Disposition, FailureKind, Label
@@ -19,7 +20,7 @@ from bio_claim_check.features.contracts.verdict import (
     VerifierOutput,
 )
 from bio_claim_check.features.report.build import build_report
-from bio_claim_check.features.report.models import FAKE_NOTICE, Report
+from bio_claim_check.features.report.models import FAKE_NOTICE, LIVE_NOTICE, ModelUse, Report, RunModels
 
 pytestmark = pytest.mark.unit
 
@@ -54,7 +55,12 @@ FINDINGS = (
 def _report() -> Report:
     answer = Answer(question="Does X work?", mode=AnswerMode.OVER_EAGER, claims=(C1, C2, C3))
     return build_report(
-        provenance="fake", answer=answer, papers=(P1, P2), findings=FINDINGS, outcomes=_outcomes()
+        provenance="fake",
+        models=None,
+        answer=answer,
+        papers=(P1, P2),
+        findings=FINDINGS,
+        outcomes=_outcomes(),
     )
 
 
@@ -90,9 +96,57 @@ def test_fake_report_carries_its_notice() -> None:
     assert _dump()["notice"] == FAKE_NOTICE
 
 
+GPT = ModelUse(deployment="gpt-x", family=ModelFamily.OPENAI)
+CLAUDE = ModelUse(deployment="claude-x", family=ModelFamily.ANTHROPIC)
+
+
+def _live(models: RunModels | None) -> Report:
+    answer = Answer(question="q", mode=AnswerMode.STRICT, claims=())
+    return build_report(provenance="live", models=models, answer=answer, papers=(), findings=(), outcomes={})
+
+
+def test_live_report_names_its_models_and_says_labels_are_model_judgements() -> None:
+    dumped = _live(RunModels(answerer=GPT, verifier=CLAUDE)).model_dump(mode="json")
+    assert dumped["notice"] == LIVE_NOTICE
+    assert "FAKE" not in LIVE_NOTICE
+    assert "not expert review" in LIVE_NOTICE
+    assert dumped["models"] == {
+        "answerer": {"deployment": "gpt-x", "family": "openai"},
+        "verifier": {"deployment": "claude-x", "family": "anthropic"},
+        "same_family": False,
+    }
+
+
+def test_same_family_is_flagged() -> None:
+    assert RunModels(
+        answerer=GPT, verifier=ModelUse(deployment="gpt-y", family=ModelFamily.OPENAI)
+    ).same_family
+
+
+def test_models_are_required_for_live_and_absent_for_fake() -> None:
+    with pytest.raises(ValidationError, match="models"):
+        _live(None)
+    dumped = _dump() | {"models": RunModels(answerer=GPT, verifier=CLAUDE).model_dump(mode="json")}
+    with pytest.raises(ValidationError, match="models"):
+        Report.model_validate(dumped)
+
+
+def test_a_forged_same_family_is_rejected() -> None:
+    forged = RunModels(answerer=GPT, verifier=CLAUDE).model_dump(mode="json") | {"same_family": True}
+    with pytest.raises(ValidationError, match="same_family"):
+        RunModels.model_validate(forged)
+
+
+def test_a_stored_family_outside_the_vocabulary_is_rejected() -> None:
+    stored = RunModels(answerer=GPT, verifier=CLAUDE).model_dump(mode="json")
+    stored["verifier"]["family"] = "fabricated"
+    with pytest.raises(ValidationError, match="family"):
+        RunModels.model_validate(stored)
+
+
 def test_an_abstaining_answer_counts_nothing() -> None:
     answer = Answer(question="q", mode=AnswerMode.STRICT, claims=())
-    report = build_report(provenance="fake", answer=answer, papers=(), findings=(), outcomes={})
+    report = build_report(provenance="fake", models=None, answer=answer, papers=(), findings=(), outcomes={})
     assert set(report.pair_counts.values()) == set(report.claim_counts.values()) == {0}
 
 
@@ -193,7 +247,12 @@ def test_fake_report_may_not_cite_real_sources() -> None:
     answer = Answer(question="q", mode=AnswerMode.STRICT, claims=(C1, c2, C3))
     with pytest.raises(ValidationError, match="only FAKE: sources"):
         build_report(
-            provenance="fake", answer=answer, papers=(P1, real), findings=FINDINGS, outcomes=outcomes
+            provenance="fake",
+            models=None,
+            answer=answer,
+            papers=(P1, real),
+            findings=FINDINGS,
+            outcomes=outcomes,
         )
 
 
@@ -216,10 +275,18 @@ def test_build_rejects_missing_or_extra_outcomes() -> None:
     missing = _outcomes()
     del missing["c1"]["FAKE:9"]
     with pytest.raises(ValueError, match="exactly its cited sources"):
-        build_report(provenance="fake", answer=answer, papers=(P1, P2), findings=FINDINGS, outcomes=missing)
+        build_report(
+            provenance="fake",
+            models=None,
+            answer=answer,
+            papers=(P1, P2),
+            findings=FINDINGS,
+            outcomes=missing,
+        )
     with pytest.raises(ValueError, match="claims not in the answer"):
         build_report(
             provenance="fake",
+            models=None,
             answer=answer,
             papers=(P1, P2),
             findings=FINDINGS,

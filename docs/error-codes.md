@@ -60,4 +60,5 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `retrieval.failed` | `RetrievalError` | The literature database failed or sent a malformed response |
 | `retrieval.malformed_record` | `MalformedRecordError` | A record field has a type the API was not seen to return |
 | `run.input` | `RunInputError` | `run`: the question is blank or `k` is not a positive int |
+| `retractions.input` | `RetractionInputError` | `retractions`: the run id is malformed, or the run is missing, altered, not a live `run`, or not a report (checked before any request) |
 | `verdict.negation_rules_mismatch` | `NegationRulesMismatchError` | A stored verdict was made under other negation rules; re-run it rather than re-score it (ADR 0017) |

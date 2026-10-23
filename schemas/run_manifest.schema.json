@@ -29,6 +29,42 @@
       "title": "ArtifactRef",
       "type": "object"
     },
+    "DeclaredLlm": {
+      "additionalProperties": false,
+      "description": "One wired LLM role (agent) of a live run, named whether or not any of its calls finished, so a run\nwhose verifier calls all failed, or that made none, still names the verifier's prompt (I71).",
+      "properties": {
+        "agent": {
+          "title": "Agent",
+          "type": "string"
+        },
+        "deployment": {
+          "title": "Deployment",
+          "type": "string"
+        },
+        "model_version": {
+          "title": "Model Version",
+          "type": "string"
+        },
+        "prompt_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prompt Sha256",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "agent",
+        "provider",
+        "deployment",
+        "model_version",
+        "prompt_sha256"
+      ],
+      "title": "DeclaredLlm",
+      "type": "object"
+    },
     "LlmUse": {
       "additionalProperties": false,
       "description": "One distinct (agent, model, prompt, served model) that produced a response used by the run.",
@@ -159,6 +195,14 @@
       ],
       "default": null,
       "title": "Dataset Manifest Sha256"
+    },
+    "declared_llm": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/DeclaredLlm"
+      },
+      "title": "Declared Llm",
+      "type": "array"
     },
     "inputs": {
       "$ref": "#/$defs/RunInputs"

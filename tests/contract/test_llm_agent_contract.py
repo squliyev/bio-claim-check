@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from bio_claim_check.app.container import default_rulepack
 from bio_claim_check.engine.agent.base_llm_agent import AGENT_NAME, BaseLlmAgent
 from bio_claim_check.engine.agent.ping_llm_agent import PingLlmAgent
 from bio_claim_check.engine.events.emitter import EventEmitter
@@ -19,6 +20,8 @@ from bio_claim_check.features.answer.answer_models import AnswerPayload
 from bio_claim_check.features.answer.over_eager_answer_llm_agent import OverEagerAnswerLlmAgent
 from bio_claim_check.features.answer.strict_answer_llm_agent import StrictAnswerLlmAgent
 from bio_claim_check.features.retrieval.in_memory_literature_source import FAKE_CORPUS
+from bio_claim_check.features.verify.verify_llm_agent import VerifyLlmAgent
+from bio_claim_check.features.verify.verify_models import VerifyPayload
 from tests.support.events import stepping_clock
 from tests.support.llm import response, spec
 
@@ -26,7 +29,12 @@ pytestmark = pytest.mark.contract
 
 type AnyAgent = BaseLlmAgent[Any, Any]
 
-IMPLEMENTATIONS: tuple[type[AnyAgent], ...] = (PingLlmAgent, StrictAnswerLlmAgent, OverEagerAnswerLlmAgent)
+IMPLEMENTATIONS: tuple[type[AnyAgent], ...] = (
+    PingLlmAgent,
+    StrictAnswerLlmAgent,
+    OverEagerAnswerLlmAgent,
+    VerifyLlmAgent,
+)
 
 
 @dataclass(frozen=True)
@@ -43,6 +51,15 @@ CASES: dict[type[AnyAgent], AgentCase] = {
     PingLlmAgent: AgentCase(payload=None, reply='{"ok": true}'),
     StrictAnswerLlmAgent: ANSWER,
     OverEagerAnswerLlmAgent: ANSWER,
+    VerifyLlmAgent: AgentCase(
+        payload=VerifyPayload(
+            claim="OS-912 reduced plaque in mice.",
+            title=FAKE_CORPUS[0].title,
+            abstract=FAKE_CORPUS[0].abstract,
+            rules=default_rulepack(),
+        ),
+        reply='{"label": "not_in_source", "overstated_reason": null, "evidence": null, "reason": "Absent."}',
+    ),
 }
 
 

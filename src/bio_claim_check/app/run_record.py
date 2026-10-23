@@ -26,9 +26,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass, fields
 from datetime import UTC
 from enum import StrEnum
-from typing import Annotated, Final, Literal
+from typing import Annotated, Final, Literal, Self
 
-from pydantic import AwareDatetime, Field, JsonValue
+from pydantic import AwareDatetime, Field, JsonValue, model_validator
 
 from bio_claim_check.common.base_clock import BaseClock
 from bio_claim_check.common.canonical_json import compact_json, pretty_json_bytes
@@ -91,14 +91,37 @@ class RunInputs(ValidatedModel):
     k: Annotated[int, Field(strict=True, ge=1)]
 
 
+class DeclaredLlm(ValidatedModel):
+    """One wired LLM role (agent) of a live run, named whether or not any of its calls finished, so a run
+    whose verifier calls all failed, or that made none, still names the verifier's prompt (I71)."""
+
+    agent: NonBlankStr
+    provider: NonBlankStr
+    deployment: NonBlankStr
+    model_version: NonBlankStr
+    prompt_sha256: Sha256Hex
+
+
 class RunDetails(ValidatedModel):
-    """What the command knows about its run; the recorder adds the artifact, LLM uses and version."""
+    """What the command knows about its run; the recorder adds the artifact, LLM uses and version.
+    `declared_llm` is the wired roles, sorted by agent (at least one for a live run, none for a fake one);
+    `llm` (on the manifest) is what was observed."""
 
     provenance: Literal["fake", "live"]
     inputs: RunInputs
     negation_rules: Annotated[int, Field(strict=True, ge=1)]
     rulepack_sha256: Sha256Hex | None = None
     dataset_manifest_sha256: Sha256Hex | None = None
+    declared_llm: tuple[DeclaredLlm, ...] = ()
+
+    @model_validator(mode="after")
+    def _declared_sorted(self) -> Self:
+        agents = [d.agent for d in self.declared_llm]
+        if agents != sorted(set(agents)):
+            raise ValueError("declared_llm: one entry per agent, sorted by agent")
+        if (self.provenance == "live") != bool(agents):
+            raise ValueError("declared_llm: required for a live run, empty for a fake one")
+        return self
 
 
 class RunManifest(RunDetails):

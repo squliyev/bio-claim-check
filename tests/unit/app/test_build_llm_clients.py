@@ -20,10 +20,12 @@ from bio_claim_check.app.container import (
     MissingProviderError,
     UnsupportedProviderError,
     build_dev_answer_ports,
+    build_live_run_ports,
     build_llm_clients,
     foundry_urls,
 )
 from bio_claim_check.app.models import model_catalog
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.engine.cache.policy import CacheMissError, CacheMode
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
 from bio_claim_check.engine.llm.errors import LlmBudgetExceededError, LlmProviderError
@@ -31,6 +33,11 @@ from bio_claim_check.engine.llm.model_spec import ModelSpec, Provider
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
 from bio_claim_check.features.answer.llm_answerer import LlmAnswerer
 from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.contracts.verdict import Claim
+from bio_claim_check.features.report.models import ModelUse, RunModels
+from bio_claim_check.features.retrieval.in_memory_literature_source import FAKE_CORPUS
+from bio_claim_check.features.verify.llm_verifier import LlmVerifier
+from bio_claim_check.features.verify.verify_prompts import VERIFY_PROMPT
 
 pytestmark = pytest.mark.unit
 
@@ -49,7 +56,11 @@ def test_foundry_urls_derive_both_apis_from_one_resource() -> None:
 
 def test_each_deployment_gets_its_provider_backend_and_one_sdk_per_api() -> None:
     other = ModelSpec(
-        deployment="gpt-other", provider=Provider.FOUNDRY_OPENAI, model_version="v1", price=None
+        deployment="gpt-other",
+        provider=Provider.FOUNDRY_OPENAI,
+        model_version="v1",
+        family=ModelFamily.OPENAI,
+        price=None,
     )
     with build_llm_clients(make_settings(foundry=FOUNDRY), [GPT, CLAUDE, other]) as clients:
         assert set(clients) == {"gpt-6.1-sol", "claude-opus-4-8", "gpt-other"}
@@ -113,7 +124,9 @@ def test_missing_foundry_settings_fail_before_any_client() -> None:
 
 @pytest.mark.parametrize("provider", [Provider.ANTHROPIC, Provider.OLLAMA])
 def test_a_provider_without_an_adapter_is_refused_by_name(provider: Provider) -> None:
-    spec = ModelSpec(deployment="some-model", provider=provider, model_version="v1", price=None)
+    spec = ModelSpec(
+        deployment="some-model", provider=provider, model_version="v1", family=ModelFamily.OPENAI, price=None
+    )
     with (
         pytest.raises(UnsupportedProviderError, match="some-model"),
         build_llm_clients(make_settings(foundry=FOUNDRY), [GPT, spec]),
@@ -164,4 +177,49 @@ def test_dev_answer_ports_cap_live_calls_with_the_configured_budget(tmp_path: Pa
             ports.answerer.answer("first?", (), AnswerMode.STRICT)
         with pytest.raises(LlmBudgetExceededError):
             ports.answerer.answer("second?", (), AnswerMode.STRICT)
+    assert len(seen) == 1
+
+
+def test_live_run_ports_replay_read_only_and_declare_both_roles(tmp_path: Path) -> None:
+    settings = make_settings(cache_mode=CacheMode.READ_ONLY, var_dir=tmp_path)
+    with build_live_run_ports(settings, AnswerMode.OVER_EAGER, None) as live:
+        assert isinstance(live.ports.answerer, LlmAnswerer)
+        assert isinstance(live.ports.verifier, LlmVerifier)
+        assert live.ports.provenance == "live"
+        assert live.ports.models == RunModels(
+            answerer=ModelUse(deployment="gpt-6.1-sol", family=ModelFamily.OPENAI),
+            verifier=ModelUse(deployment="claude-opus-4-8", family=ModelFamily.ANTHROPIC),
+        )
+        with pytest.raises(CacheMissError):
+            live.ports.literature.search("anything", limit=1)
+    assert [(d.agent, d.deployment) for d in live.declared_llm] == [
+        ("answer_over_eager", "gpt-6.1-sol"),
+        ("verifier", "claude-opus-4-8"),
+    ]
+    assert live.declared_llm[1].prompt_sha256 == VERIFY_PROMPT.sha256
+
+
+def test_one_budget_caps_the_answerer_and_the_verifier_together(tmp_path: Path) -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(401, json={"error": {"code": "unauthorized"}})
+
+    settings = make_settings(
+        cache_mode=CacheMode.READ_WRITE, var_dir=tmp_path, foundry=FOUNDRY, max_live_llm_calls=1
+    )
+    paper = FAKE_CORPUS[0]
+    claim = Claim(id="c1", text="OS-912 works.", cites=(paper.source_id,))
+    with build_live_run_ports(
+        settings,
+        AnswerMode.STRICT,
+        None,
+        openai_http=openai.DefaultHttpxClient(transport=httpx2.MockTransport(handler)),
+        anthropic_http=anthropic.DefaultHttpxClient(transport=httpx2.MockTransport(handler)),
+    ) as live:
+        with pytest.raises(LlmProviderError):
+            live.ports.answerer.answer("first?", (), AnswerMode.STRICT)
+        with pytest.raises(LlmBudgetExceededError):
+            live.ports.verifier.verify(claim, paper, live.ports.rules)
     assert len(seen) == 1

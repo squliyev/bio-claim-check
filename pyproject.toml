@@ -139,6 +139,7 @@ source_modules = [
     "bio_claim_check.app.run_record",
     "bio_claim_check.app.usecases.build_corpus",
     "bio_claim_check.app.usecases.corpus_audit",
+    "bio_claim_check.app.usecases.retractions",
     "bio_claim_check.common",
     "bio_claim_check.engine.cache",
     "bio_claim_check.engine.events",
@@ -156,9 +157,11 @@ source_modules = [
     "bio_claim_check.features.retrieval.errors",
     "bio_claim_check.features.retrieval.europe_pmc_literature_source",
     "bio_claim_check.features.retrieval.in_memory_literature_source",
+    "bio_claim_check.features.retrieval.models",
     "bio_claim_check.features.retrieval.query",
     "bio_claim_check.features.verify.base_verifier",
     "bio_claim_check.features.verify.scripted_verifier",
+    "bio_claim_check.features.verify.verify_models",
     "bio_claim_check.infrastructure",
 ]
 forbidden_modules = ["bio_claim_check.engine.llm"]

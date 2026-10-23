@@ -9,6 +9,8 @@ Retries are deterministic (1, 2, 4 s, or `Retry-After` capped at 60 s): no rando
 injected, so tests take no time. Requests are sequential, and consecutive requests are at least
 `MIN_INTERVAL` apart (a bulk corpus build is the first caller that sends many). Cache hits send nothing,
 so they never wait. One search is one request.
+`retraction_status` (S12a, ADR 0019) asks for exact `MED:` ids, at most `MAX_LIMIT` per request, with no
+citable filters and no cache: it reports the database's current state, not search eligibility.
 Must not: log request headers (they carry the contact email), rewrite the query, page beyond one request,
 or construct its own HTTP client (the app builds it with the User-Agent and timeouts).
 
@@ -20,7 +22,7 @@ import json
 import logging
 import time
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import cast, override
 
 import httpx
@@ -28,17 +30,26 @@ from pydantic import JsonValue
 
 from bio_claim_check.engine.cache.base_cache import BaseCache
 from bio_claim_check.engine.cache.policy import CacheMode, cache_key, fetch_through
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
 from bio_claim_check.features.retrieval.citable import (
     MalformedRecordError,
     RejectReason,
     is_citable,
+    is_retracted,
     record_to_paper,
     validate_shape,
 )
 from bio_claim_check.features.retrieval.errors import RetrievalError
-from bio_claim_check.features.retrieval.query import build_query, validate_search
+from bio_claim_check.features.retrieval.models import RetractionStatus
+from bio_claim_check.features.retrieval.query import (
+    MAX_LIMIT,
+    build_id_query,
+    build_query,
+    validate_retraction_ids,
+    validate_search,
+)
 
 SEARCH_URL = "https://www.ebi.ac.uk/europepmc/webservices/rest/search"
 CACHE_NAMESPACE = "europepmc.search"
@@ -60,6 +71,11 @@ def _not_json(token: str) -> object:
 
 def _records(body: bytes) -> list[Mapping[str, object]]:
     """The validated result records, or `RetrievalError` for anything but the documented envelope."""
+    return _envelope(body)[1]
+
+
+def _envelope(body: bytes) -> tuple[int, list[Mapping[str, object]]]:
+    """`hitCount` and the validated result records (see `_records`)."""
     try:
         envelope = json.loads(body, parse_constant=_not_json)
     except ValueError as exc:  # JSONDecodeError, UnicodeDecodeError, NaN/Infinity
@@ -87,7 +103,7 @@ def _records(body: bytes) -> list[Mapping[str, object]]:
             validate_shape(record)
     except MalformedRecordError as exc:
         raise RetrievalError(f"Europe PMC response: malformed record ({exc})") from exc
-    return typed
+    return hits, typed
 
 
 def _retry_after(response: httpx.Response, default: float) -> float:
@@ -159,6 +175,35 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
         Raises KeyError if that search was not made by this instance.
         """
         return self._response_sha256[(question, limit)]
+
+    @override
+    def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
+        validate_retraction_ids(source_ids)
+        pmids = [s.removeprefix("MED:") for s in source_ids if s.startswith("MED:")]
+        found: dict[str, bool] = {}
+        for start in range(0, len(pmids), MAX_LIMIT):
+            chunk = pmids[start : start + MAX_LIMIT]
+            params = {
+                "query": build_id_query(chunk),
+                "resultType": "core",
+                "format": "json",
+                "pageSize": str(MAX_LIMIT),
+            }
+            hits, records = _envelope(self._get(params).content)
+            if hits > len(records):
+                raise RetrievalError("Europe PMC response: more hits than one page for an id query")
+            asked = set(chunk)
+            for record in records:
+                pmid = record.get("pmid")
+                if record.get("source") != "MED" or not isinstance(pmid, str) or pmid not in asked:
+                    raise RetrievalError("Europe PMC response: a record for an id that was not asked for")
+                if pmid in found:
+                    raise RetrievalError(f"Europe PMC response: MED:{pmid} returned twice")
+                found[pmid] = is_retracted(record)
+        return tuple(
+            RetractionStatus(source_id=s, retracted=found.get(s[4:]) if s.startswith("MED:") else None)
+            for s in source_ids
+        )
 
     def _fetch(self, params: Mapping[str, str]) -> bytes:
         """One validated 200 body. Raises before returning, so nothing bad reaches the cache."""
