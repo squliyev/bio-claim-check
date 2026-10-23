@@ -11,7 +11,7 @@ Real values live only in the git-ignored ``.env`` file; ``.env.example`` documen
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, SecretStr
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from bio_claim_check.engine.cache.policy import CacheMode
@@ -63,10 +63,13 @@ class Settings(BaseSettings):
     """Sent in the User-Agent to Europe PMC, as their usage etiquette asks."""
 
     var_dir: Path = Path("var")
-    """The single writable root: cache, ledger, runs, annotations."""
+    """The single writable root: cache, runs, event traces, the run ledger, annotations."""
 
     cache_mode: CacheMode = CacheMode.READ_WRITE
     """``read-only`` replays from cache and fails closed on a miss (CI and offline demos). ADR 0009."""
+
+    max_live_llm_calls: PositiveInt = 40
+    """The most live LLM calls one command may make; cache hits are free; refused before the call."""
 
     log_level: LogLevel = "WARNING"
     """Applied by `app.logging_setup` (S08b). WARNING shows only retries and problems; INFO adds progress.

@@ -7,10 +7,10 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 ## 1. Where things stand
 
-- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10.
+- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11.
   CI is green on `main`.
-- **Next session: S11, the run record** (section 4).
-- Next free ids: invariant **I65**, ADR **0018**.
+- **Next session: S12, the verifier and the first live `run`** (section 4).
+- Next free ids: invariant **I69**, ADR **0019**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12) may use **dev-split sources only**.
 
@@ -37,24 +37,24 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S11 — the run record
+## 4. Next: S12 — the verifier and the first live `run`
 
-**Goal:** a run leaves a durable, replayable record: the `events.jsonl` sink and run-level events on the
-S09 vocabulary, a run manifest, budgets, and an append-only ledger built from `LlmCallFinished` that
-includes failed and cancelled runs; a read-only replay is byte-identical.
+**Goal:** the verifier agent and the first live `run`: verifier prompt, context isolation, a dev smoke
+gold set in CI, model-family independence, a retraction re-check; ends with the tag `prompts-frozen-v1`.
 
 **Bindings from earlier sessions (must hold):**
-- Events never carry content (I59); new event types join `app/events.py`'s union (I58).
-- A stopped or failed run is never recorded as success; a failed call's spend survives every exception
-  path (backlog A14).
-- Replayed calls are cache hits and never count as spend (S10's `answer dev` already splits live and
-  cache-hit usage; reuse that split, do not invent a second one).
+- Dev-split sources only; drop and count anything else (reuse `dev_pool`).
+- The verifier subclasses `BaseLlmAgent`; map `llm.*` errors (including `llm.prompt_filtered`) to
+  `FailureKind`. Context isolation: a sentinel in the payload never appears in the request.
+- A live `run` records through `record_run` like `answer dev` (ADR 0018): its manifest names the models
+  and prompt hashes; the shared `CallBudget` wraps every live client; replay must be byte-identical.
+- A change to the negation rules bumps `NEGATION_RULES`. Revisit Claude's `max_output_tokens=8192`.
+- Re-check retraction of every cited paper uncached.
 - Money stays "unpriced" while `ModelSpec.price is None`; never 0.
 
-**Exit:** a fake and a dev answer run each write `events.jsonl`, a manifest and a ledger row; replay in
-`read-only` mode reproduces the artifacts byte for byte; `make verify` and CI green.
+**Exit:** the roadmap's S12 row; `make verify` and CI green.
 
-## 5. Engine contracts you build on (S08, S08b, S09)
+## 5. Engine contracts you build on (S08–S11)
 
 - `engine/llm`: `LlmRequest`, `LlmResponse`, `Message`, `FinishReason`, `Usage`, `Price`, `Spend`,
   `cost()`, `ModelSpec`, `ModelCatalog`, `Provider`, `LlmCallError` (kinds: invalid output, truncated,
@@ -80,6 +80,11 @@ includes failed and cancelled runs; a read-only replay is byte-identical.
 - `common/canonical_json.py` for every hash and written JSON; `common/errors.py::BccError` with a stable
   `code` for every deliberate error (listed in [error-codes.md](error-codes.md)); logging goes to stderr
   through a redacting filter.
+- **S11:** `app/run_record.py` (`RunManifest`, `LedgerRow`, `recording`, `RunRecorder`) wired by
+  `app/container.py::record_run`; `engine/events/{jsonl,tee}_event_sink.py`, `call_tally.py`;
+  `engine/llm/budgeted_llm_client.py` (`CallBudget`); `infrastructure/line_files.py`. Every attempt of
+  both commands writes `var/events/*.jsonl` and a `var/ledger.jsonl` row; a success also publishes
+  `var/runs/<run_id>/{artifact, manifest.json}` (ADR 0018).
 
 ## 6. Bindings for later sessions
 
@@ -89,9 +94,6 @@ includes failed and cancelled runs; a read-only replay is byte-identical.
   every cited paper uncached, and ends with the tag `prompts-frozen-v1`.
 - **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
   records the frozen prompts hash.
-- **S11:** ledger records failed and `cancelled` runs; a stopped run is never recorded as success. S11
-  adds the `events.jsonl` sink and run-level events on the S09 vocabulary, and builds the ledger from
-  `LlmCallFinished` (ADR 0016), and closes the S09 spend gap on re-raised client errors (backlog A14).
 - **S12:** the verifier agent subclasses `BaseLlmAgent`; map `llm.*` errors (including
   `llm.prompt_filtered`) to `FailureKind`; revisit Claude's `max_output_tokens=8192` budget.
 - **S17:** layered Streamlit UI (backlog B4).

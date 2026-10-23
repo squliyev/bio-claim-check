@@ -4,6 +4,9 @@ Why: spend, finish reasons, repairs and transport retries are the numbers a revi
 *logical attempt* is one runner turn (the first call, or the one repair): it emits exactly one
 `LlmCallStarted` and one `LlmCallFinished`, or the call's single `LlmCallFailed` (I60). A *transport
 retry* happens inside a backend, within one logical attempt, and emits `LlmRetryScheduled`.
+`LlmCallFailed.unmeasured` says the failing attempt's client call raised after it may have reached the
+provider (a transport error, an unexpected response, a provider rejection, a cache write after a live
+call), so its usage is unknown: counted, never summed as 0 (I67).
 Usage fields mirror `engine.llm.Usage` (reasoning ⊆ output, cached ⊆ input, reasoning None when
 unreported); a parity test keeps them in step (I58).
 Must not: carry message text, model output, validator messages, payloads, endpoints or keys (I59);
@@ -62,6 +65,7 @@ class LlmCallFailed(PipelineEvent):
     error_code: NonBlankStr
     kind: NonBlankStr | None
     attempts: Count  # 0 when it failed before reaching the client (e.g. a processor contract error)
+    unmeasured: bool  # the failing attempt may have reached the provider, and its usage is unknown
 
 
 class LlmRetryScheduled(PipelineEvent):

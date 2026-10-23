@@ -11,11 +11,16 @@ failures or double-counts money. The order here is the whole contract (ADR 0012)
 Every failure the runner decides is an `LlmCallError` carrying the spend of all its attempts. A prompt
 rejected by the provider's filter (`LlmPromptFilteredError`) is recorded as an unmeasured call and fails as
 `content_filtered`. Any other exception (client, cache, processor) propagates unchanged: no blind except.
-Known gap (S11 binding): such a propagated client error does not carry the spend of earlier attempts, and
-a call that may have been billed (timeout, unexpected response) is not yet counted as unmeasured.
+Such a propagated client error does not carry `Spend`; the run's money record is the ledger, folded from
+events (ADR 0018), where earlier attempts already emitted `LlmCallFinished`.
 Events (ADR 0016, I60), when an emitter is given: each logical attempt emits `LlmCallStarted` and then
 `LlmCallFinished` once a response exists; a repair emits `LlmRepairRequested`; a typed (`BccError`)
-failure emits one `LlmCallFailed` before it propagates. Events carry no text (I59).
+failure emits one `LlmCallFailed` before it propagates. Its `unmeasured` is decided where the client is
+called: true when `complete` raised a typed error after the request may have reached the provider (all
+but a budget refusal, a read-only miss and a cache read failure); a processor or validation failure is
+never unmeasured. An `EventWriteError` (the trace file failed) passes through as is, never as an LLM
+failure: the in-memory copy already holds the event. If writing `LlmCallFailed` itself fails, the
+original error still propagates. Events carry no text (I59).
 Processors may not touch what the runner owns: a request processor may reshape messages but not the model,
 responses or spend; a response processor may change only the payload. A violation raises
 `ProcessorContractError`, because it would send the call to the wrong model or hide what was paid.
@@ -24,14 +29,17 @@ model-controlled values into a user-role message.
 Must not: retry transport errors (that is the backend's job, S09), or repair more than once.
 """
 
+import logging
 from collections.abc import Callable, Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from pydantic import BaseModel, JsonValue, ValidationError
 
 from bio_claim_check.common.errors import BccError
+from bio_claim_check.engine.cache.policy import CacheError, CacheMissError, CacheWriteError
 from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.engine.events.errors import EventWriteError
 from bio_claim_check.engine.events.llm_events import (
     LlmCallFailed,
     LlmCallFinished,
@@ -40,7 +48,12 @@ from bio_claim_check.engine.events.llm_events import (
 )
 from bio_claim_check.engine.events.pipeline_event import PipelineEvent
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
-from bio_claim_check.engine.llm.errors import LlmCallError, LlmFailureKind, LlmPromptFilteredError
+from bio_claim_check.engine.llm.errors import (
+    LlmBudgetExceededError,
+    LlmCallError,
+    LlmFailureKind,
+    LlmPromptFilteredError,
+)
 from bio_claim_check.engine.llm.event_refs import model_ref
 from bio_claim_check.engine.llm.llm_cache_key import llm_cache_key
 from bio_claim_check.engine.llm.messages import FinishReason, LlmRequest, LlmResponse, Message
@@ -55,6 +68,7 @@ REPAIR_INSTRUCTION = (
     "Reply again with only the corrected JSON object."
 )
 EMPTY_REPLY = "(empty reply)"
+logger = logging.getLogger(__name__)
 
 
 class ProcessorContractError(BccError, RuntimeError):
@@ -64,6 +78,21 @@ class ProcessorContractError(BccError, RuntimeError):
 
 
 UNDECLARED = "<undeclared>"
+
+
+def may_have_reached_provider(error: BccError) -> bool:
+    """Whether a typed error from `client.complete` leaves the attempt's usage unknown (not proven unsent)."""
+    if isinstance(error, LlmBudgetExceededError | CacheMissError):
+        return False
+    return not isinstance(error, CacheError) or isinstance(error, CacheWriteError)
+
+
+@dataclass(slots=True)
+class _Progress:
+    """The logical attempt reached, and whether its client call may have been billed without usage."""
+
+    attempt: int = 0
+    unmeasured: bool = False
 
 
 def declared_names(schema: JsonValue) -> frozenset[str]:
@@ -118,14 +147,19 @@ class LlmRunner[P, T: BaseModel]:
             raise ValueError(
                 f"request is for {invocation.request.model}, runner is for {self._spec.identity()}"
             )
-        attempts = [0]  # the logical attempt reached, for the failure event
+        progress = _Progress()
         try:
-            return self._run(invocation, attempts)
+            return self._run(invocation, progress)
+        except EventWriteError:
+            raise
         except BccError as error:
-            self._failed(error, attempts[0])
+            try:
+                self._failed(error, progress)
+            except EventWriteError as write_error:
+                logger.error("could not record the failed LLM call: %s", type(write_error).__name__)
             raise
 
-    def _run(self, invocation: Invocation[P], attempts: list[int]) -> tuple[T, Invocation[P]]:
+    def _run(self, invocation: Invocation[P], progress: _Progress) -> tuple[T, Invocation[P]]:
         inv = invocation
         for processor in self._request:
             before = inv
@@ -142,13 +176,17 @@ class LlmRunner[P, T: BaseModel]:
         declared = declared_names(schema)
         inv = replace(inv, request=inv.request.with_schema(self._output.__name__, schema))
         for attempt in range(1, MAX_ATTEMPTS + 1):
-            attempts[0] = attempt
+            progress.attempt = attempt
             self._started(inv.request, attempt)
             try:
                 response = self._client.complete(inv.request)
             except LlmPromptFilteredError as error:
+                progress.unmeasured = True
                 inv = replace(inv, spend=inv.spend.record_unmeasured())
                 raise self._error(LlmFailureKind.CONTENT_FILTERED, inv, attempt) from error
+            except BccError as error:
+                progress.unmeasured = may_have_reached_provider(error)
+                raise
             inv = self._record(inv, response)
             self._finished(response, attempt)
             if response.finish_reason is FinishReason.CONTENT_FILTER:
@@ -227,7 +265,7 @@ class LlmRunner[P, T: BaseModel]:
             )
         )
 
-    def _failed(self, error: BccError, attempts: int) -> None:
+    def _failed(self, error: BccError, progress: _Progress) -> None:
         kind = error.kind.value if isinstance(error, LlmCallError) else None
         self._emit(
             lambda at: LlmCallFailed(
@@ -236,7 +274,8 @@ class LlmRunner[P, T: BaseModel]:
                 model=self._model,
                 error_code=error.code,
                 kind=kind,
-                attempts=attempts,
+                attempts=progress.attempt,
+                unmeasured=progress.unmeasured,
             )
         )
 

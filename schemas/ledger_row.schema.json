@@ -1,0 +1,206 @@
+{
+  "$defs": {
+    "CacheMode": {
+      "description": "How a run uses the cache.",
+      "enum": [
+        "read-write",
+        "read-only",
+        "off"
+      ],
+      "title": "CacheMode",
+      "type": "string"
+    },
+    "ModelRef": {
+      "additionalProperties": false,
+      "description": "Which model an LLM event is about: provider, deployment and pinned version (primitives only).",
+      "properties": {
+        "deployment": {
+          "title": "Deployment",
+          "type": "string"
+        },
+        "model_version": {
+          "title": "Model Version",
+          "type": "string"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "deployment",
+        "model_version"
+      ],
+      "title": "ModelRef",
+      "type": "object"
+    },
+    "ModelUsage": {
+      "additionalProperties": false,
+      "description": "`engine.events.call_tally.CallTally` for one model, as stored in the ledger.",
+      "properties": {
+        "cache_hits": {
+          "minimum": 0,
+          "title": "Cache Hits",
+          "type": "integer"
+        },
+        "failed_calls": {
+          "minimum": 0,
+          "title": "Failed Calls",
+          "type": "integer"
+        },
+        "finished_attempts": {
+          "minimum": 0,
+          "title": "Finished Attempts",
+          "type": "integer"
+        },
+        "measured_input_tokens": {
+          "minimum": 0,
+          "title": "Measured Input Tokens",
+          "type": "integer"
+        },
+        "measured_output_tokens": {
+          "minimum": 0,
+          "title": "Measured Output Tokens",
+          "type": "integer"
+        },
+        "measured_reasoning_tokens": {
+          "minimum": 0,
+          "title": "Measured Reasoning Tokens",
+          "type": "integer"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelRef"
+        },
+        "reasoning_unreported": {
+          "minimum": 0,
+          "title": "Reasoning Unreported",
+          "type": "integer"
+        },
+        "transport_retries": {
+          "minimum": 0,
+          "title": "Transport Retries",
+          "type": "integer"
+        },
+        "unmeasured_attempts": {
+          "minimum": 0,
+          "title": "Unmeasured Attempts",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "model",
+        "finished_attempts",
+        "cache_hits",
+        "failed_calls",
+        "unmeasured_attempts",
+        "transport_retries",
+        "measured_input_tokens",
+        "measured_output_tokens",
+        "measured_reasoning_tokens",
+        "reasoning_unreported"
+      ],
+      "title": "ModelUsage",
+      "type": "object"
+    },
+    "RunStatus": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "title": "RunStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "One command attempt. No question text, no paths, no cost (no deployment is priced yet, A13).",
+  "properties": {
+    "cache_mode": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CacheMode"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "code": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Code"
+    },
+    "command": {
+      "title": "Command",
+      "type": "string"
+    },
+    "events": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Events"
+    },
+    "finished_at": {
+      "format": "date-time",
+      "title": "Finished At",
+      "type": "string"
+    },
+    "ledger_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Ledger Version",
+      "type": "integer"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Run Id"
+    },
+    "started_at": {
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/RunStatus"
+    },
+    "usage": {
+      "items": {
+        "$ref": "#/$defs/ModelUsage"
+      },
+      "title": "Usage",
+      "type": "array"
+    }
+  },
+  "required": [
+    "started_at",
+    "finished_at",
+    "command",
+    "status",
+    "code",
+    "run_id",
+    "events",
+    "cache_mode",
+    "usage"
+  ],
+  "title": "LedgerRow",
+  "type": "object"
+}

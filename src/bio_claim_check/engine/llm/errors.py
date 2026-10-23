@@ -103,3 +103,9 @@ class LlmUnexpectedResponseError(BccError):
     """A provider response in a shape the codec does not know: fail closed, never guess (I53)."""
 
     code = "llm.unexpected_response"
+
+
+class LlmBudgetExceededError(BccError):
+    """The command already made its maximum number of live LLM calls; this one was not sent (S11)."""
+
+    code = "llm.budget_exceeded"

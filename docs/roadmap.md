@@ -5,7 +5,7 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S10 done):** S01–S10 are done. Next is **S11**, the run record (events, manifest, ledger).
+**Status (S11 done):** S01–S11 are done. Next is **S12**, the verifier and the first live `run`.
 
 ## Product
 
@@ -84,8 +84,8 @@ can be contributed here as their own credited rule pack. No results from this re
 | S08b | Retrofit: canonical JSON, typed errors with codes, exit-code enum, redacted logging, unreported reasoning = `None` | ✅ |
 | S09 | Provider adapters, the LLM agent base and the pipeline event vocabulary (see below) | ✅ |
 | S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | ✅ |
-| S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | ⏳ next |
-| S12 | Verifier prompt, context isolation, dev smoke gold set in CI, model-family independence, first live `run`, retraction re-check; tag `prompts-frozen-v1` | |
+| S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | ✅ |
+| S12 | Verifier prompt, context isolation, dev smoke gold set in CI, model-family independence, first live `run`, retraction re-check; tag `prompts-frozen-v1` | ⏳ next |
 
 ### Phase C — Measurement
 
@@ -147,6 +147,16 @@ can be contributed here as their own credited rule pack. No results from this re
 - **Done (see [dev-log S10](dev-log/S10.md)):** all 8 dev questions ran live in both modes; Strict
   abstained on both unanswerable questions. Over-eager on gpt-6.1-sol hedged more than intended
   (author-read); recorded, not chased.
+
+### S11 — the run record (done)
+
+- Every attempt of `run --fake` and `answer dev`, including a failed or cancelled one, leaves a streamed
+  trace in `var/events/` and one row in the append-only `var/ledger.jsonl`; a success also publishes the
+  artifact and then `manifest.json` in `var/runs/<run_id>/` (the run id is the manifest's hash).
+- Usage is folded per model from events, with unknown usage counted as unmeasured, never as 0 (closes
+  backlog A14). One shared budget caps logical live LLM calls per command (ADR 0018).
+- **Done (see [dev-log S11](dev-log/S11.md)):** a live `answer dev` and its read-only replay gave the
+  same answer, manifest and run id; the replay made no live call.
 
 ## Dependencies
 

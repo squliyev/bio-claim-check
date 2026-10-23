@@ -14,6 +14,7 @@ from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
+from bio_claim_check.engine.llm.budgeted_llm_client import BudgetedLlmClient, CallBudget
 from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient
 from bio_claim_check.engine.llm.messages import FinishReason, LlmRequest, LlmResponse
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
@@ -26,6 +27,7 @@ pytestmark = pytest.mark.contract
 
 IMPLEMENTATIONS: tuple[type[BaseLlmClient], ...] = (
     ScriptedLlmClient,
+    BudgetedLlmClient,
     CachingLlmClient,
     OpenAiLlmClient,
     AnthropicLlmClient,
@@ -52,6 +54,10 @@ def _caching() -> tuple[BaseLlmClient, Sequence[Case]]:
     return CachingLlmClient(ScriptedLlmClient(RESPONSES), InMemoryCache(), CacheMode.READ_WRITE), HAND_BUILT
 
 
+def _budgeted() -> tuple[BaseLlmClient, Sequence[Case]]:
+    return BudgetedLlmClient(ScriptedLlmClient(RESPONSES), CallBudget(len(RESPONSES))), HAND_BUILT
+
+
 def _replay() -> tuple[BaseLlmClient, Sequence[Case]]:
     cache = InMemoryCache()
     recorder = CachingLlmClient(ScriptedLlmClient(RESPONSES), cache, CacheMode.READ_WRITE)
@@ -72,6 +78,7 @@ def _fixtures(provider: ProviderDir) -> Factory:
 
 _VARIANTS: dict[str, tuple[type[BaseLlmClient], Factory]] = {
     "scripted": (ScriptedLlmClient, _scripted),
+    "budgeted": (BudgetedLlmClient, _budgeted),
     "caching-read-write": (CachingLlmClient, _caching),
     "caching-read-only-replay": (CachingLlmClient, _replay),
     "foundry-openai-fixtures": (OpenAiLlmClient, _fixtures("foundry_openai")),

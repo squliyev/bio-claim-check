@@ -9,7 +9,9 @@ User-Agent and timeouts, and the SQLite cache under `var_dir` in the configured 
 `build_llm_clients` (S09) builds the live provider backends: one SDK client per Foundry API, SDK retries
 off (our `transport_policy` retries), URLs derived from the one Foundry resource endpoint.
 `build_dev_answer_ports` (S10) wires the live dev answer flow: Europe PMC and the answer model share one
-cache in the configured mode, and a read-only replay needs no provider at all.
+cache in the configured mode, and a read-only replay needs no provider at all. From S11 every live client
+sits behind one `CallBudget` per command, inside the cache, and `record_run` wires the run record's file
+operations (`app.run_record` holds its logic).
 Must not: hold logic. It builds objects, composes infrastructure with pure parsers, and normalises
 infrastructure errors into the domain's error types.
 """
@@ -17,19 +19,31 @@ infrastructure errors into the domain's error types.
 import hashlib
 import time
 from collections.abc import Callable, Generator, Iterable
-from contextlib import ExitStack, contextmanager
+from contextlib import AbstractContextManager, ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import anthropic
 import httpx
 import openai
 
 from bio_claim_check import __version__
+from bio_claim_check.app.run_record import (
+    EVENTS_DIR,
+    LEDGER_FILE,
+    RUNS_DIR,
+    TRACE_SUFFIX,
+    RecordIo,
+    RunRecorder,
+    TraceHandle,
+    recording,
+)
 from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.answer_dev import DevAnswerPorts
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
+from bio_claim_check.common.base_clock import BaseClock
 from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.system_clock import SystemClock
 from bio_claim_check.engine.cache.base_cache import BaseCache
@@ -37,10 +51,11 @@ from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
 from bio_claim_check.engine.events.emitter import EventEmitter
-from bio_claim_check.engine.events.in_memory_event_sink import InMemoryEventSink
+from bio_claim_check.engine.events.errors import EventWriteError
 from bio_claim_check.engine.events.logging_event_sink import LoggingEventSink
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
+from bio_claim_check.engine.llm.budgeted_llm_client import BudgetedLlmClient, CallBudget
 from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient
 from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
@@ -58,14 +73,13 @@ from bio_claim_check.features.contracts.labels import OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError, parse_rulepack
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, audit_file
 from bio_claim_check.features.corpus.seal import sealed_bytes
-from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes, run_id
-from bio_claim_check.features.report.models import Report
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import InMemoryLiteratureSource
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
+from bio_claim_check.infrastructure.line_files import AppendError, LineFile, append_line, create_numbered
 from bio_claim_check.infrastructure.publish import PublishError, publish_once
 from bio_claim_check.infrastructure.strict_yaml import StrictYamlError, load_strict_yaml
-from bio_claim_check.infrastructure.text_files import ReadError, read_package_text, read_text_file
+from bio_claim_check.infrastructure.text_files import ReadError, read_package_bytes, read_text_file
 
 DEFAULT_RULEPACK = ("data", "rulepacks", "default.yaml")
 REPO_URL = "https://github.com/squliyev/bio-claim-check"
@@ -97,13 +111,29 @@ def load_rulepack(path: Path) -> RulePack:
     return _rulepack_from_text(text, str(path))
 
 
-def default_rulepack() -> RulePack:
-    """The rule pack shipped with the package (author-written seed rules)."""
+@dataclass(frozen=True, slots=True)
+class HashedRulePack:
+    """A parsed rule pack and the sha256 of the exact file bytes it was parsed from (the run manifest)."""
+
+    pack: RulePack
+    sha256: str
+
+
+def default_rulepack_hashed() -> HashedRulePack:
+    """The shipped rule pack, read as bytes once: hashed, then decoded and parsed."""
     try:
-        text = read_package_text(*DEFAULT_RULEPACK)
+        data = read_package_bytes(*DEFAULT_RULEPACK)
+        text = data.decode("utf-8")
     except ReadError as err:
         raise RulePackError([str(err)]) from None
-    return _rulepack_from_text(text, DEFAULT_RULEPACK[-1])
+    except UnicodeDecodeError as err:
+        raise RulePackError([f"{DEFAULT_RULEPACK[-1]}: not UTF-8: {err}"]) from None
+    return HashedRulePack(_rulepack_from_text(text, DEFAULT_RULEPACK[-1]), hashlib.sha256(data).hexdigest())
+
+
+def default_rulepack() -> RulePack:
+    """The rule pack shipped with the package (author-written seed rules)."""
+    return default_rulepack_hashed().pack
 
 
 def load_corpus_spec(path: Path) -> CorpusSpec:
@@ -212,20 +242,67 @@ def build_replay(settings: Settings) -> Generator[EuropePmcLiteratureSource]:
         yield source
 
 
-def publish_report(out: Path, report: Report) -> Path:
-    """Write `<out>/<run_id>/report.json` once, as canonical bytes, and return its path."""
-    data = canonical_bytes(report)
-    return publish_once(out / run_id(data), REPORT_FILE, data)
+def _trace_handle(file: LineFile) -> TraceHandle:
+    def write_line(data: bytes) -> None:
+        file.write_line(data)  # an OSError becomes EventWriteError in JsonlEventSink
+
+    def close() -> None:
+        try:
+            file.close()
+        except OSError as err:
+            raise EventWriteError(f"cannot close the trace {file.path.name}: {err.strerror or err}") from None
+
+    return TraceHandle(name=file.path.name, write_line=write_line, close=close)
 
 
-def build_fake_run_ports() -> RunPorts:
+def record_io(var_dir: Path) -> RecordIo:
+    """The run record's file operations under `var_dir`; every failure is typed (`RECORD_OUTPUT_ERRORS`)."""
+
+    def open_trace(stem: str) -> TraceHandle:
+        try:
+            return _trace_handle(create_numbered(var_dir / EVENTS_DIR, stem, TRACE_SUFFIX))
+        except OSError as err:
+            raise EventWriteError(f"cannot create a trace under {var_dir / EVENTS_DIR}: {err}") from None
+
+    def publish(run_id: str, name: str, data: bytes) -> None:
+        try:
+            publish_once(var_dir / RUNS_DIR / run_id, name, data)
+        except OSError as err:
+            raise PublishError(f"cannot write {var_dir / RUNS_DIR / run_id / name}: {err}") from None
+
+    def append_ledger(line: bytes) -> None:
+        append_line(var_dir / LEDGER_FILE, line)
+
+    return RecordIo(open_trace=open_trace, publish=publish, append_ledger=append_ledger)
+
+
+RECORD_OUTPUT_ERRORS: Final = (EventWriteError, PublishError, AppendError)
+"""The run record's output failures (ADR 0018); the CLI maps them to the OUTPUT exit code."""
+
+
+def record_run(
+    var_dir: Path, command: str, cache_mode: CacheMode | None, *, clock: BaseClock | None = None
+) -> AbstractContextManager[RunRecorder]:
+    """Record one command attempt under `var_dir` (ADR 0018); the wall clock unless one is given."""
+    return recording(record_io(var_dir), clock or SystemClock(), command, cache_mode, __version__)
+
+
+def run_path(var_dir: Path, run_id: str) -> Path:
+    """The folder of a published run."""
+    return var_dir / RUNS_DIR / run_id
+
+
+def build_fake_run_ports(emitter: EventEmitter | None = None) -> RunPorts:
     """Fictional papers, scripted answers and verdicts. Needs no settings, network or `.env`."""
+    rules = default_rulepack_hashed()
     return RunPorts(
         literature=InMemoryLiteratureSource(),
         answerer=ScriptedAnswerer(),
         verifier=ScriptedVerifier(),
-        rules=default_rulepack(),
+        rules=rules.pack,
         provenance="fake",
+        rules_sha256=rules.sha256,
+        emitter=emitter,
     )
 
 
@@ -326,12 +403,6 @@ def logging_emitter() -> EventEmitter:
     return EventEmitter(LoggingEventSink(), SystemClock())
 
 
-def recording_emitter() -> tuple[EventEmitter, InMemoryEventSink]:
-    """Events kept in memory for a command's own summary (`answer dev`'s usage), stamped by the wall clock."""
-    sink = InMemoryEventSink()
-    return EventEmitter(sink, SystemClock()), sink
-
-
 def foundry_urls(base_url: str) -> tuple[str, str]:
     """The `/openai/v1/` and `/anthropic` endpoints of one Foundry resource (same endpoint and key)."""
     root = base_url.rstrip("/")
@@ -428,6 +499,6 @@ def build_dev_answer_ports(
             clients = stack.enter_context(
                 build_llm_clients(settings, [spec], sleep=sleep, emitter=emitter, openai_http=openai_http)
             )
-            live = clients[spec.deployment]
+            live = BudgetedLlmClient(clients[spec.deployment], CallBudget(settings.max_live_llm_calls))
         client = CachingLlmClient(live, cache, settings.cache_mode)
-        yield DevAnswerPorts(source=source, answerer=build_answerer(client, spec, emitter))
+        yield DevAnswerPorts(source=source, answerer=build_answerer(client, spec, emitter), emitter=emitter)

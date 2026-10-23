@@ -6,12 +6,16 @@ that does not echo its question, or a verdict whose evidence does not re-locate 
 instead of becoming a number. A cite outside the retrieved set is never sent to the verifier; it is
 recorded as CitationNotRetrieved (FLAGGED) and as a finding (invariant I18). Claims that refer to
 something outside themselves are flagged after the invented citations; they are still verified.
+Stage events (`retrieve`, `answer`, `verify`) go to the ports' emitter when one is given (S11).
 Must not: do I/O (the caller writes the report), catch errors to keep going, or import the container,
 the driving adapters or infrastructure: it receives its ports in `RunPorts` (S05b).
 """
 
 from dataclasses import dataclass
 
+from bio_claim_check.common.errors import BccError
+from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.engine.events.stage_events import stage
 from bio_claim_check.features.answer.base_answerer import BaseAnswerer
 from bio_claim_check.features.checks.citations import invented_citations
 from bio_claim_check.features.checks.self_containment import dangling_claims
@@ -25,48 +29,60 @@ from bio_claim_check.features.retrieval.base_literature_source import BaseLitera
 from bio_claim_check.features.verify.base_verifier import BaseVerifier
 
 
+class RunInputError(BccError):
+    """The question is blank or `k` is not a positive int."""
+
+    code = "run.input"
+
+
 @dataclass(frozen=True, slots=True)
 class RunPorts:
-    """Everything one run needs, chosen by the composition root."""
+    """Everything one run needs, chosen by the composition root. `rules_sha256` is the hash of the rule
+    pack's file bytes, for the run manifest; `emitter` receives the stage events (S11)."""
 
     literature: BaseLiteratureSource
     answerer: BaseAnswerer
     verifier: BaseVerifier
     rules: RulePack
     provenance: Provenance
+    rules_sha256: str
+    emitter: EventEmitter | None = None
 
 
 def run_question(c: RunPorts, question: str, mode: AnswerMode, *, k: int) -> Report:
     """Run the whole flow for one question; `k` is the number of papers to retrieve (≥ 1)."""
     if type(k) is not int or k < 1:
-        raise ValueError(f"k must be an integer ≥ 1, got {k!r}")
+        raise RunInputError(f"k must be an integer ≥ 1, got {k!r}")
     if not question.strip():
-        raise ValueError("question must not be blank")
+        raise RunInputError("the question must not be blank")
 
-    papers = c.literature.search(question, limit=k)
+    with stage(c.emitter, "retrieve"):
+        papers = c.literature.search(question, limit=k)
     if len(papers) > k:
         raise ValueError(f"literature source returned {len(papers)} papers for limit={k}")
     by_id = {p.source_id: p for p in papers}
     if len(by_id) != len(papers):
         raise ValueError("literature source returned duplicate source ids")
 
-    answer = c.answerer.answer(question, papers, mode)
+    with stage(c.emitter, "answer"):
+        answer = c.answerer.answer(question, papers, mode)
     if (answer.question, answer.mode) != (question, mode):
         raise ValueError("answerer returned an answer to a different question or mode")
 
     outcomes: dict[ClaimId, dict[SourceId, PairOutcome]] = {}
-    for claim in answer.claims:
-        per_source: dict[SourceId, PairOutcome] = {}
-        for source_id in claim.cites:
-            paper = by_id.get(source_id)
-            if paper is None:
-                per_source[source_id] = CitationNotRetrieved(claim_id=claim.id, source_id=source_id)
-                continue
-            outcome = c.verifier.verify(claim, paper, c.rules)
-            if isinstance(outcome, Verdict):
-                outcome.verify_against(paper.abstract)
-            per_source[source_id] = outcome
-        outcomes[claim.id] = per_source
+    with stage(c.emitter, "verify"):
+        for claim in answer.claims:
+            per_source: dict[SourceId, PairOutcome] = {}
+            for source_id in claim.cites:
+                paper = by_id.get(source_id)
+                if paper is None:
+                    per_source[source_id] = CitationNotRetrieved(claim_id=claim.id, source_id=source_id)
+                    continue
+                outcome = c.verifier.verify(claim, paper, c.rules)
+                if isinstance(outcome, Verdict):
+                    outcome.verify_against(paper.abstract)
+                per_source[source_id] = outcome
+            outcomes[claim.id] = per_source
 
     return build_report(
         provenance=c.provenance,

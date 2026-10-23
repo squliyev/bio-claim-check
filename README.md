@@ -60,9 +60,10 @@ uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake --mode o
 ```
 
 This is a **fake run**: fictional papers (`FAKE:1`–`FAKE:4`) and a scripted answer and verdicts. It
-exercises the real contracts and checks and writes `var/runs/<run_id>/report.json`, but it is a demo of
-the pipeline, not a result. Nothing is `passed` yet, because the negation check arrives in S10. Live runs
-arrive in S12.
+exercises the real contracts and checks, but it is a demo of the pipeline, not a result. Live runs
+arrive in S12. Every attempt, including a failed or cancelled one, leaves a trace in `var/events/` and
+one row in `var/ledger.jsonl` ([ADR 0018](docs/adr/0018-run-record.md)); a successful one also publishes
+`var/runs/<run_id>/report.json` and then `manifest.json` (the run id is the manifest's hash).
 
 Search Europe PMC for citable MEDLINE abstracts (needs `BCC_CONTACT_EMAIL` in `.env`; it is sent in the
 `User-Agent`, as Europe PMC asks). Responses are cached in `var/cache.sqlite`, so a repeated search makes

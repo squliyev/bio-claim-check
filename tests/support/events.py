@@ -44,6 +44,14 @@ def one_of_each() -> tuple[PipelineEvent, ...]:
             cached_input_tokens=0,
         ),
         LlmRepairRequested(at=T0, agent="ping", model=MODEL, attempt=1, problems=(("ok", "missing"),)),
-        LlmCallFailed(at=T0, agent="ping", model=MODEL, error_code="llm.transport", kind=None, attempts=1),
+        LlmCallFailed(
+            at=T0,
+            agent="ping",
+            model=MODEL,
+            error_code="llm.transport",
+            kind=None,
+            attempts=1,
+            unmeasured=True,
+        ),
         LlmRetryScheduled(at=T0, model=MODEL, transport_attempt=1, status=429, delay_s=1.0),
     )

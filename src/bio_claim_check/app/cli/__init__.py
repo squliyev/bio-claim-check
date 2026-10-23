@@ -5,6 +5,7 @@ anything worth testing lives in ``features`` or ``app.usecases`` and is called f
 infrastructure only through ``app.container`` (contract ``driving-adapters-use-the-container``).
 """
 
+import hashlib
 import re
 from collections import Counter
 from collections.abc import Sequence
@@ -18,6 +19,7 @@ from pydantic import ValidationError
 
 from bio_claim_check import __version__
 from bio_claim_check.app.container import (
+    RECORD_OUTPUT_ERRORS,
     DatasetReadError,
     MissingProviderError,
     OutputConflictError,
@@ -34,21 +36,23 @@ from bio_claim_check.app.container import (
     logging_emitter,
     publish_audit,
     publish_corpus,
-    publish_report,
     publish_sheet,
     read_dataset,
-    recording_emitter,
+    record_run,
+    run_path,
     write_seal,
 )
 from bio_claim_check.app.logging_setup import configure_logging
 from bio_claim_check.app.models import model_catalog
+from bio_claim_check.app.run_record import RunDetails, RunInputs, RunRecorder
 from bio_claim_check.app.settings import Settings, load_settings
 from bio_claim_check.app.usecases.answer_dev import (
     DevAnswer,
     DevAnswerInputError,
+    DevDatasetError,
     EmptyDevPoolError,
     answer_dev,
-    tally_calls,
+    dev_answer_record,
 )
 from bio_claim_check.app.usecases.build_corpus import PoolConflictError, build_corpus
 from bio_claim_check.app.usecases.corpus_audit import (
@@ -58,10 +62,14 @@ from bio_claim_check.app.usecases.corpus_audit import (
     export_sheet,
 )
 from bio_claim_check.app.usecases.llm_ping import PingResult, ping
-from bio_claim_check.app.usecases.run import run_question
+from bio_claim_check.app.usecases.run import RunInputError, run_question
+from bio_claim_check.common.canonical_json import pretty_json_bytes
+from bio_claim_check.common.negation import NEGATION_RULES
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
+from bio_claim_check.engine.events.call_tally import summed, tally_calls
 from bio_claim_check.engine.events.pipeline_event import PipelineEvent
 from bio_claim_check.engine.llm.errors import (
+    LlmBudgetExceededError,
     LlmCallError,
     LlmPromptFilteredError,
     LlmProviderError,
@@ -79,6 +87,7 @@ from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
 from bio_claim_check.features.corpus.audit_sheet import AuditSheetError
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, SPEC
 from bio_claim_check.features.corpus.seal import dataset_problems
+from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes
 from bio_claim_check.features.retrieval.errors import RetrievalError
 
 DEFAULT_K = 4
@@ -98,7 +107,8 @@ class ExitCode(IntEnum):
 
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")  # date.fromisoformat also takes 20250115 and 2025-W03-3
-DEFAULT_RUNS_DIR = Path("var/runs")  # relative to the working directory; --fake never reads settings
+DEFAULT_VAR_DIR = Path("var")  # relative to the working directory; --fake never reads settings
+ANSWER_FILE = "answer.json"
 
 app = typer.Typer(
     name="bio-claim-check",
@@ -199,19 +209,31 @@ def run(
     ] = False,
     mode: Annotated[AnswerMode, typer.Option(help="How the answering agent behaves.")] = AnswerMode.STRICT,
     k: Annotated[int, typer.Option("--k", min=1, help="Number of papers to retrieve.")] = DEFAULT_K,
-    out: Annotated[Path, typer.Option(help="Folder that receives <run_id>/report.json.")] = DEFAULT_RUNS_DIR,
+    var_dir: Annotated[
+        Path, typer.Option("--var-dir", help="Root for runs/<run_id>/, events/ and ledger.jsonl.")
+    ] = DEFAULT_VAR_DIR,
 ) -> None:
-    """Answer a question, check every claim against the paper it cites, and write the report."""
+    """Answer a question, check every claim against the paper it cites, and record the run."""
     if not fake:
         typer.echo("Live runs arrive in S12; use --fake for the offline demo.", err=True)
         raise typer.Exit(code=ExitCode.INPUT)
-    if not question.strip():
-        typer.echo("The question must not be blank.", err=True)
-        raise typer.Exit(code=ExitCode.INPUT)
-    report = run_question(build_fake_run_ports(), question, mode, k=k)
+    try:
+        with record_run(var_dir, "run", None) as recorder:
+            ports = build_fake_run_ports(recorder.emitter)
+            report = run_question(ports, question, mode, k=k)
+            details = RunDetails(
+                provenance=ports.provenance,
+                inputs=RunInputs(question_sha256=_sha256(question), mode=mode, k=k),
+                negation_rules=NEGATION_RULES,
+                rulepack_sha256=ports.rules_sha256,
+            )
+            recorder.prepare(REPORT_FILE, canonical_bytes(report), details)
+    except RunInputError as err:
+        _fail(ExitCode.INPUT, str(err))
+    except RECORD_OUTPUT_ERRORS as err:
+        _fail(ExitCode.OUTPUT, str(err))
     typer.echo(report.notice)
-    path = publish_report(out, report)
-    typer.echo(f"report: {path}")
+    typer.echo(f"report: {_run_file(var_dir, recorder, REPORT_FILE)}")
     for name, counts in (("pairs", report.pair_counts), ("claims", report.claim_counts)):
         typer.echo(f"{name}: " + ", ".join(f"{d.value}={n}" for d, n in counts.items()))
     # Claim-level findings are not folded into the dispositions above, so they are always shown beside them.
@@ -301,17 +323,36 @@ def answer_dev_command(
     dataset: DatasetDir = Path("datasets"),
     env_file: EnvFile = Path(".env"),
 ) -> None:
-    """Answer one dev question from its sealed dev pool and run the deterministic checks. Costs tokens."""
+    """Answer one dev question from its sealed dev pool and run the deterministic checks. Costs tokens.
+
+    Records the attempt under the var dir: runs/<run_id>/answer.json and manifest.json on success, an
+    event trace, and one ledger row whatever happens (ADR 0018).
+    """
     settings = _settings(env_file)
-    files, spec = _dataset(dataset)
-    if problems := dataset_problems(files, spec):
-        _print_problems(f"{dataset} is not intact", problems)
-        raise typer.Exit(code=ExitCode.DATASET)
-    emitter, events = recording_emitter()
+    recorder: RunRecorder | None = None
     try:
-        model = model_catalog().lookup(settings.answer_model)
-        with build_dev_answer_ports(settings, model, emitter) as ports:
-            result = answer_dev(ports, files, spec, question_id, mode, k=k)
+        with record_run(settings.var_dir, "answer dev", settings.cache_mode) as recorder:
+            files = read_dataset(dataset)
+            spec = load_corpus_spec(dataset / SPEC)
+            model = model_catalog().lookup(settings.answer_model)
+            with build_dev_answer_ports(settings, model, recorder.emitter) as ports:
+                result = answer_dev(ports, files, spec, question_id, mode, k=k)
+            details = RunDetails(
+                provenance="live",
+                inputs=RunInputs(question_id=question_id, mode=mode, k=k),
+                negation_rules=NEGATION_RULES,
+                dataset_manifest_sha256=_sha256(files[MANIFEST]),
+            )
+            record = pretty_json_bytes(dev_answer_record(result, k).model_dump(mode="json"))
+            recorder.prepare(ANSWER_FILE, record, details)
+    except DatasetReadError as err:
+        _fail(ExitCode.INPUT, str(err))
+    except CorpusSpecError as err:
+        _print_problems("Invalid corpus spec", err.problems)
+        raise typer.Exit(code=ExitCode.INPUT) from None
+    except DevDatasetError as err:
+        _print_problems(f"{dataset} is not intact", err.problems)
+        raise typer.Exit(code=ExitCode.DATASET) from None
     except DevAnswerInputError as err:
         _print_problems("Cannot answer", err.problems)
         raise typer.Exit(code=ExitCode.INPUT) from None
@@ -332,12 +373,27 @@ def answer_dev_command(
         LlmPromptFilteredError,
         LlmRequestError,
         LlmUnexpectedResponseError,
+        LlmBudgetExceededError,
         AnswerClaimsError,
     ) as err:
         _fail(ExitCode.PROVIDER, f"{err.code}: {err}")
+    except RECORD_OUTPUT_ERRORS as err:
+        _fail(ExitCode.OUTPUT, str(err))
     finally:
-        _print_usage(events.events)
+        if recorder is not None:
+            _print_usage(recorder.events)
     _print_dev_answer(result, k)
+    typer.echo(f"run: {_run_file(settings.var_dir, recorder, ANSWER_FILE)}")
+
+
+def _sha256(data: str | bytes) -> str:
+    return hashlib.sha256(data.encode("utf-8") if isinstance(data, str) else data).hexdigest()
+
+
+def _run_file(var_dir: Path, recorder: RunRecorder | None, name: str) -> Path:
+    if recorder is None or recorder.run_id is None:
+        raise AssertionError("a run that returned normally is published")  # pragma: no cover
+    return run_path(var_dir, recorder.run_id) / name
 
 
 def _print_dev_answer(result: DevAnswer, k: int) -> None:
@@ -358,12 +414,14 @@ def _print_dev_answer(result: DevAnswer, k: int) -> None:
 
 
 def _print_usage(events: Sequence[PipelineEvent]) -> None:
-    tally = tally_calls(events)
+    t = summed(tally_calls(events).values())
     typer.echo(
-        f"llm calls: live={tally.live_calls} cache_hit={tally.cached_calls} failed={tally.failed_calls}; "
-        f"live tokens in={tally.input_tokens} out={tally.output_tokens} "
-        f"reasoning={tally.reasoning_tokens} (unreported on {tally.reasoning_unreported} call(s)); "
-        "failed calls may be billed, usage unknown; money: unpriced",
+        f"llm calls: finished_live={t.finished_live_attempts} cache_hit={t.cache_hits} "
+        f"failed={t.failed_calls}; "
+        f"live tokens in={t.measured_input_tokens} out={t.measured_output_tokens} "
+        f"reasoning={t.measured_reasoning_tokens} (unreported on {t.reasoning_unreported} call(s)); "
+        f"unmeasured: attempts={t.unmeasured_attempts} transport_retries={t.transport_retries} "
+        "(may be billed, usage unknown); money: unpriced",
         err=True,
     )
 

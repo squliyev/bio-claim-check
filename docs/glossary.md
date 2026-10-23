@@ -63,6 +63,21 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   never part of a canonical artifact ([ADR 0016](./adr/0016-pipeline-events-and-clock.md)).
 - **Fake run:** `run --fake` uses fictional papers (`FAKE:` ids) and scripted answers and verdicts. Its
   report says so in `provenance` and `notice`; it is a demo of the pipeline, never a result.
+- **Run record:** what an attempt leaves under the var root ([ADR 0018](./adr/0018-run-record.md)):
+  always one ledger row and (unless it cannot be opened) a trace; on success also a canonical artifact
+  and manifest.
+- **Manifest:** `runs/<run_id>/manifest.json`, published last. It records what produced the artifact
+  (command, inputs, models, prompt hashes, package version, artifact hash) and no time, path or cache
+  mode. A run folder without it is incomplete.
+- **Run id:** the first 16 hex characters of the manifest's sha256. It changes with the package version.
+- **Trace:** `events/<UTC start>-<n>.jsonl`, the attempt's pipeline events, one per line. It holds times
+  and cache hits, so it is never compared byte for byte.
+- **Ledger:** `ledger.jsonl`, append-only, one row per attempt: status, code, run id (on success only),
+  trace name, cache mode and usage per model. It is the run's money record.
+- **Unmeasured attempt:** an attempt that may have reached the provider but reported no usage (a failed
+  call, or a start with no end). Counted apart, never as 0 tokens.
+- **`run.cancelled` / `run.internal`:** ledger codes for an interrupted attempt and for an unexpected
+  exception (a bug). They are run codes, not error classes, so they are not in `error-codes.md`.
 
 ## AnswerMode
 

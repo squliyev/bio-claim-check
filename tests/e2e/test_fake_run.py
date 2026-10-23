@@ -42,12 +42,16 @@ EXPECTED_COUNTS = {
 EXPECTED_PASSED = {AnswerMode.STRICT: ["s1"], AnswerMode.OVER_EAGER: []}
 
 
-def _run(out: Path, *args: str) -> tuple[str, Path]:
-    result = runner.invoke(app, ["run", *args, "--out", str(out)])
+def _run(var: Path, *args: str) -> tuple[str, Path]:
+    result = runner.invoke(app, ["run", *args, "--var-dir", str(var)])
     assert result.exit_code == 0, result.output
-    reports = list(out.glob("*/report.json"))
+    reports = list((var / "runs").glob("*/report.json"))
     assert len(reports) == 1
     return result.stdout, reports[0]
+
+
+def _ledger(var: Path) -> list[dict[str, object]]:
+    return [json.loads(line) for line in (var / "ledger.jsonl").read_text().splitlines()]
 
 
 @pytest.mark.parametrize("mode", list(AnswerMode))
@@ -73,8 +77,39 @@ def test_a_second_run_is_byte_identical(tmp_path: Path) -> None:
     _, first = _run(tmp_path / "a", Q, "--fake")
     _, second = _run(tmp_path / "b", Q, "--fake")
     assert first.read_bytes() == second.read_bytes()
-    assert first.parent.name == second.parent.name
-    assert first.parent.name == hashlib.sha256(first.read_bytes()).hexdigest()[:16]
+    manifest = (first.parent / "manifest.json").read_bytes()
+    assert manifest == (second.parent / "manifest.json").read_bytes()
+    assert first.parent.name == second.parent.name == hashlib.sha256(manifest).hexdigest()[:16]
+    assert json.loads(manifest)["artifact"] == {
+        "name": "report.json",
+        "sha256": hashlib.sha256(first.read_bytes()).hexdigest(),
+    }
+
+
+def test_a_run_records_a_manifest_a_trace_and_one_ledger_row(tmp_path: Path) -> None:
+    _, report = _run(tmp_path, Q, "--fake")
+    manifest = json.loads((report.parent / "manifest.json").read_bytes())
+    assert (manifest["command"], manifest["provenance"], manifest["llm"]) == ("run", "fake", [])
+    assert manifest["inputs"] == {
+        "question_id": None,
+        "question_sha256": hashlib.sha256(Q.encode()).hexdigest(),
+        "mode": "strict",
+        "k": 4,
+    }
+    (row,) = _ledger(tmp_path)
+    assert (row["status"], row["code"], row["run_id"], row["cache_mode"]) == (
+        "succeeded",
+        None,
+        report.parent.name,
+        None,
+    )
+    trace = (tmp_path / "events" / str(row["events"])).read_text().splitlines()
+    stages = [(e["type"], e["stage"]) for e in map(json.loads, trace)]
+    assert stages == [
+        ("stage.started", "run"),
+        *(p for s in ("retrieve", "answer", "verify") for p in (("stage.started", s), ("stage.finished", s))),
+        ("stage.finished", "run"),
+    ]
 
 
 def test_non_ascii_question_is_echoed_exactly(tmp_path: Path) -> None:
@@ -86,7 +121,7 @@ def test_non_ascii_question_is_echoed_exactly(tmp_path: Path) -> None:
 
 
 def test_live_run_is_refused_until_s12(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["run", Q, "--out", str(tmp_path)])
+    result = runner.invoke(app, ["run", Q, "--var-dir", str(tmp_path)])
     assert result.exit_code == 2
     assert "use --fake" in result.output
     assert list(tmp_path.iterdir()) == []
@@ -96,7 +131,14 @@ def test_live_run_is_refused_until_s12(tmp_path: Path) -> None:
     "args", [["   ", "--fake"], [Q, "--fake", "--k", "0"], [Q, "--fake", "--mode", "over-eager"]]
 )
 def test_bad_input_exits_2(args: list[str], tmp_path: Path) -> None:
-    assert runner.invoke(app, ["run", *args, "--out", str(tmp_path)]).exit_code == 2
+    assert runner.invoke(app, ["run", *args, "--var-dir", str(tmp_path)]).exit_code == 2
+
+
+def test_a_blank_question_is_recorded_as_a_failed_attempt(tmp_path: Path) -> None:
+    assert runner.invoke(app, ["run", "   ", "--fake", "--var-dir", str(tmp_path)]).exit_code == 2
+    (row,) = _ledger(tmp_path)
+    assert (row["status"], row["code"], row["run_id"]) == ("failed", "run.input", None)
+    assert not (tmp_path / "runs").exists()
 
 
 def test_installed_script_ignores_hostile_env_and_writes_to_var_runs(tmp_path: Path) -> None:
@@ -124,4 +166,5 @@ def test_installed_script_ignores_hostile_env_and_writes_to_var_runs(tmp_path: P
     reports = list((tmp_path / "var" / "runs").glob("*/report.json"))
     assert len(reports) == 1
     assert reports[0].read_bytes() == (GOLDEN / "fake_run_strict.json").read_bytes()
+    assert (tmp_path / "var" / "ledger.jsonl").exists()
     assert not (tmp_path / "elsewhere").exists()

@@ -136,6 +136,7 @@ name = "Deterministic code never calls an LLM (ADR 0003)"
 type = "forbidden"
 source_modules = [
     "bio_claim_check.app.events",
+    "bio_claim_check.app.run_record",
     "bio_claim_check.app.usecases.build_corpus",
     "bio_claim_check.app.usecases.corpus_audit",
     "bio_claim_check.common",
@@ -194,6 +195,7 @@ id = "pure-modules-import-no-drivers"
 name = "Pure modules import no driver libraries (ADR 0002, ADR 0007)"
 type = "forbidden"
 source_modules = [
+    "bio_claim_check.app.run_record",
     "bio_claim_check.common",
     "bio_claim_check.engine.events",
     "bio_claim_check.features.annotate.agreement",

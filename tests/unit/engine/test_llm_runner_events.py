@@ -8,9 +8,12 @@ from pydantic import BaseModel, ConfigDict
 from tests.support.events import stepping_clock
 from tests.support.llm import request, response, spec
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
-from bio_claim_check.engine.cache.policy import CacheMode
+from bio_claim_check.engine.cache.policy import CacheError, CacheMissError, CacheMode, CacheWriteError
+from bio_claim_check.engine.events.base_event_sink import BaseEventSink
 from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.engine.events.errors import EventWriteError
 from bio_claim_check.engine.events.in_memory_event_sink import InMemoryEventSink
 from bio_claim_check.engine.events.llm_events import (
     LlmCallFailed,
@@ -18,13 +21,18 @@ from bio_claim_check.engine.events.llm_events import (
     LlmCallStarted,
     LlmRepairRequested,
 )
+from bio_claim_check.engine.events.pipeline_event import PipelineEvent
+from bio_claim_check.engine.events.tee_event_sink import TeeEventSink
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
 from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient
 from bio_claim_check.engine.llm.errors import (
+    LlmBudgetExceededError,
     LlmCallError,
     LlmFailureKind,
     LlmPromptFilteredError,
+    LlmProviderError,
     LlmTransportError,
+    LlmUnexpectedResponseError,
 )
 from bio_claim_check.engine.llm.llm_cache_key import llm_cache_key
 from bio_claim_check.engine.llm.messages import FinishReason, LlmRequest, LlmResponse, PromptRef
@@ -193,3 +201,89 @@ def test_a_lost_cache_race_reports_what_this_run_paid() -> None:
     finished = sink.events[1]
     assert isinstance(finished, LlmCallFinished)
     assert (finished.input_tokens, finished.output_tokens, finished.cache_hit) == (12, 6, False)
+
+
+# --- S11: which failures may have been billed, and trace-write failures (ADR 0018, I67) ---------------
+
+
+def _failed(client: BaseLlmClient, processors: tuple[BaseRequestProcessor[str], ...] = ()) -> LlmCallFailed:
+    sink = InMemoryEventSink()
+    runner = LlmRunner[str, Out](
+        client, spec(), Out, request_processors=processors, emitter=EventEmitter(sink, stepping_clock())
+    )
+    with pytest.raises(BccError):
+        runner.run(Invocation(payload="claim", request=request()))
+    failed = sink.events[-1]
+    assert isinstance(failed, LlmCallFailed)
+    return failed
+
+
+@pytest.mark.parametrize(
+    ("error", "unmeasured"),
+    [
+        (LlmTransportError(deployment="model-a", status=503, attempts=4, reason="unavailable"), True),
+        (LlmProviderError(deployment="model-a", status=400, provider_code="bad_request"), True),
+        (LlmPromptFilteredError(deployment="model-a"), True),
+        (LlmUnexpectedResponseError("model-a: unknown shape"), True),
+        (CacheWriteError("llm: cannot store"), True),
+        (LlmBudgetExceededError("spent"), False),
+        (CacheMissError("llm"), False),
+        (CacheError("llm: cannot read"), False),
+    ],
+    ids=lambda v: type(v).__name__ if isinstance(v, BccError) else str(v),
+)
+def test_a_client_error_is_unmeasured_only_if_the_call_may_have_reached_the_provider(
+    error: BccError, unmeasured: bool
+) -> None:
+    assert _failed(ScriptedLlmClient([error])).unmeasured is unmeasured
+
+
+def test_validation_and_processor_failures_are_measured() -> None:
+    assert _failed(ScriptedLlmClient([response("{}"), response("nope")])).unmeasured is False
+    assert _failed(ScriptedLlmClient([]), (Rogue(),)).unmeasured is False
+
+
+class _PutFails(InMemoryCache):
+    @override
+    def put(self, key: str, data: bytes) -> None:
+        raise CacheError("disk full")
+
+
+def test_a_cache_write_failure_after_a_live_call_is_unmeasured() -> None:
+    client = CachingLlmClient(ScriptedLlmClient([response()]), _PutFails(), CacheMode.READ_WRITE)
+    failed = _failed(client)
+    assert (failed.error_code, failed.unmeasured) == ("cache.write_failed", True)
+
+
+class _FailsOn(BaseEventSink):
+    """Writes like a trace file, failing on the first event of the given type."""
+
+    def __init__(self, event_type: str) -> None:
+        self.event_type = event_type
+
+    @override
+    def emit(self, event: PipelineEvent) -> None:
+        if event.type == self.event_type:
+            raise EventWriteError("disk full")
+
+
+def _teed(client: BaseLlmClient, fails_on: str) -> tuple[InMemoryEventSink, LlmRunner[str, Out]]:
+    memory = InMemoryEventSink()
+    sink = TeeEventSink(memory, _FailsOn(fails_on))
+    return memory, LlmRunner[str, Out](client, spec(), Out, emitter=EventEmitter(sink, stepping_clock()))
+
+
+def test_a_trace_write_failure_passes_through_and_memory_keeps_one_terminal_event() -> None:
+    memory, runner = _teed(ScriptedLlmClient([response()]), "llm.call_finished")
+    with pytest.raises(EventWriteError):
+        runner.run(Invocation(payload="claim", request=request()))
+    assert kinds(memory) == ["llm.call_started", "llm.call_finished"]
+
+
+def test_the_original_error_wins_when_its_failure_event_cannot_be_written() -> None:
+    boom = LlmTransportError(deployment="model-a", status=503, attempts=4, reason="unavailable")
+    memory, runner = _teed(ScriptedLlmClient([boom]), "llm.call_failed")
+    with pytest.raises(LlmTransportError) as raised:
+        runner.run(Invocation(payload="claim", request=request()))
+    assert raised.value is boom
+    assert kinds(memory) == ["llm.call_started", "llm.call_failed"]

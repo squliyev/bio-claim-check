@@ -1,0 +1,221 @@
+{
+  "$defs": {
+    "AnswerMode": {
+      "description": "How the answering agent behaves. Over-eager exists to produce overstatements to catch.",
+      "enum": [
+        "strict",
+        "over_eager"
+      ],
+      "title": "AnswerMode",
+      "type": "string"
+    },
+    "ArtifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "sha256"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "LlmUse": {
+      "additionalProperties": false,
+      "description": "One distinct (agent, model, prompt, served model) that produced a response used by the run.",
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Agent"
+        },
+        "deployment": {
+          "title": "Deployment",
+          "type": "string"
+        },
+        "model_version": {
+          "title": "Model Version",
+          "type": "string"
+        },
+        "prompt_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Prompt Sha256"
+        },
+        "provider": {
+          "title": "Provider",
+          "type": "string"
+        },
+        "served_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Served Model"
+        }
+      },
+      "required": [
+        "agent",
+        "provider",
+        "deployment",
+        "model_version",
+        "prompt_sha256",
+        "served_model"
+      ],
+      "title": "LlmUse",
+      "type": "object"
+    },
+    "RunInputs": {
+      "additionalProperties": false,
+      "description": "`question_sha256` is the sha256 of the question's UTF-8 bytes as given (run); dev names its id.",
+      "properties": {
+        "k": {
+          "minimum": 1,
+          "title": "K",
+          "type": "integer"
+        },
+        "mode": {
+          "$ref": "#/$defs/AnswerMode"
+        },
+        "question_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Question Id"
+        },
+        "question_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Question Sha256"
+        }
+      },
+      "required": [
+        "mode",
+        "k"
+      ],
+      "title": "RunInputs",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Canonical: the same inputs, code version and cached responses give the same bytes (I65).",
+  "properties": {
+    "artifact": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "command": {
+      "title": "Command",
+      "type": "string"
+    },
+    "dataset_manifest_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Dataset Manifest Sha256"
+    },
+    "inputs": {
+      "$ref": "#/$defs/RunInputs"
+    },
+    "llm": {
+      "items": {
+        "$ref": "#/$defs/LlmUse"
+      },
+      "title": "Llm",
+      "type": "array"
+    },
+    "manifest_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Manifest Version",
+      "type": "integer"
+    },
+    "negation_rules": {
+      "minimum": 1,
+      "title": "Negation Rules",
+      "type": "integer"
+    },
+    "package_version": {
+      "title": "Package Version",
+      "type": "string"
+    },
+    "provenance": {
+      "enum": [
+        "fake",
+        "live"
+      ],
+      "title": "Provenance",
+      "type": "string"
+    },
+    "rulepack_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rulepack Sha256"
+    }
+  },
+  "required": [
+    "provenance",
+    "inputs",
+    "negation_rules",
+    "command",
+    "package_version",
+    "artifact",
+    "llm"
+  ],
+  "title": "RunManifest",
+  "type": "object"
+}

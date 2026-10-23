@@ -23,7 +23,7 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | A11 | As a maintainer, I want the Europe PMC retry helper to use `engine/llm/transport_policy`, so that there is one deterministic retry policy | ⏸ |
 | A12 | As a scientist, I want the Anthropic prompt-filter error shape recorded and handled, and the billing of prompt-filtered calls confirmed, so that filtered Claude calls are counted like gpt's | ⏸ (only the OpenAI 400 `content_filter` shape is known; ADR 0014 open items) |
 | A13 | As a maintainer, I want provider cache-write tokens (`input_tokens_details.cache_write_tokens`) priced once prices exist, so that cost stays honest | ⏸ (inside input; ignored while prices are `None`) |
-| A14 | As a scientist, I want a failed call's spend to survive every exception path (a re-raised client error after a billed attempt; a timeout or unexpected response counted as unmeasured), so that no paid attempt drops out of `Spend` | ⏳ (S11, with the ledger; found by the S09 implementation review) |
+| A14 | As a scientist, I want a failed call's spend to survive every exception path (a re-raised client error after a billed attempt; a timeout or unexpected response counted as unmeasured), so that no paid attempt drops out of `Spend` | ✅ (S11: the ledger folds events; a failure that may have reached the provider is `unmeasured`, ADR 0018) |
 | A9 | As a reviewer, I want one canonical JSON serialiser, typed errors with stable documented codes and exit codes, and redacted stderr logs, so that hashes cannot drift, failures are nameable and no secret reaches a log | ✅ (S08b: no output byte, hash, golden or seal changed; central exit mapping in S16) |
 
 ## Feature B — Real adapters and the product

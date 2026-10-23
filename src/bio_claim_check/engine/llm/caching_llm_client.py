@@ -13,7 +13,7 @@ from typing import override
 from pydantic import ValidationError
 
 from bio_claim_check.engine.cache.base_cache import BaseCache
-from bio_claim_check.engine.cache.policy import CacheError, CacheMode, fetch_through_result
+from bio_claim_check.engine.cache.policy import CacheError, CacheMode, CacheWriteError, fetch_through_result
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
 from bio_claim_check.engine.llm.llm_cache_key import NAMESPACE, llm_cache_key
 from bio_claim_check.engine.llm.messages import LlmRequest, LlmResponse
@@ -36,7 +36,12 @@ class CachingLlmClient(BaseLlmClient):
         fetched = fetch_through_result(
             self._cache, self._mode, llm_cache_key(request), lambda: self._live(request), namespace=NAMESPACE
         )
-        stored = _load(fetched.data)
+        try:
+            stored = _load(fetched.data)
+        except CacheError as error:
+            if fetched.live is None:
+                raise
+            raise CacheWriteError(str(error)) from error  # after a live call: its usage is unknown (I67)
         if fetched.live is None:
             return LlmResponse.model_validate({**stored.model_dump(), "cache_hit": True})
         live = _load(fetched.live)

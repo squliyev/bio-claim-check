@@ -47,6 +47,10 @@
           "default": "llm.call_failed",
           "title": "Type",
           "type": "string"
+        },
+        "unmeasured": {
+          "title": "Unmeasured",
+          "type": "boolean"
         }
       },
       "required": [
@@ -55,7 +59,8 @@
         "model",
         "error_code",
         "kind",
-        "attempts"
+        "attempts",
+        "unmeasured"
       ],
       "title": "LlmCallFailed",
       "type": "object"

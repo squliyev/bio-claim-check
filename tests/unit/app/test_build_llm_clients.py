@@ -26,10 +26,11 @@ from bio_claim_check.app.container import (
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.engine.cache.policy import CacheMissError, CacheMode
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
-from bio_claim_check.engine.llm.errors import LlmProviderError
+from bio_claim_check.engine.llm.errors import LlmBudgetExceededError, LlmProviderError
 from bio_claim_check.engine.llm.model_spec import ModelSpec, Provider
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
 from bio_claim_check.features.answer.llm_answerer import LlmAnswerer
+from bio_claim_check.features.contracts.labels import AnswerMode
 
 pytestmark = pytest.mark.unit
 
@@ -145,3 +146,22 @@ def test_dev_answer_ports_need_foundry_settings_outside_read_only(tmp_path: Path
         build_dev_answer_ports(settings, GPT, None),
     ):
         pass
+
+
+def test_dev_answer_ports_cap_live_calls_with_the_configured_budget(tmp_path: Path) -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(401, json={"error": {"code": "unauthorized"}})
+
+    settings = make_settings(
+        cache_mode=CacheMode.READ_WRITE, var_dir=tmp_path, foundry=FOUNDRY, max_live_llm_calls=1
+    )
+    http = openai.DefaultHttpxClient(transport=httpx2.MockTransport(handler))
+    with build_dev_answer_ports(settings, GPT, None, openai_http=http) as ports:
+        with pytest.raises(LlmProviderError):
+            ports.answerer.answer("first?", (), AnswerMode.STRICT)
+        with pytest.raises(LlmBudgetExceededError):
+            ports.answerer.answer("second?", (), AnswerMode.STRICT)
+    assert len(seen) == 1

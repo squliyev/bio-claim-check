@@ -101,14 +101,14 @@ def test_validate_default_pack_is_byte_exact() -> None:
     [
         (
             "strict",
-            "f58468dae9bf910f",
+            "1532a5e1a5ab5d4a",
             "2, needs_review=1, failed=0, flagged=1",
             "1, needs_review=1, failed=0, flagged=1",
             "invented_citation=0, dangling_reference=0",
         ),
         (
             "over_eager",
-            "d7067c2641f6f408",
+            "c104c9e38e804ef2",
             "0, needs_review=1, failed=1, flagged=4",
             "0, needs_review=1, failed=1, flagged=4",
             "invented_citation=1, dangling_reference=0",
@@ -118,10 +118,10 @@ def test_validate_default_pack_is_byte_exact() -> None:
 def test_fake_run_stdout_is_byte_exact(
     tmp_path: Path, mode: str, run_id: str, pairs: str, claims: str, findings: str
 ) -> None:
-    result = runner.invoke(app, ["run", "Q?", "--fake", "--mode", mode, "--out", str(tmp_path)])
+    result = runner.invoke(app, ["run", "Q?", "--fake", "--mode", mode, "--var-dir", str(tmp_path)])
     assert result.exit_code == 0
     assert result.stdout == (
         "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result.\n"
-        f"report: {tmp_path / run_id / 'report.json'}\n"
+        f"report: {tmp_path / 'runs' / run_id / 'report.json'}\n"
         f"pairs: passed={pairs}\nclaims: passed={claims}\nfindings: {findings}\n"
     )

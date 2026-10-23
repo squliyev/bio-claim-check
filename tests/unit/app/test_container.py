@@ -1,4 +1,4 @@
-"""Composition root: rule-pack composers, report publishing and the fake wiring (S05b)."""
+"""Composition root: rule-pack composers, the run record's file operations and the fake wiring."""
 
 import hashlib
 import json
@@ -15,15 +15,19 @@ from bio_claim_check.app.container import (
     load_corpus_spec,
     load_rulepack,
     publish_corpus,
-    publish_report,
+    record_io,
 )
+from bio_claim_check.app.run_record import EVENTS_DIR, LEDGER_FILE
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import run_question
+from bio_claim_check.engine.events.errors import EventWriteError
 from bio_claim_check.features.contracts.corpus import CorpusSpecError
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePackError
 from bio_claim_check.features.corpus.layout import MANIFEST
-from bio_claim_check.features.report.canonical import canonical_bytes, run_id
+from bio_claim_check.features.report.canonical import canonical_bytes
+from bio_claim_check.infrastructure.publish import PublishError
+from bio_claim_check.infrastructure.text_files import read_package_bytes
 
 pytestmark = pytest.mark.unit
 
@@ -66,12 +70,40 @@ def test_canonical_bytes_are_sorted_utf8_with_a_trailing_newline() -> None:
     assert "run_id" not in data.decode()
 
 
-def test_publish_report_names_the_folder_by_content_hash(tmp_path: Path) -> None:
-    path = publish_report(tmp_path, REPORT)
-    data = canonical_bytes(REPORT)
-    assert run_id(data) == hashlib.sha256(data).hexdigest()[:16]
-    assert path == tmp_path / run_id(data) / "report.json"
-    assert path.read_bytes() == data
+def test_the_rule_pack_hash_is_of_the_shipped_file_bytes() -> None:
+    data = read_package_bytes(*container.DEFAULT_RULEPACK)
+    assert build_fake_run_ports().rules_sha256 == hashlib.sha256(data).hexdigest()
+
+
+def test_record_io_publishes_once_and_refuses_different_bytes(tmp_path: Path) -> None:
+    io = record_io(tmp_path)
+    io.publish("abc", "report.json", b"{}\n")
+    io.publish("abc", "report.json", b"{}\n")
+    assert (tmp_path / "runs" / "abc" / "report.json").read_bytes() == b"{}\n"
+    with pytest.raises(PublishError):
+        io.publish("abc", "report.json", b"[]\n")
+
+
+def test_record_io_appends_ledger_lines(tmp_path: Path) -> None:
+    io = record_io(tmp_path)
+    io.append_ledger(b'{"a":1}')
+    io.append_ledger(b'{"a":2}')
+    assert (tmp_path / LEDGER_FILE).read_bytes() == b'{"a":1}\n{"a":2}\n'
+
+
+def test_record_io_opens_numbered_traces_and_fails_closed_when_all_names_are_taken(tmp_path: Path) -> None:
+    io = record_io(tmp_path)
+    first = io.open_trace("20260101T000000Z")
+    second = io.open_trace("20260101T000000Z")
+    assert (first.name, second.name) == ("20260101T000000Z-0.jsonl", "20260101T000000Z-1.jsonl")
+    first.write_line(b"{}")
+    first.close()
+    second.close()
+    assert (tmp_path / EVENTS_DIR / first.name).read_bytes() == b"{}\n"
+    for n in range(2, 100):
+        (tmp_path / EVENTS_DIR / f"20260101T000000Z-{n}.jsonl").touch()
+    with pytest.raises(EventWriteError):
+        io.open_trace("20260101T000000Z")
 
 
 def test_load_corpus_spec_reads_the_fixture() -> None:

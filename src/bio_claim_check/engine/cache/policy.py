@@ -32,6 +32,13 @@ class CacheError(BccError):
     code = "cache.failed"
 
 
+class CacheWriteError(CacheError):
+    """The cache failed after a live fetch (storing it, or reading back the stored entry): the fetch
+    already ran and may have been paid for, so its usage is unknown."""
+
+    code = "cache.write_failed"
+
+
 class CacheMissError(BccError, LookupError):
     """`read-only` mode and the key is absent: fail closed instead of fetching."""
 
@@ -72,6 +79,7 @@ def fetch_through_result(
     - `read-only`: the cached bytes, or `CacheMissError`; `fetch` is never called.
     - `read-write`: the cached bytes, else `fetch()` then store. `fetch` must raise on anything that
       should not be stored (an error status, a malformed body), so only good responses are frozen.
+      A cache failure after `fetch()` ran is a `CacheWriteError`, so callers know the fetch happened.
       The stored bytes are returned, not the fetched ones: if another process stored the key first,
       this run uses the bytes every replay will see.
     """
@@ -83,10 +91,13 @@ def fetch_through_result(
     if mode is CacheMode.READ_ONLY:
         raise CacheMissError(namespace)
     live = fetch()
-    cache.put(key, live)
-    stored = cache.get(key)
+    try:
+        cache.put(key, live)
+        stored = cache.get(key)
+    except CacheError as err:
+        raise CacheWriteError(f"the {namespace} cache failed after a live fetch: {err}") from err
     if stored is None:
-        raise CacheError(f"the {namespace} cache did not keep a written entry")
+        raise CacheWriteError(f"the {namespace} cache did not keep a written entry")
     return Fetched(data=stored, live=live)
 
 

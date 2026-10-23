@@ -6,7 +6,7 @@ from typing import override
 import pytest
 
 from bio_claim_check.app.container import build_fake_run_ports
-from bio_claim_check.app.usecases.run import RunPorts, run_question
+from bio_claim_check.app.usecases.run import RunInputError, RunPorts, run_question
 from bio_claim_check.features.answer.base_answerer import BaseAnswerer
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
 from bio_claim_check.features.contracts.answer import Answer
@@ -72,14 +72,14 @@ def _container(**changes: object) -> RunPorts:
 
 @pytest.mark.parametrize("k", [0, -1, True, 2.0])
 def test_k_must_be_a_positive_int(k: object) -> None:
-    with pytest.raises(ValueError, match="k must be"):
+    with pytest.raises(RunInputError, match="k must be"):
         # wrong type on purpose
         run_question(build_fake_run_ports(), Q, AnswerMode.STRICT, k=k)  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.parametrize("question", ["", "   ", "\t\n"])
 def test_question_must_not_be_blank(question: str) -> None:
-    with pytest.raises(ValueError, match="blank"):
+    with pytest.raises(RunInputError, match="blank"):
         run_question(build_fake_run_ports(), question, AnswerMode.STRICT, k=4)
 
 

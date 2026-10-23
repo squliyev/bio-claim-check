@@ -28,8 +28,16 @@ def read_text_file(path: Path) -> str:
 
 def read_package_text(*parts: str) -> str:
     """Text of a file shipped inside `bio_claim_check`, e.g. ``("data", "rulepacks", "default.yaml")``."""
+    try:
+        return read_package_bytes(*parts).decode("utf-8")
+    except UnicodeDecodeError as err:
+        raise ReadError(f"package data {'/'.join(parts)}: cannot read: {err}") from None
+
+
+def read_package_bytes(*parts: str) -> bytes:
+    """Raw bytes of a file shipped inside `bio_claim_check` (hash these, then decode them)."""
     resource = files("bio_claim_check").joinpath(*parts)
     try:
-        return resource.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as err:
+        return resource.read_bytes()
+    except OSError as err:
         raise ReadError(f"package data {'/'.join(parts)}: cannot read: {err}") from None
