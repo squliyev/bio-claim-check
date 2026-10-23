@@ -42,11 +42,13 @@ JUDGE_FILES: Final[tuple[str, ...]] = (
 )
 """Package files (paths under `bio_claim_check/`) whose bytes are part of the judge."""
 
-FROZEN: Final[Mapping[str, str]] = {}
+FROZEN: Final[Mapping[str, str]] = {
+    "v1": "3f07faf7ea1aee6354ebb3de23f8deb508b9eac06d16b0221ba3c8a62eeabfed",
+}
 """sha256 of each committed freeze record's exact bytes, by name. Records are never edited."""
 
-ACTIVE_FREEZE: Final[str | None] = None
-"""The freeze the code must match; None until the first freeze is written."""
+ACTIVE_FREEZE: Final[str] = "v1"
+"""The freeze the code must match (I73)."""
 
 FREEZE_DIR: Final = "freeze"
 

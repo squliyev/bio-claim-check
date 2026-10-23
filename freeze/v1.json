@@ -1,0 +1,41 @@
+{
+  "challenge_result_sha256": "e6e7768fafc316ce0c2afb64f16ff8ec597330f82898dd220fefa2959364ac63",
+  "freeze_sha256": "ee8c5ce887e1e368461f1821a424e69fde71821a6ae7d74ebcc44ff4adc9723c",
+  "judge": {
+    "answerer": {
+      "deployment": "gpt-6.1-sol",
+      "family": "openai",
+      "model_version": "2026-09-29",
+      "params": {},
+      "provider": "foundry_openai"
+    },
+    "files": {
+      "common/negation.py": "7d9a6f0b87d4279ac1262c4b9dff81268d7b58f72c3904357d6525aee705146f",
+      "common/text.py": "cf9255694183cd6de1b81d96230e69f3c4993561f3ae3f3ea14d81024c575e64",
+      "data/rulepacks/default.yaml": "9a4f4ac38acbbb0aa1ec3d43723aa665adcf76121b5dd23a856abe4c8b5de6be",
+      "engine/prompts/prompt_template.py": "f3f7dfcc78989904bf449631a2eb0e5f846cdb066435f1a2e8a3e446f47782af",
+      "features/answer/answer_models.py": "731bce0e373e6a14d268cc5f6fd766cf38d51d9088b0b825a4f823c496bbd502",
+      "features/answer/answer_prompts.py": "863e12362cb84f4ca28a5a2f0a82b3a4d6a8c3b39840da8157ad87dac18c4239",
+      "features/answer/over_eager_answer_llm_agent.py": "a024e72b0440425c86829902ddc728ebfe0eaf0852dd0b04192176b4da725cf5",
+      "features/answer/strict_answer_llm_agent.py": "803cebec70ad7bf8055e4c4e71989e508399f39e4b1a2dbbe2139d0c1e7bf4da",
+      "features/contracts/labels.py": "110ff483dce3725b1a5647bd4a069bc2bdb4d6c4465ab7c4177316ce4895ab74",
+      "features/contracts/verdict.py": "7b05a4e5d8e2cde90ae4a88c43cb2ee0e8c2fcc5e23c5e03c568ba00703aac78",
+      "features/verify/llm_verifier.py": "c7958f4b0e0943d2e6d0033379efc435e738ff499659d876defe128d53f7488b",
+      "features/verify/verify_llm_agent.py": "ca95c15ada7eb1579fee59abd73ac4302a286d972c73d3930753efe942d0c7d3",
+      "features/verify/verify_models.py": "8c541d73e93b2b94ebe645e950e6e9f59fdd9e363782f413b0239a45b536e8fd",
+      "features/verify/verify_prompts.py": "1c7302a7625bf71b3fb9068aae329e573f1faec88958f3def15eb114a502b049"
+    },
+    "rapidfuzz": "3.14.6",
+    "verifier": {
+      "deployment": "claude-opus-4-8",
+      "family": "anthropic",
+      "model_version": "claude-opus-4-8",
+      "params": {
+        "max_output_tokens": 8192
+      },
+      "provider": "foundry_anthropic"
+    }
+  },
+  "judge_sha256": "6d9996445668fa466c6767f288e03c695847b4c99ef3d62bdf934e9f2c79f5d3",
+  "name": "v1"
+}

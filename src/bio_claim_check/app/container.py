@@ -34,7 +34,14 @@ import openai
 from pydantic import JsonValue
 
 from bio_claim_check import __version__
-from bio_claim_check.app.freeze import JUDGE_FILES, JudgeInputs, judge_inputs
+from bio_claim_check.app.freeze import (
+    ACTIVE_FREEZE,
+    JUDGE_FILES,
+    JudgeInputs,
+    freeze_problems,
+    freeze_record,
+    judge_inputs,
+)
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import (
     EVENTS_DIR,
@@ -672,6 +679,32 @@ def current_judge(settings: Settings) -> JudgeInputs:
     return judge_inputs(
         files, importlib.metadata.version("rapidfuzz"), _spec_json(roles.answer), _spec_json(roles.verifier)
     )
+
+
+class FreezeError(BccError):
+    """This code is not the active frozen judge, so the test split stays closed (ADR 0020, I74)."""
+
+    code = "app.freeze"
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("\n".join(problems))
+        self.problems = tuple(problems)
+
+
+def active_freeze_sha256(settings: Settings, freeze_dir: Path, challenge_result: Path) -> str:
+    """Recompute the active freeze from this code and the committed files; refuse unless it still holds."""
+    try:
+        committed = (freeze_dir / f"{ACTIVE_FREEZE}.json").read_bytes()
+        result = challenge_result.read_bytes()
+    except OSError as err:
+        raise FreezeError([f"cannot read the active freeze: {err.strerror or type(err).__name__}"]) from None
+    try:
+        current = freeze_record(ACTIVE_FREEZE, current_judge(settings), result)
+    except JudgeReadError as err:
+        raise FreezeError([str(err)]) from None
+    if problems := freeze_problems(committed, current):
+        raise FreezeError(problems)
+    return current.freeze_sha256
 
 
 @contextmanager

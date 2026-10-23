@@ -68,9 +68,9 @@ def test_a_planted_test_id_in_a_challenge_item_is_caught() -> None:
     assert {v.detail for v in found} == {"test PMID 31234567", "test question id fx-statin-q1"}
 
 
-def test_the_challenge_files_are_scanned() -> None:
+def test_the_challenge_and_freeze_files_are_scanned() -> None:
     scanned = {p.relative_to(ROOT).as_posix() for p in _text_files()}
-    assert {"challenge/dev-v1.jsonl", "challenge/dev-v1.result.json"} <= scanned
+    assert {"challenge/dev-v1.jsonl", "challenge/dev-v1.result.json", "freeze/v1.json"} <= scanned
 
 
 def _text_files() -> list[Path]:

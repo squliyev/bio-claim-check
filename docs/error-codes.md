@@ -31,6 +31,7 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `answer.empty_pool` | `EmptyDevPoolError` | No paper of the question's dev pool came back usable (missing or edited since the build); nothing was answered |
 | `answer.invalid_claims` | `AnswerClaimsError` | An LLM answer has a claim with blank text, no cites, a duplicate cite or a malformed source id; refused, never repaired (I61) |
 | `app.dataset_read` | `DatasetReadError` | The dataset folder, or a file in it, cannot be read |
+| `app.freeze` | `FreezeError` | This code is not the active frozen judge (ADR 0020), so a test-split audit is refused |
 | `app.judge_read` | `JudgeReadError` | A judge file (ADR 0020) is missing from the installed package |
 | `app.missing_provider` | `MissingProviderError` | A live LLM role has no provider settings |
 | `app.output_conflict` | `OutputConflictError` | An output file exists with different bytes, or cannot be written |

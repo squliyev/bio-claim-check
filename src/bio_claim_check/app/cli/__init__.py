@@ -22,10 +22,12 @@ from bio_claim_check import __version__
 from bio_claim_check.app.container import (
     RECORD_OUTPUT_ERRORS,
     DatasetReadError,
+    FreezeError,
     JudgeReadError,
     MissingProviderError,
     OutputConflictError,
     UnsupportedProviderError,
+    active_freeze_sha256,
     build_challenge_ports,
     build_dev_answer_ports,
     build_fake_run_ports,
@@ -75,7 +77,6 @@ from bio_claim_check.app.usecases.challenge import (
     run_challenge,
 )
 from bio_claim_check.app.usecases.corpus_audit import (
-    AUDIT_SPLIT,
     AuditInputError,
     apply_decisions,
     export_sheet,
@@ -107,7 +108,7 @@ from bio_claim_check.engine.llm.errors import (
 )
 from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
 from bio_claim_check.features.answer.answer_models import AnswerClaimsError
-from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpec, CorpusSpecError
+from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpec, CorpusSpecError, CorpusSplit
 from bio_claim_check.features.contracts.finding import FindingKind
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
@@ -703,28 +704,42 @@ def seal_corpus_command(dataset: DatasetDir = Path("datasets")) -> None:
 
 
 KindOption = Annotated[OverstatedReason, typer.Option("--kind", help="Trap kind to audit.")]
+SplitOption = Annotated[
+    CorpusSplit, typer.Option("--split", help="dev, or test (only under the active prompt freeze).")
+]
 DEFAULT_AUDIT_DIR = Path("var/audit")  # git-ignored: sheets hold abstract text (publisher copyright)
+
+
+def _test_freeze(settings: Settings) -> str:
+    """The recomputed active freeze hash that gates a test audit (never typed; I74)."""
+    try:
+        return active_freeze_sha256(settings, Path(FREEZE_DIR), _result_path(DEFAULT_CHALLENGE))
+    except FreezeError as err:
+        _print_problems("The test split is closed: this code is not the active frozen judge", err.problems)
+        raise typer.Exit(code=ExitCode.INPUT) from None
 
 
 @corpus_app.command("audit-sheet")
 def audit_sheet_command(
     kind: KindOption,
+    split: SplitOption = CorpusSplit.DEV,
     dataset: DatasetDir = Path("datasets"),
     out: Annotated[
         Path, typer.Option(help="Folder for the sheet (keep it git-ignored).")
     ] = DEFAULT_AUDIT_DIR,
     env_file: EnvFile = Path(".env"),
 ) -> None:
-    """Export the dev audit sheet of one kind, replaying abstracts from the cache (never the network).
+    """Export the audit sheet of one kind, replaying abstracts from the cache (never the network).
 
-    Dev only until the prompt freeze (S12): a test sheet would show test abstracts before tuning ends.
+    A test sheet shows test abstracts, so it needs the active prompt freeze, recomputed here (ADR 0020).
     """
     files, spec = _dataset(dataset)
     settings = _settings(env_file)
+    freeze = _test_freeze(settings) if split is CorpusSplit.TEST else None
     try:
         with build_replay(settings) as source:
-            sheet = export_sheet(files, spec, kind, source)
-        path = publish_sheet(out, AUDIT_SPLIT, kind, sheet)
+            sheet = export_sheet(files, spec, kind, source, split=split, freeze_sha256=freeze)
+        path = publish_sheet(out, split, kind, sheet)
     except AuditInputError as err:
         _print_problems("Cannot export the audit sheet", err.problems)
         raise typer.Exit(code=ExitCode.DATASET) from None
@@ -743,19 +758,31 @@ def apply_audit_command(
     kind: KindOption,
     sheet: Annotated[Path, typer.Option("--sheet", help="The filled-in audit sheet (CSV).")],
     prompts_sha256: Annotated[
-        str, typer.Option("--prompts-sha256", help="sha256 of the prompts and rule packs in force.")
-    ],
+        str | None,
+        typer.Option("--prompts-sha256", help="dev only: sha256 of the prompts and rule packs in force."),
+    ] = None,
+    split: SplitOption = CorpusSplit.DEV,
     dataset: DatasetDir = Path("datasets"),
+    env_file: EnvFile = Path(".env"),
 ) -> None:
-    """Record a filled-in dev audit sheet in the dataset, once, bound to the seal; print the precision."""
+    """Record a filled-in audit sheet in the dataset, once, bound to the seal; print the precision.
+
+    For test, the prompts hash is the active freeze, recomputed here; it cannot be typed (ADR 0020).
+    """
+    if split is CorpusSplit.TEST and prompts_sha256 is not None:
+        _fail(ExitCode.INPUT, "--prompts-sha256 is refused for test: the active prompt freeze sets it")
+    if split is CorpusSplit.DEV and prompts_sha256 is None:
+        _fail(ExitCode.INPUT, "--prompts-sha256 is required for dev")
     files, spec = _dataset(dataset)
+    if prompts_sha256 is None:
+        prompts_sha256 = _test_freeze(_settings(env_file))
     try:
         text = sheet.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as err:
         _fail(ExitCode.INPUT, f"cannot read {sheet}: {type(err).__name__}")
     try:
-        summary = apply_decisions(files, spec, kind, text, prompts_sha256=prompts_sha256)
-        path = publish_audit(dataset, AUDIT_SPLIT, kind, summary.record)
+        summary = apply_decisions(files, spec, kind, text, prompts_sha256=prompts_sha256, split=split)
+        path = publish_audit(dataset, split, kind, summary.record)
     except AuditSheetError as err:
         _print_problems(f"{sheet} is not a valid audit", err.problems)
         raise typer.Exit(code=ExitCode.INPUT) from None

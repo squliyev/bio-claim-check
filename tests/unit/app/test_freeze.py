@@ -1,14 +1,17 @@
 """The judge fingerprint and the freeze record (I73): every input counts, records are pinned by bytes."""
 
 import hashlib
+import json
+from pathlib import Path
 from typing import Any
 
 import pytest
 from pydantic import JsonValue, ValidationError
+from tests.support.paths import ROOT
 from tests.support.settings import make_settings
 
 from bio_claim_check.app import container
-from bio_claim_check.app.container import JudgeReadError, current_judge
+from bio_claim_check.app.container import FreezeError, JudgeReadError, active_freeze_sha256, current_judge
 from bio_claim_check.app.freeze import (
     ACTIVE_FREEZE,
     FROZEN,
@@ -108,7 +111,7 @@ def test_an_unpinned_edited_or_renamed_record_is_refused() -> None:
 
 
 def test_every_pin_names_an_existing_record_and_the_active_one_is_pinned() -> None:
-    assert ACTIVE_FREEZE is None or ACTIVE_FREEZE in FROZEN
+    assert ACTIVE_FREEZE in FROZEN
 
 
 def test_the_installed_judge_reads_every_listed_file() -> None:
@@ -122,3 +125,29 @@ def test_a_missing_judge_file_is_an_error(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(container, "JUDGE_FILES", ("features/verify/missing.py",))
     with pytest.raises(JudgeReadError, match=r"missing\.py"):
         current_judge(make_settings())
+
+
+RECORDED = ROOT / "challenge" / "dev-v1.result.json"
+
+
+def test_the_active_freeze_is_recomputed_from_the_code_and_committed_files() -> None:
+    committed = json.loads((ROOT / "freeze" / f"{ACTIVE_FREEZE}.json").read_bytes())
+    assert active_freeze_sha256(make_settings(), ROOT / "freeze", RECORDED) == committed["freeze_sha256"]
+
+
+def test_the_active_freeze_refuses_a_missing_record(tmp_path: Path) -> None:
+    with pytest.raises(FreezeError, match="cannot read the active freeze"):
+        active_freeze_sha256(make_settings(), tmp_path, RECORDED)
+
+
+def test_the_active_freeze_refuses_another_challenge_result(tmp_path: Path) -> None:
+    other = tmp_path / "result.json"
+    other.write_bytes(RECORDED.read_bytes() + b"\n")
+    with pytest.raises(FreezeError, match="the challenge result changed since freeze v1"):
+        active_freeze_sha256(make_settings(), ROOT / "freeze", other)
+
+
+def test_the_active_freeze_refuses_a_missing_judge_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(container, "JUDGE_FILES", ("features/verify/missing.py",))
+    with pytest.raises(FreezeError, match=r"missing\.py"):
+        active_freeze_sha256(make_settings(), ROOT / "freeze", RECORDED)
