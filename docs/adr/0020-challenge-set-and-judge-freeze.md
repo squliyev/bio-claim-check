@@ -41,7 +41,9 @@ Abstracts cannot be committed (ADR 0008), and CI has no cache and no keys, so CI
 4. **Tuning stays off the set.** Prompt revisions (at most 3) come only from failure analysis of natural
    dev pairs. The set runs at most twice: the baseline and the final prompt.
 5. **The judge fingerprint** (`app/freeze.py`) is the sha256 over:
-   - the bytes of a fixed list of judge source files, including the rule pack;
+   - the bytes of a fixed list of judge source files: the prompts and their rendering, the provider
+     codecs, the retry and repair loop, quote location, negation, disposition, and the rule pack with its
+     parser;
    - the `rapidfuzz` version;
    - the full answerer and verifier `ModelSpec`s.
 
@@ -73,7 +75,11 @@ Abstracts cannot be committed (ADR 0008), and CI has no cache and no keys, so CI
 - **Negation:** all 4 `negated_supported` dev pairs were `claim_shares_negation`. The claim was itself
   negative and correct, so these are safe false blocks. No rule change; this is a backlog item for a
   later ADR.
-- **Freeze v1:** judge `6d999644…`, `freeze_sha256` `ee8c5ce8…`.
+- **Freeze v1:** judge `7d8d8f76…`, `freeze_sha256` `c8b5383c…`. The implementation review found that
+  the first fingerprint (`6d999644…`) missed the request path, so v1 was redone before any tag or test
+  audit. The outcomes are unchanged (cache replay).
+- **Committed test audits** must carry the `freeze_sha256` of a committed freeze record. CI checks this,
+  so a record written outside the CLI is caught (I74).
 
 ## Consequences
 

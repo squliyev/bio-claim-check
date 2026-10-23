@@ -1,6 +1,6 @@
 {
   "challenge_sha256": "c7f129200e8012c36294d86486ff494ed2744d4ef2125d0bdb0abca2c65d52b2",
-  "judge_sha256": "6d9996445668fa466c6767f288e03c695847b4c99ef3d62bdf934e9f2c79f5d3",
+  "judge_sha256": "7d8d8f76b233bb3fc8900348b9ad97ddd592cc408242e48a1fb47c61245000de",
   "outcomes": [
     {
       "disposition": "passed",

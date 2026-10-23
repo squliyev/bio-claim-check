@@ -21,8 +21,11 @@ from bio_claim_check.app.freeze import (
     freeze_problems,
     freeze_record,
     judge_inputs,
+    unfrozen_audits,
 )
 from bio_claim_check.common.canonical_json import pretty_json_bytes
+from bio_claim_check.features.contracts.corpus import AuditDecision, AuditRecord, CorpusSplit
+from bio_claim_check.features.contracts.labels import OverstatedReason
 
 pytestmark = pytest.mark.unit
 
@@ -151,3 +154,26 @@ def test_the_active_freeze_refuses_a_missing_judge_file(monkeypatch: pytest.Monk
     monkeypatch.setattr(container, "JUDGE_FILES", ("features/verify/missing.py",))
     with pytest.raises(FreezeError, match=r"missing\.py"):
         active_freeze_sha256(make_settings(), ROOT / "freeze", RECORDED)
+
+
+def _audit(split: CorpusSplit, prompts_sha256: str) -> bytes:
+    decision = AuditDecision(source_id="PMID:1", decision="confirm", reason=None)
+    record = AuditRecord(
+        split=split,
+        kind=next(iter(OverstatedReason)),
+        corpus_seal="c" * 64,
+        prompts_sha256=prompts_sha256,
+        decisions=(decision,),
+    )
+    return pretty_json_bytes(record.model_dump(mode="json"))
+
+
+def test_a_test_audit_must_carry_a_committed_freeze_hash() -> None:
+    record = freeze_record("v1", _judge(), RESULT)
+    records = {"v1.json": pretty_json_bytes(record.model_dump(mode="json"))}
+    audits = {
+        "frozen.json": _audit(CorpusSplit.TEST, record.freeze_sha256),
+        "typed.json": _audit(CorpusSplit.TEST, "d" * 64),
+        "dev.json": _audit(CorpusSplit.DEV, "d" * 64),
+    }
+    assert unfrozen_audits(audits, records) == ["typed.json: a test audit not made under a committed freeze"]

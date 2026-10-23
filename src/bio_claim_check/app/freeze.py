@@ -1,7 +1,8 @@
 """[RING:app] The judge fingerprint and the prompt freeze record (ADR 0020).
 
-Why: a claim's disposition depends on more than the prompt text: on how the prompts are rendered, on
-quote location, the near-match threshold, the negation rules, the disposition table, the rule pack, the
+Why: a claim's disposition depends on more than the prompt text: on how the prompts are rendered and
+sent (the JSON rendering, the provider codecs, the retry and repair loop, the rule-pack parser), on quote
+location, the near-match threshold, the negation rules, the disposition table, the rule pack, the
 fuzzy-matching library and the models and their parameters. The fingerprint hashes the exact bytes of
 the files that hold those (`JUDGE_FILES`), the `rapidfuzz` version and both model specs (price
 excluded: it judges nothing), so any edit to them, even to a docstring, is a different judge. That is
@@ -23,17 +24,26 @@ from pydantic import JsonValue, model_validator
 
 from bio_claim_check.common.canonical_json import compact_sha256
 from bio_claim_check.common.models import NonBlankStr, Sha256Hex, ValidatedModel
+from bio_claim_check.features.contracts.corpus import AuditRecord, CorpusSplit
 
 JUDGE_FILES: Final[tuple[str, ...]] = (
+    "common/canonical_json.py",
     "common/negation.py",
     "common/text.py",
     "data/rulepacks/default.yaml",
+    "engine/agent/base_llm_agent.py",
+    "engine/llm/anthropic_messages_codec.py",
+    "engine/llm/codec_support.py",
+    "engine/llm/messages.py",
+    "engine/llm/openai_responses_codec.py",
+    "engine/pipeline/llm_runner.py",
     "engine/prompts/prompt_template.py",
     "features/answer/answer_models.py",
     "features/answer/answer_prompts.py",
     "features/answer/over_eager_answer_llm_agent.py",
     "features/answer/strict_answer_llm_agent.py",
     "features/contracts/labels.py",
+    "features/contracts/rulepack.py",
     "features/contracts/verdict.py",
     "features/verify/llm_verifier.py",
     "features/verify/verify_llm_agent.py",
@@ -43,7 +53,7 @@ JUDGE_FILES: Final[tuple[str, ...]] = (
 """Package files (paths under `bio_claim_check/`) whose bytes are part of the judge."""
 
 FROZEN: Final[Mapping[str, str]] = {
-    "v1": "3f07faf7ea1aee6354ebb3de23f8deb508b9eac06d16b0221ba3c8a62eeabfed",
+    "v1": "17705069d842806ebe64fd7160496f83bdc35e5784629cafb13e274a7168edc1",
 }
 """sha256 of each committed freeze record's exact bytes, by name. Records are never edited."""
 
@@ -143,3 +153,17 @@ def freeze_problems(committed: bytes, current: FreezeRecord, pins: Mapping[str, 
     if record.challenge_result_sha256 != current.challenge_result_sha256:
         problems.append(f"the challenge result changed since freeze {record.name}")
     return problems
+
+
+def unfrozen_audits(audits: Mapping[str, bytes], records: Mapping[str, bytes]) -> list[str]:
+    """Each test-split audit whose `prompts_sha256` is not the `freeze_sha256` of a committed record (I74).
+
+    The CLI computes that hash; this check is how CI sees a record written any other way.
+    """
+    frozen = {FreezeRecord.model_validate_json(raw).freeze_sha256 for raw in records.values()}
+    return [
+        f"{name}: a test audit not made under a committed freeze"
+        for name, raw in sorted(audits.items())
+        if (record := AuditRecord.model_validate_json(raw)).split is CorpusSplit.TEST
+        and record.prompts_sha256 not in frozen
+    ]

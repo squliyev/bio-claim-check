@@ -9,7 +9,14 @@ import hashlib
 import pytest
 
 from bio_claim_check.app.container import current_judge
-from bio_claim_check.app.freeze import ACTIVE_FREEZE, FREEZE_DIR, FROZEN, freeze_problems, freeze_record
+from bio_claim_check.app.freeze import (
+    ACTIVE_FREEZE,
+    FREEZE_DIR,
+    FROZEN,
+    freeze_problems,
+    freeze_record,
+    unfrozen_audits,
+)
 from tests.support.paths import ROOT
 from tests.support.settings import make_settings
 
@@ -28,3 +35,9 @@ def test_the_code_is_the_active_frozen_judge() -> None:
     current = freeze_record(ACTIVE_FREEZE, current_judge(make_settings()), RESULT.read_bytes())
     committed = (RECORDS / f"{ACTIVE_FREEZE}.json").read_bytes()
     assert freeze_problems(committed, current) == []
+
+
+def test_every_committed_test_audit_was_made_under_a_freeze() -> None:
+    audits = {p.name: p.read_bytes() for p in (ROOT / "datasets" / "audit" / "test").glob("*.json")}
+    records = {p.name: p.read_bytes() for p in RECORDS.glob("*.json")}
+    assert unfrozen_audits(audits, records) == []
