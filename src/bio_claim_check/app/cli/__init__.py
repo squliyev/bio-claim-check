@@ -22,9 +22,11 @@ from bio_claim_check import __version__
 from bio_claim_check.app.container import (
     RECORD_OUTPUT_ERRORS,
     DatasetReadError,
+    JudgeReadError,
     MissingProviderError,
     OutputConflictError,
     UnsupportedProviderError,
+    build_challenge_ports,
     build_dev_answer_ports,
     build_fake_run_ports,
     build_live_run_ports,
@@ -32,6 +34,7 @@ from bio_claim_check.app.container import (
     build_replay,
     build_retraction_source,
     build_retrieval,
+    current_judge,
     declared_answerer,
     default_rulepack,
     file_sha256,
@@ -40,6 +43,7 @@ from bio_claim_check.app.container import (
     logging_emitter,
     publish_audit,
     publish_corpus,
+    publish_document,
     publish_retraction_check,
     publish_sheet,
     read_dataset,
@@ -48,6 +52,7 @@ from bio_claim_check.app.container import (
     run_path,
     write_seal,
 )
+from bio_claim_check.app.freeze import FREEZE_DIR, freeze_record
 from bio_claim_check.app.logging_setup import configure_logging
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import RunDetails, RunInputs, RunRecorder
@@ -61,6 +66,14 @@ from bio_claim_check.app.usecases.answer_dev import (
     dev_answer_record,
 )
 from bio_claim_check.app.usecases.build_corpus import PoolConflictError, build_corpus
+from bio_claim_check.app.usecases.challenge import (
+    ChallengeInputError,
+    ChallengePoolError,
+    ChallengeResult,
+    attestation_problems,
+    result_bytes,
+    run_challenge,
+)
 from bio_claim_check.app.usecases.corpus_audit import (
     AUDIT_SPLIT,
     AuditInputError,
@@ -757,6 +770,124 @@ def apply_audit_command(
         f"precision {summary.confirmed}/{summary.reviewed} confirmed "
         f"(95% Wilson {low:.2f}-{high:.2f}); author-confirmed, single rater"
     )
+
+
+challenge_app = typer.Typer(help="The dev challenge set of the verifier (ADR 0020).", no_args_is_help=True)
+app.add_typer(challenge_app, name="challenge")
+DEFAULT_CHALLENGE = Path("challenge/dev-v1.jsonl")
+ChallengeFile = Annotated[Path, typer.Option("--challenge", help="The challenge set (JSONL).")]
+CHALLENGE_DIR = "challenge"  # attempts under the var dir, by judge
+
+
+def _result_path(challenge: Path) -> Path:
+    return challenge.with_name(challenge.name.removesuffix(".jsonl") + ".result.json")
+
+
+def _read_input(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError as err:
+        _fail(ExitCode.INPUT, f"cannot read {path}: {err.strerror or type(err).__name__}")
+
+
+@challenge_app.command("run")
+def challenge_run_command(
+    challenge: ChallengeFile = DEFAULT_CHALLENGE,
+    record: Annotated[
+        bool, typer.Option("--record", help="Also publish <set>.result.json beside the set, once.")
+    ] = False,
+    dataset: DatasetDir = Path("datasets"),
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Judge every challenge item with the configured verifier, from its sealed dev pool. Costs tokens.
+
+    Every attempt is kept under the var dir as challenge/<judge>.json; a read-only replay is byte-identical.
+    """
+    settings = _settings(env_file)
+    data = _read_input(challenge)
+    with _live_exit_codes(dataset):
+        try:
+            files = read_dataset(dataset)
+            spec = load_corpus_spec(dataset / SPEC)
+            judge = current_judge(settings)
+            with build_challenge_ports(settings, logging_emitter()) as (ports, verifier):
+                result = run_challenge(
+                    ports, data, files, spec, judge_sha256=judge.sha256, verifier=verifier.deployment
+                )
+            out = result_bytes(result)
+            attempt = publish_document(
+                settings.var_dir / CHALLENGE_DIR,
+                f"{judge.sha256[:16]}-{result.challenge_sha256[:8]}.json",
+                out,
+            )
+        except ChallengeInputError as err:
+            _print_problems(f"{challenge} cannot be run", err.problems)
+            raise typer.Exit(code=ExitCode.INPUT) from None
+        except ChallengePoolError as err:
+            _fail(ExitCode.DATASET, str(err))
+        except JudgeReadError as err:
+            _fail(ExitCode.INPUT, str(err))
+        except OutputConflictError as err:
+            _fail(ExitCode.OUTPUT, str(err))
+    _print_challenge(result)
+    typer.echo(f"attempt: {attempt}")
+    if record:
+        if not result.score.passed:
+            _fail(ExitCode.INPUT, "the challenge rule is not met; nothing recorded")
+        try:
+            path = publish_document(challenge.parent, _result_path(challenge).name, out)
+        except OutputConflictError as err:
+            _fail(ExitCode.OUTPUT, str(err))
+        typer.echo(f"recorded: {path}")
+
+
+def _print_challenge(result: ChallengeResult) -> None:
+    s = result.score
+    typer.echo(f"verifier: {result.verifier}; judge {result.judge_sha256[:16]}")
+    typer.echo(
+        f"agree {s.agree}/{s.n}; unsafe passes {s.unsafe_passes}; failed or absent evidence "
+        f"{s.failures_or_absent}; near {s.near}; supported but negated {s.negated_supported}"
+    )
+    for label, counts in s.table.items():
+        typer.echo(f"  {label}: " + (", ".join(f"{d}={n}" for d, n in counts.items()) or "none"))
+    typer.echo(
+        f"challenge rule: {'met' if s.passed else 'NOT met'} (author-confirmed, single rater; not accuracy)"
+    )
+
+
+freeze_app = typer.Typer(help="The prompt freeze record (ADR 0020).", no_args_is_help=True)
+app.add_typer(freeze_app, name="freeze")
+
+
+@freeze_app.command("write")
+def freeze_write_command(
+    name: Annotated[str, typer.Option("--name", help="Freeze name, e.g. v1.")] = "v1",
+    challenge: ChallengeFile = DEFAULT_CHALLENGE,
+    dataset: DatasetDir = Path("datasets"),
+    out: Annotated[Path, typer.Option(help="Folder for freeze records.")] = Path(FREEZE_DIR),
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Write freeze/<name>.json once, only if the committed challenge result attests this judge."""
+    settings = _settings(env_file)
+    files, _ = _dataset(dataset)
+    data = _read_input(challenge)
+    result = _read_input(_result_path(challenge))
+    try:
+        judge = current_judge(settings)
+    except JudgeReadError as err:
+        _fail(ExitCode.INPUT, str(err))
+    verifier = str(judge.verifier["deployment"])
+    if problems := attestation_problems(data, result, files, judge_sha256=judge.sha256, verifier=verifier):
+        _print_problems("Cannot freeze", problems)
+        raise typer.Exit(code=ExitCode.INPUT)
+    record = freeze_record(name, judge, result)
+    try:
+        path = publish_document(out, f"{name}.json", pretty_json_bytes(record.model_dump(mode="json")))
+    except OutputConflictError as err:
+        _fail(ExitCode.OUTPUT, str(err))
+    typer.echo(f"wrote: {path}")
+    typer.echo(f"file sha256 (pin it in app/freeze.py FROZEN): {_sha256(path.read_bytes())}")
+    typer.echo(f"freeze_sha256: {record.freeze_sha256}")
 
 
 def _fail(code: ExitCode, message: str) -> NoReturn:

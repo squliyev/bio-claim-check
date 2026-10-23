@@ -12,6 +12,7 @@ digraph {
     ".traps"
     ".verify" [label=".verify/"]
     ".answer" ->  ".contracts"
+    ".bench" ->  ".contracts"
     ".checks" ->  ".contracts"
     ".corpus" ->  ".contracts"
     ".report" ->  ".contracts"

@@ -49,10 +49,12 @@ SLICES = (
     "verify",
 )
 PURE = (  # kinds that never import a driver; backends elsewhere are checked by the driver guard
+    "app.freeze",
     "app.run_record",
     "common",
     "engine.events",
     "features.annotate.agreement",
+    "features.bench.challenge",
     "features.bench.stats",
     "features.checks",
     "features.contracts",

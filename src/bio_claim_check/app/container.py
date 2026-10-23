@@ -13,11 +13,14 @@ cache in the configured mode, and a read-only replay needs no provider at all. F
 sits behind one `CallBudget` per command, inside the cache, and `record_run` wires the run record's file
 operations (`app.run_record` holds its logic). `build_live_run_ports` (S12a) wires a live or dev `run`:
 Europe PMC, the answerer and the LLM verifier share one cache and one budget (ADR 0019).
+`build_challenge_ports` and `current_judge` (S12b) wire the dev challenge run and the judge fingerprint
+of the code as installed (ADR 0020).
 Must not: hold logic. It builds objects, composes infrastructure with pure parsers, and normalises
 infrastructure errors into the domain's error types.
 """
 
 import hashlib
+import importlib.metadata
 import time
 from collections.abc import Callable, Generator, Iterable
 from contextlib import AbstractContextManager, ExitStack, contextmanager
@@ -28,8 +31,10 @@ from typing import Final
 import anthropic
 import httpx
 import openai
+from pydantic import JsonValue
 
 from bio_claim_check import __version__
+from bio_claim_check.app.freeze import JUDGE_FILES, JudgeInputs, judge_inputs
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import (
     EVENTS_DIR,
@@ -47,6 +52,7 @@ from bio_claim_check.app.run_record import (
 from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.answer_dev import DevAnswerPorts
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
+from bio_claim_check.app.usecases.challenge import ChallengePorts
 from bio_claim_check.app.usecases.retractions import (
     REPORT_FILE,
     RetractionCheck,
@@ -249,6 +255,16 @@ def publish_sheet(out: Path, split: CorpusSplit, kind: OverstatedReason, sheet: 
         raise OutputConflictError(str(err)) from None
     except OSError as err:
         raise OutputConflictError(f"cannot write the sheet under {out}: {err}") from None
+
+
+def publish_document(folder: Path, name: str, data: bytes) -> Path:
+    """Write a document once (challenge results, freeze records); different existing bytes are refused."""
+    try:
+        return publish_once(folder, name, data)
+    except PublishError as err:
+        raise OutputConflictError(str(err)) from None
+    except OSError as err:
+        raise OutputConflictError(f"cannot write {folder / name}: {err}") from None
 
 
 @contextmanager
@@ -634,3 +650,67 @@ def build_live_run_ports(
             _declared(VerifyLlmAgent.name, VerifyLlmAgent.prompt, verifier),
         )
         yield LiveRun(ports=ports, declared_llm=tuple(sorted(declared, key=lambda d: d.agent)))
+
+
+class JudgeReadError(BccError):
+    """A judge file is missing from the installed package."""
+
+    code = "app.judge_read"
+
+
+def _spec_json(spec: ModelSpec) -> dict[str, JsonValue]:
+    return spec.model_dump(mode="json", exclude={"price"})
+
+
+def current_judge(settings: Settings) -> JudgeInputs:
+    """The judge fingerprint of this installation with the configured answer and verifier models."""
+    roles = build_models(settings.model_copy(update={"cache_mode": CacheMode.READ_ONLY}), model_catalog())
+    try:
+        files = {name: read_package_bytes(*name.split("/")) for name in JUDGE_FILES}
+    except ReadError as err:
+        raise JudgeReadError(str(err)) from None
+    return judge_inputs(
+        files, importlib.metadata.version("rapidfuzz"), _spec_json(roles.answer), _spec_json(roles.verifier)
+    )
+
+
+@contextmanager
+def build_challenge_ports(
+    settings: Settings,
+    emitter: EventEmitter | None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    anthropic_http: anthropic.DefaultHttpxClient | None = None,
+    openai_http: openai.DefaultHttpxClient | None = None,
+) -> Generator[tuple[ChallengePorts, ModelSpec]]:
+    """Europe PMC and the LLM verifier through one cache in the configured mode, behind one budget.
+
+    A read-only replay builds no provider client. `transport`/`*_http` are for tests.
+    """
+    verifier = build_models(settings, model_catalog()).verifier
+    rules = default_rulepack_hashed()
+    with ExitStack() as stack:
+        cache = _cache(settings, stack)
+        source = _europe_pmc(settings, stack, cache, transport, sleep)
+        live: BaseLlmClient | None = None
+        if settings.cache_mode is not CacheMode.READ_ONLY:
+            clients = stack.enter_context(
+                build_llm_clients(
+                    settings,
+                    [verifier],
+                    sleep=sleep,
+                    emitter=emitter,
+                    openai_http=openai_http,
+                    anthropic_http=anthropic_http,
+                )
+            )
+            live = BudgetedLlmClient(clients[verifier.deployment], CallBudget(settings.max_live_llm_calls))
+        client = CachingLlmClient(live, cache, settings.cache_mode)
+        ports = ChallengePorts(
+            literature=source,
+            verifier=LlmVerifier(VerifyLlmAgent(client, verifier, emitter=emitter)),
+            rules=rules.pack,
+            emitter=emitter,
+        )
+        yield ports, verifier

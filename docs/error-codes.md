@@ -31,12 +31,15 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `answer.empty_pool` | `EmptyDevPoolError` | No paper of the question's dev pool came back usable (missing or edited since the build); nothing was answered |
 | `answer.invalid_claims` | `AnswerClaimsError` | An LLM answer has a claim with blank text, no cites, a duplicate cite or a malformed source id; refused, never repaired (I61) |
 | `app.dataset_read` | `DatasetReadError` | The dataset folder, or a file in it, cannot be read |
+| `app.judge_read` | `JudgeReadError` | A judge file (ADR 0020) is missing from the installed package |
 | `app.missing_provider` | `MissingProviderError` | A live LLM role has no provider settings |
 | `app.output_conflict` | `OutputConflictError` | An output file exists with different bytes, or cannot be written |
 | `app.unsupported_provider` | `UnsupportedProviderError` | A deployment whose provider has no adapter yet (Anthropic direct, Ollama) |
 | `cache.failed` | `CacheError` | The cache cannot be opened or written |
 | `cache.miss` | `CacheMissError` | Read-only cache mode and the key is absent |
 | `cache.write_failed` | `CacheWriteError` | A live response could not be stored in the cache; the attempt is recorded as unmeasured (ADR 0018) |
+| `challenge.input` | `ChallengeInputError` | The challenge set is malformed, or an item is not a sealed dev pair; nothing was fetched (I72) |
+| `challenge.pool` | `ChallengePoolError` | An item's source did not come back, with its sealed hash, in its dev pool |
 | `config.strict_yaml` | `StrictYamlError` | A YAML file is ambiguous (duplicate keys, merges, implicit types) |
 | `contracts.corpus_spec` | `CorpusSpecError` | A corpus spec cannot be loaded |
 | `contracts.rule_pack` | `RulePackError` | A rule pack cannot be loaded |
