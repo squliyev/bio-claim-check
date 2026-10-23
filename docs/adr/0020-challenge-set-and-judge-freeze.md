@@ -1,16 +1,16 @@
 # ADR 0020 — The verifier challenge set and the judge freeze
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-23
 - **Supersedes / Extends:** extends [ADR 0011](./0011-sieve-v2-and-sealed-dataset.md) (the test split is
   touched only under a frozen judge) and [ADR 0019](./0019-llm-verifier-and-live-run.md) (the verifier)
 - **Related:** [ADR 0008](./0008-citable-sources-medline-abstracts.md), [ADR 0003](./0003-structure-in-code-judgement-in-llm.md)
-- **Enforced by:** `tests/unit/features/test_challenge_score.py` · `tests/unit/app/test_challenge_usecase.py` · `tests/unit/app/test_freeze.py` · `tests/unit/app/test_cli_challenge.py` (the attestation and active-freeze tests follow in later S12b commits)
+- **Enforced by:** `tests/arch/test_challenge_attestation.py` (I72) · `tests/arch/test_active_freeze.py` (I73) · `tests/unit/app/test_corpus_audit.py::test_cli_test_split_is_closed_when_the_freeze_does_not_hold` (I74) · `tests/unit/features/test_challenge_score.py` · `tests/unit/app/test_freeze.py`
 
 ## Context
 
-This ADR was drafted in the same commit as the challenge set and pass rule, before any model saw the set.
-It becomes Accepted when the freeze lands.
+The draft of this ADR was committed with the challenge set and the pass rule, before any model saw the
+set (commit A of S12b). It was accepted when freeze v1 landed.
 
 S12a shipped the LLM verifier with untuned wording. Before anyone looks at the test split, we need three
 things:
@@ -55,8 +55,25 @@ Abstracts cannot be committed (ADR 0008), and CI has no cache and no keys, so CI
    byte for byte.
 7. **The freeze.** `freeze/v1.json` records the judge and result hashes. `app/freeze.py` pins its bytes,
    and an active pointer names it. A new freeze needs a new file, a new pin and an ADR.
-8. **The test audit export** requires the active freeze, recomputed. Its sheet header carries the freeze
-   hash, and `apply-audit` checks it. Dev is unchanged.
+8. **The test audit export** (`corpus audit-sheet --split test`) requires the active freeze, recomputed
+   (`active_freeze_sha256`). Its sheet header carries the seal and the freeze hash. `apply-audit` checks
+   both and stamps the freeze hash as `prompts_sha256`; `--prompts-sha256` is refused for test. Dev is
+   unchanged.
+
+   Each sheet lists only its own split's sources. Abstracts may come from any question's cached pool:
+   sources are split by cluster, not by question, and the replay keeps only the wanted ids.
+
+## Outcome (S12b)
+
+- **v1 baseline:** `claude-opus-4-8` with the untuned S12a prompt scored 15/16, with 0 unsafe passes and
+  0 failures. The rule was met. The only miss, ch04 (`not_in_source` → `overstated`), was flagged, not
+  passed.
+- **No tuning:** failure analysis of 31 natural dev pairs found no substantive false pass. The set ran
+  once; the recorded result is a byte-identical read-only replay.
+- **Negation:** all 4 `negated_supported` dev pairs were `claim_shares_negation`. The claim was itself
+  negative and correct, so these are safe false blocks. No rule change; this is a backlog item for a
+  later ADR.
+- **Freeze v1:** judge `6d999644…`, `freeze_sha256` `ee8c5ce8…`.
 
 ## Consequences
 

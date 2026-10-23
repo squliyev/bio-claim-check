@@ -7,12 +7,16 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 ## 1. Where things stand
 
-- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a.
+- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
+  S12b (tag `prompts-frozen-v1`).
   CI is green on `main`.
-- **Next session: S12b, verifier tuning on dev and the prompt freeze** (section 4).
-- Next free ids: invariant **I72**, ADR **0020**.
+- **Next: the maintainer's test-split audit, then S13 (trap generator)** (section 4).
+- Next free ids: invariant **I75**, ADR **0021**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
+- The judge is **frozen** (`freeze/v1.json`, ADR 0020). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
+  either model spec or `rapidfuzz` fails `tests/arch/test_active_freeze.py`. A new judge needs a new freeze
+  record, a new pin and an ADR.
 
 ## 2. Start checklist
 
@@ -37,27 +41,29 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S12b — verifier tuning and the prompt freeze
+## 4. Next: the test-split audit (maintainer), then S13 — the trap generator
 
-**Goal:** a dev smoke gold set that runs in CI, verifier and near-threshold tuning on dev sources only, the
-freeze record and test export (ADR 0011), and the tag `prompts-frozen-v1`.
+**Before S13 (maintainer, not an agent session):** the test-split eligibility audit and the unanswerable
+check. The test audit is gated on the active freeze (I74):
 
-**Bindings from earlier sessions (must hold):**
-- Dev-split sources only (`run --dev QUESTION_ID`, `dev_papers`); drop and count anything else.
-- A change to `VERIFY_PROMPT`, an answer prompt or the rule pack changes the run id (declared LLMs, I71);
-  a change to the negation rules bumps `NEGATION_RULES`.
-- The verifier sees only `VerifyPayload` (I69); keep the failure mapping of ADR 0019 (I70).
-- S12a live observation: on a metformin question the verifier said `supported` with a located quote, and
-  the pair still went to `needs_review`: the sentence-level negation detector (conservative by design) saw
-  "no effect was observed for insulin…" in the same sentence. Measure how often this happens on dev before
-  deciding whether a clause-level rule (a `NEGATION_RULES` bump) is worth it.
-- Claude's `max_output_tokens=8192` was kept: verifier replies were ~200 tokens; revisit if tuning
-  changes the output.
-- Money stays "unpriced" while `ModelSpec.price is None`; never 0.
+```bash
+uv run bio-claim-check corpus audit-sheet --kind <kind> --split test   # recomputes freeze v1, refuses if stale
+uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var/audit/test-<kind>.csv
+```
 
-**Exit:** the roadmap's S12b row; `make verify` and CI green.
+**S13 goal:** see the roadmap row (rule floor + model traps within eligibility, validity gate, audit
+sheet, parent pairing, structural leakage test).
 
-## 5. Engine contracts you build on (S08–S11)
+**Bindings from S12b (must hold):**
+- Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside
+  `JUDGE_FILES`. If S13 must touch one, plan a freeze v2 with its own challenge run and ADR.
+- The challenge set is a regression check, not accuracy. Never report its 15/16 as an accuracy figure.
+- Negation: `claim_shares_negation` false blocks are known (backlog C4). They are safe (`needs_review`).
+- Dev numbers stay exploratory; test numbers come only after `protocol-v1` (S15).
+
+**Exit:** the roadmap's S13 row; `make verify` and CI green.
+
+## 5. Engine contracts you build on (S08–S12b)
 
 - `engine/llm`: `LlmRequest`, `LlmResponse`, `Message`, `FinishReason`, `Usage`, `Price`, `Spend`,
   `cost()`, `ModelSpec`, `ModelCatalog`, `Provider`, `LlmCallError` (kinds: invalid output, truncated,
@@ -96,12 +102,16 @@ freeze record and test export (ADR 0011), and the tag `prompts-frozen-v1`.
   `answer_dev.py::dev_papers`; `BaseLiteratureSource.retraction_status`; `app/usecases/retractions.py`;
   `app/container.py::build_live_run_ports`. Commands: `run QUESTION`, `run --dev QUESTION_ID`,
   `retractions RUN_ID` (ADR 0019).
+- **S12b:** `features/bench/challenge.py` (`ChallengeItem`, `ChallengeOutcome`, `ChallengeScore`,
+  `score`); `app/freeze.py` (`JUDGE_FILES`, `JudgeInputs`, `FreezeRecord`, `FROZEN`, `ACTIVE_FREEZE`);
+  `app/usecases/challenge.py` (`run_challenge`, `attestation_problems`); `app/container.py::current_judge`,
+  `active_freeze_sha256`, `build_challenge_ports`; `corpus_audit` with `split`. Commands: `challenge run
+  [--record]`, `freeze write`, `corpus audit-sheet|apply-audit --split test` (ADR 0020).
 
 ## 6. Bindings for later sessions
 
-- **S12b:** see section 4. Tag `prompts-frozen-v1` only after the dev smoke gold set is green in CI.
 - **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
-  records the frozen prompts hash.
+  records the active `freeze_sha256` (computed, never typed).
 - **S17:** layered Streamlit UI (backlog B4).
 - **S15:** protocol hashes must equal `prompts-frozen-v1`, or each deviation is disclosed.
 - **S16/S19:** a pre-flight token estimate is a labelled heuristic range, never mixed with measured usage
@@ -130,5 +140,6 @@ uv run bio-claim-check run glp1-q1 --dev --mode strict   # live over the dev poo
 uv run bio-claim-check run "<question>"                   # live answer + LLM verifier, recorded
 uv run bio-claim-check retractions RUN_ID                 # re-check a live run's citations, uncached
 uv run bio-claim-check corpus verify
+uv run bio-claim-check challenge run                      # live; BCC_CACHE_MODE=read-only replays free
 gh run list --limit 3
 ```

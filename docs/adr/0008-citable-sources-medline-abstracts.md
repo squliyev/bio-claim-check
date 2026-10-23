@@ -79,3 +79,8 @@ also writes, so they cannot be the guarantee.
   citable papers. No `cursorMark` paging in S06.
 - **Follow-ups:** throttle for bulk callers (S07); retraction re-check for cited papers on every live
   run, because the cache freezes retraction status (ADR 0009, S12).
+
+> **Later reading (S12b):** [ADR 0020](./0020-challenge-set-and-judge-freeze.md) holds that a short claim
+> the author wrote about an abstract (≤ 30 words, not copied or closely paraphrased) is not abstract text.
+> It may be committed in the verifier challenge set. This is a narrow reading; no other abstract-derived
+> text is committed.

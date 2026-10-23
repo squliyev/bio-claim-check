@@ -55,7 +55,8 @@ pre-registered rule set: it was committed alone and tagged `prereg-corpus-v1` be
 - **Audit tooling (dev only for now).** `audit_order` is the public salted-hash order of ADR 0010;
   `parse_decisions` accepts exactly the first N rows, `confirm`/`reject`, and a reason for every
   rejection. Each `AuditRecord` carries the corpus seal and is published once. The **test** export is
-  not built until the prompt freeze exists (S12), and it will compute the prompts hash itself.
+  not built until the prompt freeze exists (S12), and it will compute the prompts hash itself. *(Done in
+  S12b: [ADR 0020](./0020-challenge-set-and-judge-freeze.md), I74.)*
 - **Dev pilot for the new kind, declared before the build:** the dev `prior_finding` candidates are
   judged against "own results do not establish the background statement"; precision below 60 % drops the kind from scoring (never a regex tweak), and the drop is
   disclosed. **Result:** 12/18 confirmed (67 %, Wilson 95 % CI 0.44–0.84) by one AI agent (single

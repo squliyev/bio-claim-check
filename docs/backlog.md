@@ -31,9 +31,9 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | Story | As a … I want … so that … | Status |
 |---|---|---|
 | B1 | As a user, I want cached Europe PMC retrieval, so that repeated runs make no network calls | ✅ |
-| B2 | As a scientist, I want a held-out test split sealed before any tuning, so that results are not tuned to the test | ✅ (S07b: sealed; test audit by the author after the S12b prompt freeze) |
+| B2 | As a scientist, I want a held-out test split sealed before any tuning, so that results are not tuned to the test | ✅ (S07b: sealed; S12b: freeze v1 and the gated test export, ADR 0020; the test audit itself is the author's, before S13) |
 | B2b | As a scientist, I want `surrogate_as_clinical` as a scored trap kind (biomarker or imaging result stated as a clinical benefit), so that the most common spin type in drug trials is covered | ⏸ (sieve precision too low in the consult, ~15 test candidates; S13 generates it as an unscored pitch example. Scoring it needs sieve v3 + a new ADR) |
-| B3 | As a user, I want `bio-claim-check run "<question>"` to give a per-claim trust report | ✅ (S12a, ADR 0019: live answer, one LLM verifier call per pair, recorded run; tuning and the prompt freeze in S12b) |
+| B3 | As a user, I want `bio-claim-check run "<question>"` to give a per-claim trust report | ✅ (S12a, ADR 0019: live answer, one LLM verifier call per pair, recorded run; S12b: no tuning needed, freeze v1) |
 | B4 | As a user, I want the S17 Streamlit UI layered as protocol → pure fold → render, so that the UI logic is tested offline without Streamlit | ⏳ (S17. Design note from S09: `app/ui/protocol.py` reads `events.jsonl` and artifacts through `app/events.parse_event`; `run_view.py` is a pure, total fold of events + artifacts into a `RunView`; `classify.py` splits the trace (stages, retries, repairs, usage) from the deliverable (verdict, quotes, disposition); `page.py` only renders and is the one `streamlit` importer, guarded by an import-linter contract. No streaming: the UI reads a finished run) |
 | B5 | As a scientist, I want the answer agent itself to answer in self-contained claims (S10 answers in that style and flags `dangling_reference` claims), so that every claim can be checked alone | ✅ (S10, ADR 0017: Strict and Over-eager agents, abstention, flag-only self-containment, invented citations, `answer dev` on the sealed dev pool) |
 | B6 | As a reviewer, I want a flagged dangling claim rewritten to stand alone with the original kept beside it (an audit trail), so that the rewrite is visible and reversible | ⏸ (S10 flags only, maintainer decision; a rewrite changes meaning) |
@@ -46,8 +46,9 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | C1 | As a scientist, I want planted traps with ground truth, so that I know what the verifier catches | ⏳ |
 | C2 | As a reviewer, I want simple baselines next to every verifier, so that I can see whether the LLM adds anything | ⏳ |
 | C3 | As a reviewer, I want a pre-registered protocol and paired, clustered statistics, so that the numbers are honest | ⏳ |
-| C4 | As a scientist, I want the negation detector's precision measured on labelled pairs, so that the share of correct null results sent to `needs_review` is known | ⏸ (needs labels, S18; S10's rule is conservative on purpose) |
+| C4 | As a scientist, I want the negation detector's precision measured on labelled pairs, so that the share of correct null results sent to `needs_review` is known | ⏸ (needs labels, S18; S10's rule is conservative on purpose. S12b dev: 4/4 `negated_supported` pairs were `claim_shares_negation`, i.e. a correct negative claim blocked; a fix needs its own ADR) |
 | C5 | As a scientist, I want to know whether Over-eager actually overstates on the answer model, so that the mode comparison measures something | ⏸ (S10 dev, author-read: gpt-6.1-sol kept hedging after one prompt revision; revisit at the proof checkpoint) |
+| C6 | As a reviewer, I want the verifier challenge set re-labelled by an independent human rater, so that its labels are not one person's call | ⏸ (S12b: one human rater plus an AI blind second rater, 16/16; not an expert panel, ADR 0020) |
 
 ## Feature D — Ship
 

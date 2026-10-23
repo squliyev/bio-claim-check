@@ -5,7 +5,8 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S12a done):** S01–S12a are done. Next is **S12b**, verifier tuning on dev and the prompt freeze.
+**Status (S12b done):** S01–S12b are done; tag `prompts-frozen-v1`. Next: the maintainer's test-split audit, then
+**S13** (trap generator).
 
 ## Product
 
@@ -86,7 +87,7 @@ can be contributed here as their own credited rule pack. No results from this re
 | S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | ✅ |
 | S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | ✅ |
 | S12a | LLM verifier (one isolated call per pair), failure mapping, model-family flag, first live `run` and `run --dev`, retraction re-check (ADR 0019) | ✅ |
-| S12b | Dev smoke gold set in CI, verifier and near-threshold tuning on dev, freeze record and test export (ADR 0011); tag `prompts-frozen-v1` | ⏳ next |
+| S12b | Verifier challenge set attested in CI, tuning on dev (none needed), freeze record and test export (ADR 0011, 0020); tag `prompts-frozen-v1` | ✅ |
 
 ### Phase C — Measurement
 

@@ -36,6 +36,14 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   the prompts hash, and its precision is labelled "author-confirmed, single rater".
 - **Prior finding:** the sieve rule for `background_as_result`: an early sentence reports prior evidence
   with an effect verb, and a later sentence reports this study's results.
+- **Challenge set:** `challenge/dev-v1.jsonl`, 16 curated dev (claim, source) items with expected labels.
+  It is a regression and sanity check of the verifier, not an accuracy estimate (ADR 0020).
+- **Judge fingerprint (`judge_sha256`):** the sha256 over the bytes of the files that decide a verdict
+  (prompts, rule pack, quote location, negation, disposition), the `rapidfuzz` version and both model
+  specs. Any edit, even to a docstring, makes a new judge.
+- **Prompt freeze:** `freeze/<name>.json`, which binds one judge fingerprint to the committed challenge
+  result. `app/freeze.py` pins its bytes and names the active one. A test-split audit records the active
+  `freeze_sha256` as its `prompts_sha256`. A dev audit's `prompts_sha256` is typed by the author.
 - **Split:** `dev` (for tuning prompts and rule packs) or `test` (sealed, for reported numbers only).
 - **Repeat:** one of several identical model requests made on purpose to measure instability. Its
   `repeat_idx` is part of the cache key, so repeats are distinct provider calls and replay keeps them
