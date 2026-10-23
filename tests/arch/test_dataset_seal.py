@@ -62,6 +62,17 @@ def test_no_test_ids_guard_scans_the_path() -> None:
     assert [(v.line, v.detail) for v in found] == [(0, "test PMID 31234567")]
 
 
+def test_a_planted_test_id_in_a_challenge_item_is_caught() -> None:
+    item = '{"id": "ch99", "question_id": "fx-statin-q1", "source_id": "MED:31234567"}'
+    found = check_no_test_ids(Path("challenge/dev-v1.jsonl"), item, test_pmids=PMIDS, test_question_ids=QIDS)
+    assert {v.detail for v in found} == {"test PMID 31234567", "test question id fx-statin-q1"}
+
+
+def test_the_challenge_files_are_scanned() -> None:
+    scanned = {p.relative_to(ROOT).as_posix() for p in _text_files()}
+    assert {"challenge/dev-v1.jsonl", "challenge/dev-v1.result.json"} <= scanned
+
+
 def _text_files() -> list[Path]:
     texts: list[Path] = []
     for path in repo_files(ROOT):

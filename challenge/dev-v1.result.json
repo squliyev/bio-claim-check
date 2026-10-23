@@ -1,0 +1,174 @@
+{
+  "challenge_sha256": "c7f129200e8012c36294d86486ff494ed2744d4ef2125d0bdb0abca2c65d52b2",
+  "judge_sha256": "6d9996445668fa466c6767f288e03c695847b4c99ef3d62bdf934e9f2c79f5d3",
+  "outcomes": [
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch01",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch02",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch03",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch04",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "certainty_inflation"
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch05",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch06",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch07",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "not_required",
+      "failure_kind": null,
+      "id": "ch08",
+      "label": "not_in_source",
+      "negation": "not_run",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch09",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch10",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch11",
+      "label": "contradicted",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "not_required",
+      "failure_kind": null,
+      "id": "ch12",
+      "label": "not_in_source",
+      "negation": "not_run",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch13",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch14",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "preclinical_to_clinical"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ch15",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "preclinical_to_clinical"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "not_required",
+      "failure_kind": null,
+      "id": "ch16",
+      "label": "not_in_source",
+      "negation": "not_run",
+      "reason": null
+    }
+  ],
+  "score": {
+    "agree": 15,
+    "failures_or_absent": 0,
+    "n": 16,
+    "near": 0,
+    "negated_supported": 0,
+    "passed": true,
+    "table": {
+      "contradicted": {
+        "flagged": 4
+      },
+      "not_in_source": {
+        "flagged": 4
+      },
+      "overstated": {
+        "flagged": 4
+      },
+      "supported": {
+        "passed": 4
+      }
+    },
+    "unsafe_passes": 0
+  },
+  "verifier": "claude-opus-4-8"
+}
