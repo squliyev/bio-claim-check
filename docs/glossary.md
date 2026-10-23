@@ -99,9 +99,9 @@ What code found when it looked for the model's quoted evidence in the cleaned ab
 
 | Value | Meaning |
 |---|---|
-| `not_run` | No negation check has run on this pair (the detector arrives in S10) |
-| `clear` | The located quote is not under a negation |
-| `negated` | The located quote sits under a negation, e.g. "no significant reduction" |
+| `not_run` | No evidence was located, so there is no span to check |
+| `clear` | No negation cue anywhere in the sentence(s) holding the located quote |
+| `negated` | A negation cue occurs in the sentence holding the quote, before, inside or after it, e.g. "no significant reduction". Conservative on purpose (ADR 0017) |
 
 ## Disposition
 
@@ -144,6 +144,7 @@ How an `overstated` claim goes beyond its source.
 | Value | Meaning |
 |---|---|
 | `invented_citation` | A claim cites a source that was not among the retrieved papers |
+| `dangling_reference` | A claim refers to something outside itself ("This drug …", "as noted above"), so the verifier cannot know what it is about. Flagged only; the claim is still verified |
 
 ## CacheMode
 

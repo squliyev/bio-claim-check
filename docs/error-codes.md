@@ -14,8 +14,8 @@ stays listed as retired.
 | 4 | `UPSTREAM` | The literature database (Europe PMC) failed |
 | 5 | `LOCAL_CACHE` | The cache file cannot be opened, read or written |
 | 6 | `OUTPUT` | An output file exists with different bytes or cannot be written; nothing is overwritten |
-| 7 | `DATASET` | The dataset folder is not intact (seal, hashes, splits, counts or audits) |
-| 8 | `PROVIDER` | An LLM provider call failed (`llm ping`; the error code is printed per deployment) |
+| 7 | `DATASET` | The dataset folder is not intact (seal, hashes, splits, counts or audits), or `answer dev` found no usable source of the dev pool |
+| 8 | `PROVIDER` | An LLM provider call failed or returned an unusable answer (`llm ping`, `answer dev`; the error code is printed) |
 
 ## Error codes
 
@@ -26,6 +26,9 @@ stable code. Which exit code a command uses for an error depends on the command 
 | Code | Class | Raised when |
 |---|---|---|
 | `agent.declaration` | `AgentDeclarationError` | An LLM agent class misdeclares `name`, `prompt` or `output`, or overrides `run` (a bug) |
+| `answer.dev_input` | `DevAnswerInputError` | `answer dev` refused: the dataset is not intact and sealed, or the question is unknown or not in the dev split; nothing was fetched (I64) |
+| `answer.empty_pool` | `EmptyDevPoolError` | No paper of the question's dev pool came back usable (missing or edited since the build); nothing was answered |
+| `answer.invalid_claims` | `AnswerClaimsError` | An LLM answer has a claim with blank text, no cites, a duplicate cite or a malformed source id; refused, never repaired (I61) |
 | `app.dataset_read` | `DatasetReadError` | The dataset folder, or a file in it, cannot be read |
 | `app.missing_provider` | `MissingProviderError` | A live LLM role has no provider settings |
 | `app.output_conflict` | `OutputConflictError` | An output file exists with different bytes, or cannot be written |
@@ -51,3 +54,4 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `prompts.render` | `PromptRenderError` | Template placeholders and variables differ |
 | `retrieval.failed` | `RetrievalError` | The literature database failed or sent a malformed response |
 | `retrieval.malformed_record` | `MalformedRecordError` | A record field has a type the API was not seen to return |
+| `verdict.negation_rules_mismatch` | `NegationRulesMismatchError` | A stored verdict was made under other negation rules; re-run it rather than re-score it (ADR 0017) |

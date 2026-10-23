@@ -146,6 +146,20 @@ def test_same_source_cited_by_two_claims_is_verified_twice() -> None:
     assert [(f.claim_id, f.source_id) for f in report.findings] == [("s1", "FAKE:99"), ("o4", "FAKE:99")]
 
 
+def test_dangling_findings_follow_the_invented_ones_and_the_claim_is_still_verified() -> None:
+    claims = (
+        Claim(id="s1", text="These findings show OS-912 reduced plaque.", cites=("FAKE:1",)),
+        Claim(id="o4", text="b", cites=("FAKE:1", "FAKE:99")),
+    )
+    spy = SpyVerifier()
+    report = run_question(_container(verifier=spy, answerer=FixedAnswerer(claims)), Q, AnswerMode.STRICT, k=4)
+    assert spy.calls == [("s1", "FAKE:1"), ("o4", "FAKE:1")]
+    assert [(f.kind.value, f.claim_id, f.source_id) for f in report.findings] == [
+        ("invented_citation", "o4", "FAKE:99"),
+        ("dangling_reference", "s1", None),
+    ]
+
+
 def test_zero_claims_gives_an_empty_report() -> None:
     report = run_question(_container(answerer=FixedAnswerer(())), Q, AnswerMode.STRICT, k=4)
     assert report.claims == ()

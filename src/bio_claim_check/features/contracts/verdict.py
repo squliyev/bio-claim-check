@@ -6,16 +6,17 @@ disposition or is impossible and raises. A Verdict keeps the LLM's judgement (`s
 code's evidence check (`evidence_status`) in separate fields; neither ever overwrites the other.
 
 `Verdict.finalise` is the trusted path: evidence status and span come from `locate_quote`, never from
-the LLM, and the negation result comes from a detector run on the located span, never from a stored
-value. `Verdict.verify_against` re-derives all three from the abstract, so a replayed or hand-edited
-verdict with a forged span or negation result is rejected. Python cannot make construction
-unforgeable; a guard test keeps `Verdict(` calls inside this module.
+the LLM, and the negation result comes from the one detector (`common.negation`, S10) run on the located
+span, never from a stored value. `Verdict.verify_against` re-derives all three from the abstract, so a
+replayed or hand-edited verdict with a forged span or negation result is rejected; a verdict made under
+other negation rules is rejected with its own error rather than silently re-scored (ADR 0017). Python
+cannot make construction unforgeable; a guard test keeps `Verdict(` calls inside this module.
 
 Must not: perform I/O, call an LLM, or carry reproducibility metadata (that is the run manifest's job).
 No LLM is involved in this module.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Annotated, ClassVar, Self, cast
 
 from pydantic import (
@@ -28,7 +29,9 @@ from pydantic import (
     model_validator,
 )
 
+from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import NonBlankStr, ValidatedModel
+from bio_claim_check.common.negation import NEGATION_RULES, is_negated
 from bio_claim_check.common.text import CleanedText, Span, locate_quote, near_match
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import (
@@ -87,8 +90,10 @@ def disposition(label: Label, status: EvidenceStatus, negation: NegationCheck) -
         ) from None
 
 
-NegationDetector = Callable[[Span, CleanedText], NegationCheck]
-"""Decides whether a located span sits under a negation (S10). Re-run on replay, so it must be pure."""
+class NegationRulesMismatchError(BccError, ValueError):
+    """A stored verdict was made under other negation rules; re-run it, never re-score it in place."""
+
+    code = "verdict.negation_rules_mismatch"
 
 
 class Claim(ValidatedModel):
@@ -153,10 +158,10 @@ def _evidence(quote: str | None, abstract: CleanedText) -> tuple[EvidenceStatus,
     return EvidenceStatus.ABSENT, None
 
 
-def _negation(span: Span | None, abstract: CleanedText, detector: NegationDetector | None) -> NegationCheck:
-    if span is None or detector is None:
+def _negation(span: Span | None, abstract: CleanedText) -> NegationCheck:
+    if span is None:
         return NegationCheck.NOT_RUN
-    return detector(span, abstract)
+    return NegationCheck.NEGATED if is_negated(span, abstract) else NegationCheck.CLEAR
 
 
 class Verdict(ValidatedModel):
@@ -173,6 +178,7 @@ class Verdict(ValidatedModel):
     evidence_status: EvidenceStatus
     evidence_span: StrictSpan | None
     negation: NegationCheck
+    negation_rules: Annotated[int, Field(strict=True, ge=1)]
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -196,14 +202,13 @@ class Verdict(ValidatedModel):
         source_id: SourceId,
         out: VerifierOutput,
         abstract: CleanedText,
-        negation_detector: NegationDetector | None = None,
     ) -> Self:
-        """Turn validated verifier output into a verdict; code, not the LLM, decides the evidence status.
+        """Turn validated verifier output into a verdict; code, not the LLM, decides evidence and negation.
 
-        Without a detector, or when the evidence is not located, negation stays NOT_RUN (never PASSED).
+        Negation is NOT_RUN only when the evidence is not located (nothing to check).
         """
         status, span = _evidence(out.evidence, abstract)
-        negation = _negation(span, abstract, negation_detector)
+        negation = _negation(span, abstract)
         return cls(
             claim_id=claim_id,
             source_id=source_id,
@@ -214,16 +219,19 @@ class Verdict(ValidatedModel):
             evidence_status=status,
             evidence_span=span,
             negation=negation,
+            negation_rules=NEGATION_RULES,
         )
 
-    def verify_against(
-        self, abstract: CleanedText, negation_detector: NegationDetector | None = None
-    ) -> None:
+    def verify_against(self, abstract: CleanedText) -> None:
         """Raise ValueError unless the stored evidence status, span and negation re-derive from this abstract.
 
-        A stored NOT_RUN is always accepted (it can only lower the disposition). A stored CLEAR or NEGATED
-        must be reproduced by `negation_detector`; without one it cannot be checked, so it is rejected.
+        Raises `NegationRulesMismatchError` first if the verdict was made under other negation rules.
         """
+        if self.negation_rules != NEGATION_RULES:
+            raise NegationRulesMismatchError(
+                f"verdict {self.claim_id}/{self.source_id}: made under negation rules "
+                f"v{self.negation_rules}, this build has v{NEGATION_RULES}; re-run it"
+            )
         status, span = _evidence(self.evidence_quote, abstract)
         if (status, span) != (self.evidence_status, self.evidence_span):
             raise ValueError(
@@ -231,14 +239,7 @@ class Verdict(ValidatedModel):
                 f"({self.evidence_status.value}, {self.evidence_span}) does not match the abstract "
                 f"({status.value}, {span})"
             )
-        if self.negation is NegationCheck.NOT_RUN:
-            return
-        if negation_detector is None:
-            raise ValueError(
-                f"verdict {self.claim_id}/{self.source_id}: negation={self.negation.value} "
-                "cannot be re-checked without the negation detector"
-            )
-        if (again := _negation(span, abstract, negation_detector)) is not self.negation:
+        if (again := _negation(span, abstract)) is not self.negation:
             raise ValueError(
                 f"verdict {self.claim_id}/{self.source_id}: stored negation={self.negation.value} "
                 f"does not match the abstract ({again.value})"

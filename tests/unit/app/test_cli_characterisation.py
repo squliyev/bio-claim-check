@@ -2,7 +2,8 @@
 
 S05b moves YAML parsing, file reading and report publishing between rings. These tests pin every
 byte the user sees, so that refactor cannot change a message, an exit code or a run id. The run ids
-changed once, deliberately, in S06: `Paper` gained seven defaulted fields (goldens diffed key by key).
+changed deliberately twice: in S06 (`Paper` gained seven defaulted fields) and in S10 (the negation check
+runs, so the note went and strict shows `passed`). Both times the goldens were diffed key by key.
 """
 
 from pathlib import Path
@@ -95,36 +96,32 @@ def test_validate_default_pack_is_byte_exact() -> None:
     )
 
 
-NOTE = (
-    "note: Negation check not run (arrives in S10): supported claims with located evidence are "
-    "needs_review, never passed.\n"
-)
-
-
 @pytest.mark.parametrize(
-    ("mode", "run_id", "pairs", "claims"),
+    ("mode", "run_id", "pairs", "claims", "findings"),
     [
         (
             "strict",
-            "b04294ccd9a244cb",
-            "0, needs_review=3, failed=0, flagged=1",
-            "0, needs_review=2, failed=0, flagged=1",
+            "f58468dae9bf910f",
+            "2, needs_review=1, failed=0, flagged=1",
+            "1, needs_review=1, failed=0, flagged=1",
+            "invented_citation=0, dangling_reference=0",
         ),
         (
             "over_eager",
-            "b3c8cbab00ca88fd",
+            "d7067c2641f6f408",
             "0, needs_review=1, failed=1, flagged=4",
             "0, needs_review=1, failed=1, flagged=4",
+            "invented_citation=1, dangling_reference=0",
         ),
     ],
 )
 def test_fake_run_stdout_is_byte_exact(
-    tmp_path: Path, mode: str, run_id: str, pairs: str, claims: str
+    tmp_path: Path, mode: str, run_id: str, pairs: str, claims: str, findings: str
 ) -> None:
     result = runner.invoke(app, ["run", "Q?", "--fake", "--mode", mode, "--out", str(tmp_path)])
     assert result.exit_code == 0
     assert result.stdout == (
         "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result.\n"
         f"report: {tmp_path / run_id / 'report.json'}\n"
-        f"pairs: passed={pairs}\nclaims: passed={claims}\n" + NOTE
+        f"pairs: passed={pairs}\nclaims: passed={claims}\nfindings: {findings}\n"
     )

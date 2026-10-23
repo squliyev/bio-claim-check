@@ -19,7 +19,7 @@ from bio_claim_check.features.contracts.verdict import (
     VerifierOutput,
 )
 from bio_claim_check.features.report.build import build_report
-from bio_claim_check.features.report.models import FAKE_NOTICE, NEGATION_NOTE, Report
+from bio_claim_check.features.report.models import FAKE_NOTICE, Report
 
 pytestmark = pytest.mark.unit
 
@@ -65,14 +65,14 @@ def _dump() -> dict[str, Any]:
 def test_counts_are_derived_over_pairs_and_claims() -> None:
     report = _report()
     pairs = {
-        Disposition.PASSED: 0,
-        Disposition.NEEDS_REVIEW: 2,
+        Disposition.PASSED: 2,
+        Disposition.NEEDS_REVIEW: 0,
         Disposition.FAILED: 1,
         Disposition.FLAGGED: 1,
     }
     claims = {
-        Disposition.PASSED: 0,
-        Disposition.NEEDS_REVIEW: 1,
+        Disposition.PASSED: 1,
+        Disposition.NEEDS_REVIEW: 0,
         Disposition.FAILED: 1,
         Disposition.FLAGGED: 1,
     }
@@ -86,15 +86,13 @@ def test_two_claims_citing_one_source_are_two_pairs() -> None:
     assert pairs.count(("c1", "FAKE:1")) == pairs.count(("c3", "FAKE:1")) == 1
 
 
-def test_fake_report_carries_its_notice_and_the_negation_note() -> None:
-    dumped = _dump()
-    assert (dumped["notice"], dumped["notes"]) == (FAKE_NOTICE, [NEGATION_NOTE])
+def test_fake_report_carries_its_notice() -> None:
+    assert _dump()["notice"] == FAKE_NOTICE
 
 
-def test_no_negation_note_without_verdicts() -> None:
+def test_an_abstaining_answer_counts_nothing() -> None:
     answer = Answer(question="q", mode=AnswerMode.STRICT, claims=())
     report = build_report(provenance="fake", answer=answer, papers=(), findings=(), outcomes={})
-    assert report.notes == ()
     assert set(report.pair_counts.values()) == set(report.claim_counts.values()) == {0}
 
 
@@ -117,7 +115,6 @@ def test_json_round_trip_keeps_outcome_types() -> None:
         ("claims", 0, "disposition"),
         ("claims", 1, "pairs", 0, "disposition"),
         ("notice",),
-        ("notes",),
     ],
     ids=str,
 )
@@ -126,7 +123,7 @@ def test_a_forged_derived_value_is_rejected(path: tuple[str | int, ...]) -> None
     node: Any = dumped
     for key in path[:-1]:
         node = node[key]
-    forged: dict[str, object] = {"pair_counts": 99, "claim_counts": 99, "notice": "A RESULT", "notes": []}
+    forged: dict[str, object] = {"pair_counts": 99, "claim_counts": 99, "notice": "A RESULT"}
     node[path[-1]] = forged.get(str(path[-1]), "passed")
     with pytest.raises(ValidationError, match="does not match the value derived"):
         Report.model_validate(dumped)
@@ -139,7 +136,7 @@ def test_a_dump_without_derived_values_still_loads() -> None:
     assert Report.model_validate(dumped) == _report()
 
 
-DERIVED = ("notice", "notes", "pair_counts", "claim_counts")
+DERIVED = ("notice", "pair_counts", "claim_counts")
 
 
 def _mutated(**changes: Any) -> dict[str, Any]:
@@ -228,3 +225,9 @@ def test_build_rejects_missing_or_extra_outcomes() -> None:
             findings=FINDINGS,
             outcomes=_outcomes() | {"zz": {}},
         )
+
+
+def test_rejects_a_finding_about_an_unknown_claim() -> None:
+    stray = Finding(kind=FindingKind.INVENTED_CITATION, claim_id="c9", source_id="FAKE:9", detail="x")
+    with pytest.raises(ValidationError, match="findings: name claims that are not in the report"):
+        Report.model_validate(_mutated(findings=[stray.model_dump(mode="json")]))

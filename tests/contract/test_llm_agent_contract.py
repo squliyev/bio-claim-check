@@ -15,6 +15,10 @@ from bio_claim_check.engine.agent.ping_llm_agent import PingLlmAgent
 from bio_claim_check.engine.events.emitter import EventEmitter
 from bio_claim_check.engine.events.in_memory_event_sink import InMemoryEventSink
 from bio_claim_check.engine.llm.scripted_llm_client import ScriptedLlmClient
+from bio_claim_check.features.answer.answer_models import AnswerPayload
+from bio_claim_check.features.answer.over_eager_answer_llm_agent import OverEagerAnswerLlmAgent
+from bio_claim_check.features.answer.strict_answer_llm_agent import StrictAnswerLlmAgent
+from bio_claim_check.features.retrieval.in_memory_literature_source import FAKE_CORPUS
 from tests.support.events import stepping_clock
 from tests.support.llm import response, spec
 
@@ -22,7 +26,7 @@ pytestmark = pytest.mark.contract
 
 type AnyAgent = BaseLlmAgent[Any, Any]
 
-IMPLEMENTATIONS: tuple[type[AnyAgent], ...] = (PingLlmAgent,)
+IMPLEMENTATIONS: tuple[type[AnyAgent], ...] = (PingLlmAgent, StrictAnswerLlmAgent, OverEagerAnswerLlmAgent)
 
 
 @dataclass(frozen=True)
@@ -31,7 +35,15 @@ class AgentCase:
     reply: str  # JSON the agent's output model accepts
 
 
-CASES: dict[type[AnyAgent], AgentCase] = {PingLlmAgent: AgentCase(payload=None, reply='{"ok": true}')}
+ANSWER = AgentCase(
+    payload=AnswerPayload(question="Does OS-912 work?", papers=FAKE_CORPUS),
+    reply='{"claims": [{"text": "OS-912 reduced plaque in mice.", "cites": ["FAKE:1"]}]}',
+)
+CASES: dict[type[AnyAgent], AgentCase] = {
+    PingLlmAgent: AgentCase(payload=None, reply='{"ok": true}'),
+    StrictAnswerLlmAgent: ANSWER,
+    OverEagerAnswerLlmAgent: ANSWER,
+}
 
 
 @pytest.fixture(params=IMPLEMENTATIONS, ids=lambda c: c.__name__)

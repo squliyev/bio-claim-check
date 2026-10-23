@@ -27,7 +27,8 @@
               "start": 66
             },
             "evidence_status": "located",
-            "negation": "not_run",
+            "negation": "clear",
+            "negation_rules": 2,
             "overstated_reason": "preclinical_to_clinical",
             "reason": "A plaque result in mice is stated as a cognitive benefit in patients.",
             "semantic_label": "overstated",
@@ -57,7 +58,8 @@
               "start": 20
             },
             "evidence_status": "located",
-            "negation": "not_run",
+            "negation": "clear",
+            "negation_rules": 2,
             "overstated_reason": "correlation_as_causation",
             "reason": "An observational association is stated as prevention.",
             "semantic_label": "overstated",
@@ -85,6 +87,7 @@
             "evidence_span": null,
             "evidence_status": "absent",
             "negation": "not_run",
+            "negation_rules": 2,
             "overstated_reason": null,
             "reason": "A fabricated quote: the abstract reports no significant change.",
             "semantic_label": "supported",
@@ -112,6 +115,7 @@
             "evidence_span": null,
             "evidence_status": "near",
             "negation": "not_run",
+            "negation_rules": 2,
             "overstated_reason": null,
             "reason": "A misquoted number: the abstract says 38%.",
             "semantic_label": "supported",
@@ -171,9 +175,6 @@
     }
   ],
   "mode": "over_eager",
-  "notes": [
-    "Negation check not run (arrives in S10): supported claims with located evidence are needs_review, never passed."
-  ],
   "notice": "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result.",
   "pair_counts": {
     "failed": 1,

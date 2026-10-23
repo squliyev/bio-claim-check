@@ -31,7 +31,7 @@ class EvidenceStatus(StrEnum):
 
 
 class NegationCheck(StrEnum):
-    """Whether a located quote sits under a negation ("no significant reduction"). Detector arrives in S10."""
+    """Whether a located quote's sentence holds a negation (`common.negation`). NOT_RUN: nothing located."""
 
     NOT_RUN = "not_run"
     CLEAR = "clear"

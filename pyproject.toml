@@ -142,6 +142,7 @@ source_modules = [
     "bio_claim_check.engine.cache",
     "bio_claim_check.engine.events",
     "bio_claim_check.features.annotate.agreement",
+    "bio_claim_check.features.answer.answer_models",
     "bio_claim_check.features.answer.base_answerer",
     "bio_claim_check.features.answer.scripted_answerer",
     "bio_claim_check.features.bench.stats",

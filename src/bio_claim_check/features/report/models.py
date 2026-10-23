@@ -4,8 +4,8 @@ Why: the report is the artifact a reader trusts, so it stores only inputs (paper
 findings) and derives every disposition and count. Derived values appear in the JSON, but on load they
 must equal what the model recomputes, so a stored number can never be forged or stale (invariant I20).
 Integrity is checked on construction, not only by the use case: every verdict is re-located against its
-paper's cleaned abstract, every invented-citation finding matches a not-retrieved pair, and a fake
-report may only cite `FAKE:` sources (I19).
+paper's cleaned abstract, every invented-citation finding matches a not-retrieved pair, every finding
+names a claim in the report, and a fake report may only cite `FAKE:` sources (I19).
 Must not: change or re-judge an outcome, or compute rates (counts only; denominators are explicit).
 
 No LLM is involved in this module.
@@ -19,7 +19,7 @@ from pydantic_core import to_jsonable_python
 
 from bio_claim_check.common.models import NonBlankStr, ValidatedModel
 from bio_claim_check.features.contracts.finding import Finding, FindingKind
-from bio_claim_check.features.contracts.labels import AnswerMode, Disposition, NegationCheck
+from bio_claim_check.features.contracts.labels import AnswerMode, Disposition
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.verdict import (
     CitationNotRetrieved,
@@ -31,10 +31,6 @@ from bio_claim_check.features.contracts.verdict import (
 )
 
 FAKE_NOTICE: Final = "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result."
-NEGATION_NOTE: Final = (
-    "Negation check not run (arrives in S10): supported claims with located evidence are needs_review, "
-    "never passed."
-)
 FAKE_PREFIX: Final = "FAKE:"
 
 type Provenance = Literal["fake"]
@@ -169,6 +165,8 @@ class Report(_Derived):
                 raise ValueError(f"{result.source_id} has a verifier outcome but was not retrieved")
             elif isinstance(result, Verdict):
                 result.verify_against(paper.abstract)
+        if unknown := sorted({f.claim_id for f in self.findings} - set(claim_ids)):
+            raise ValueError(f"findings: name claims that are not in the report: {unknown}")
         invented = [
             (f.claim_id, f.source_id) for f in self.findings if f.kind is FindingKind.INVENTED_CITATION
         ]
@@ -185,12 +183,6 @@ class Report(_Derived):
     def notice(self) -> str:
         """Printed first and stored in the artifact, so a fake report can never pass for a result."""
         return FAKE_NOTICE
-
-    @computed_field
-    @property
-    def notes(self) -> tuple[str, ...]:
-        verdicts = [p.result for c in self.claims for p in c.pairs if isinstance(p.result, Verdict)]
-        return (NEGATION_NOTE,) if any(v.negation is NegationCheck.NOT_RUN for v in verdicts) else ()
 
     @computed_field
     @property

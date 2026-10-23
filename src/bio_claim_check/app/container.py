@@ -8,6 +8,8 @@ User-Agent and timeouts, and the SQLite cache under `var_dir` in the configured 
 `build_models` (S08) resolves each LLM role through the catalogue and checks its provider settings;
 `build_llm_clients` (S09) builds the live provider backends: one SDK client per Foundry API, SDK retries
 off (our `transport_policy` retries), URLs derived from the one Foundry resource endpoint.
+`build_dev_answer_ports` (S10) wires the live dev answer flow: Europe PMC and the answer model share one
+cache in the configured mode, and a read-only replay needs no provider at all.
 Must not: hold logic. It builds objects, composes infrastructure with pure parsers, and normalises
 infrastructure errors into the domain's error types.
 """
@@ -25,6 +27,7 @@ import openai
 
 from bio_claim_check import __version__
 from bio_claim_check.app.settings import ENV_PREFIX, Settings
+from bio_claim_check.app.usecases.answer_dev import DevAnswerPorts
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.run import RunPorts
 from bio_claim_check.common.errors import BccError
@@ -34,12 +37,17 @@ from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
 from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.engine.events.in_memory_event_sink import InMemoryEventSink
 from bio_claim_check.engine.events.logging_event_sink import LoggingEventSink
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
+from bio_claim_check.engine.llm.caching_llm_client import CachingLlmClient
 from bio_claim_check.engine.llm.model_spec import ModelCatalog, ModelSpec, Provider
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
+from bio_claim_check.features.answer.llm_answerer import LlmAnswerer
+from bio_claim_check.features.answer.over_eager_answer_llm_agent import OverEagerAnswerLlmAgent
 from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
+from bio_claim_check.features.answer.strict_answer_llm_agent import StrictAnswerLlmAgent
 from bio_claim_check.features.contracts.corpus import (
     CorpusSpec,
     CorpusSpecError,
@@ -240,16 +248,25 @@ def build_retrieval(
     `transport` is for tests (an `httpx.MockTransport`); production uses httpx's default.
     """
     with ExitStack() as stack:
-        cache = _cache(settings, stack)
-        client = stack.enter_context(
-            httpx.Client(
-                transport=transport,
-                timeout=HTTP_TIMEOUT,
-                headers={"User-Agent": user_agent(settings)},
-                follow_redirects=False,
-            )
+        yield _europe_pmc(settings, stack, _cache(settings, stack), transport, sleep)
+
+
+def _europe_pmc(
+    settings: Settings,
+    stack: ExitStack,
+    cache: BaseCache,
+    transport: httpx.BaseTransport | None,
+    sleep: Callable[[float], None],
+) -> EuropePmcLiteratureSource:
+    client = stack.enter_context(
+        httpx.Client(
+            transport=transport,
+            timeout=HTTP_TIMEOUT,
+            headers={"User-Agent": user_agent(settings)},
+            follow_redirects=False,
         )
-        yield EuropePmcLiteratureSource(client, cache, settings.cache_mode, sleep=sleep)
+    )
+    return EuropePmcLiteratureSource(client, cache, settings.cache_mode, sleep=sleep)
 
 
 class MissingProviderError(BccError):
@@ -307,6 +324,12 @@ class UnsupportedProviderError(BccError):
 def logging_emitter() -> EventEmitter:
     """Pipeline events to the log (stderr), stamped by the wall clock: the live default until S11's jsonl."""
     return EventEmitter(LoggingEventSink(), SystemClock())
+
+
+def recording_emitter() -> tuple[EventEmitter, InMemoryEventSink]:
+    """Events kept in memory for a command's own summary (`answer dev`'s usage), stamped by the wall clock."""
+    sink = InMemoryEventSink()
+    return EventEmitter(sink, SystemClock()), sink
 
 
 def foundry_urls(base_url: str) -> tuple[str, str]:
@@ -371,3 +394,40 @@ def build_llm_clients(
             stack.callback(claude.close)
             backends[Provider.FOUNDRY_ANTHROPIC] = AnthropicLlmClient(claude, sleep=sleep, emitter=emitter)
         yield {spec.deployment: backends[spec.provider] for spec in specs}
+
+
+def build_answerer(client: BaseLlmClient, spec: ModelSpec, emitter: EventEmitter | None) -> LlmAnswerer:
+    """The LLM answerer: the Strict and the Over-eager agent on one client and one model spec."""
+    return LlmAnswerer(
+        StrictAnswerLlmAgent(client, spec, emitter=emitter),
+        OverEagerAnswerLlmAgent(client, spec, emitter=emitter),
+    )
+
+
+@contextmanager
+def build_dev_answer_ports(
+    settings: Settings,
+    spec: ModelSpec,
+    emitter: EventEmitter | None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    openai_http: openai.DefaultHttpxClient | None = None,
+) -> Generator[DevAnswerPorts]:
+    """Europe PMC and the answer model through one cache in the configured mode.
+
+    A read-only replay builds no provider client (it never reaches one). Otherwise the provider client
+    is built as for `llm ping`, so missing settings raise before any call. `transport`/`openai_http` are
+    for tests.
+    """
+    with ExitStack() as stack:
+        cache = _cache(settings, stack)
+        source = _europe_pmc(settings, stack, cache, transport, sleep)
+        live: BaseLlmClient | None = None
+        if settings.cache_mode is not CacheMode.READ_ONLY:
+            clients = stack.enter_context(
+                build_llm_clients(settings, [spec], sleep=sleep, emitter=emitter, openai_http=openai_http)
+            )
+            live = clients[spec.deployment]
+        client = CachingLlmClient(live, cache, settings.cache_mode)
+        yield DevAnswerPorts(source=source, answerer=build_answerer(client, spec, emitter))

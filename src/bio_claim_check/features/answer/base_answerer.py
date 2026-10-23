@@ -1,8 +1,8 @@
 """[RING:features/answer] The port the answer slice owns: something that answers from given papers.
 
 Why: the use case depends on this base; implementations subclass it and sit beside it, named by
-backend (ADR 0007): `scripted_answerer` now, the LLM answerer in S10. Replaced the structural
-`ports.Answerer` Protocol in S05b.
+backend (ADR 0007): `scripted_answerer` for the fake run and `llm_answerer` (S10) for live answers.
+Replaced the structural `ports.Answerer` Protocol in S05b.
 Must not: hold any implementation, or import one.
 
 No LLM is involved in this module.

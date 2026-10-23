@@ -7,10 +7,10 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 ## 1. Where things stand
 
-- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09.
+- Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10.
   CI is green on `main`.
-- **Next session: S10, the answer agent** (section 4).
-- Next free ids: invariant **I61**, ADR **0017**.
+- **Next session: S11, the run record** (section 4).
+- Next free ids: invariant **I65**, ADR **0018**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12) may use **dev-split sources only**.
 
@@ -28,37 +28,31 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
 1. Plan: code sketches + an ASCII tree of every `+`/`~`/`−` file with `# because …`; decisions, tests,
    invariants, ADRs, out of scope, exit.
 2. Ask the maintainer about real decisions.
-3. Exactly **one plan review** (problem hunting only), then your own triage per finding and a balance pass.
+3. Exactly **one plan review** by a paranoid-senior-engineer reviewer listing every suggestion (no cap),
+   then your own triage per finding (adopt / adapt / reject as over-engineering) and a balance pass.
 4. Implement; characterisation tests first when refactoring; `make verify` green.
-5. Exactly **one implementation review**, triaged the same way. Record both triage tables in the dev-log.
+5. Exactly **one implementation review** by the same reviewer brief, uncapped, triaged the same way.
+   Record both triage tables in the dev-log.
 6. Docs: ADR + index row, invariants, glossary, [error-codes.md](error-codes.md), backlog, dev-log,
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S10 — answer agent
+## 4. Next: S11 — the run record
 
-**Goal:** the first real feature agent. Given a question and retrieved sources, it writes an answer of
-self-contained claims, each citing sources, in two modes (Strict / Over-eager), with stated non-scope and
-abstention; plus the negation and self-containment checks and invented-citation detection.
-
-**Planned shape (to be confirmed in the plan):**
-- `features/answer/answer_llm_agent.py`: `AnswerLlmAgent(BaseLlmAgent[…, …])` declaring `name`, `prompt`,
-  `output` and `variables` (ADR 0015). It joins `tests/contract/test_llm_agent_contract.py`.
-- `features/answer/llm_answerer.py`: implements `BaseAnswerer` by **composing** the agent (no multiple
-  inheritance); `app` wires the client, spec, emitter and processors.
-- The answer prompt lives under the prompts package with a template hash; dev-split sources only.
+**Goal:** a run leaves a durable, replayable record: the `events.jsonl` sink and run-level events on the
+S09 vocabulary, a run manifest, budgets, and an append-only ledger built from `LlmCallFinished` that
+includes failed and cancelled runs; a read-only replay is byte-identical.
 
 **Bindings from earlier sessions (must hold):**
-- Every LLM agent subclasses `BaseLlmAgent` and passes the agent contract suite (I57).
-- Output models must be **strict-schema compatible** (every property required, no extra keys), or the
-  OpenAI codec refuses the request (ADR 0014).
-- Claude output is forced tool use without thinking; do not set `reasoning_effort` on Claude.
-- Events never carry content (I59); new domain events join `app/events.py`'s union (I58).
-- Tune on dev-split sources only; drop and count anything else.
-- Kimi has no adapter yet (backlog A10): do not assign it a live role.
+- Events never carry content (I59); new event types join `app/events.py`'s union (I58).
+- A stopped or failed run is never recorded as success; a failed call's spend survives every exception
+  path (backlog A14).
+- Replayed calls are cache hits and never count as spend (S10's `answer dev` already splits live and
+  cache-hit usage; reuse that split, do not invent a second one).
+- Money stays "unpriced" while `ModelSpec.price is None`; never 0.
 
-**Exit:** a Strict and an Over-eager answer run live on dev sources through the agent; offline tests on
-scripted clients; `make verify` and CI green.
+**Exit:** a fake and a dev answer run each write `events.jsonl`, a manifest and a ledger row; replay in
+`read-only` mode reproduces the artifacts byte for byte; `make verify` and CI green.
 
 ## 5. Engine contracts you build on (S08, S08b, S09)
 
@@ -78,14 +72,19 @@ scripted clients; `make verify` and CI green.
   `engine/events` (`PipelineEvent`, stage and LLM events, `EventEmitter`, in-memory and logging sinks);
   `app/events.py` (`AnyPipelineEvent`, `parse_event`); `common/base_clock.py` + scripted and system
   clocks. `bio-claim-check llm ping` checks deployments live; `make record-llm` re-records fixtures.
+- **S10:** `features/answer/` (`StrictAnswerLlmAgent`, `OverEagerAnswerLlmAgent`, `LlmAnswerer`,
+  `answer_models.to_claims`, `answer_prompts`), `features/checks/self_containment.py`,
+  `common/negation.py` (`NEGATION_RULES`, stored in every `Verdict`), `features/corpus/dev_pool.py`,
+  `app/usecases/answer_dev.py`, `app/container.py::build_dev_answer_ports`;
+  `bio-claim-check answer dev QUESTION_ID --mode strict|over_eager` (ADR 0017).
 - `common/canonical_json.py` for every hash and written JSON; `common/errors.py::BccError` with a stable
   `code` for every deliberate error (listed in [error-codes.md](error-codes.md)); logging goes to stderr
   through a redacting filter.
 
 ## 6. Bindings for later sessions
 
-- **S10/S12:** use dev-split sources only; drop and count anything else. Negation check (S10) turns
-  supported + located into `passed` only when clear. S12 maps LLM failure kinds to `FailureKind`, adds
+- **S12:** use dev-split sources only; drop and count anything else (reuse `dev_pool`). A change to the
+  negation rules bumps `NEGATION_RULES` (stored verdicts then refuse to load). S12 maps LLM failure kinds to `FailureKind`, adds
   context isolation (a sentinel in the payload never appears in the request), re-checks retraction of
   every cited paper uncached, and ends with the tag `prompts-frozen-v1`.
 - **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
@@ -117,6 +116,7 @@ make schemas         # regenerate schemas/ after contract changes
 make live            # opt-in live tests (needs BCC_CONTACT_EMAIL and BCC_FOUNDRY__*)
 make record-llm      # re-record scrubbed LLM fixtures (live, fictional text)
 uv run bio-claim-check llm ping
+uv run bio-claim-check answer dev glp1-q1 --mode strict   # live; BCC_CACHE_MODE=read-only replays free
 uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake
 uv run bio-claim-check corpus verify
 gh run list --limit 3

@@ -4,7 +4,8 @@ Why: this is the product flow: retrieve → answer → deterministic checks → 
 pair → report. It distrusts every port: a source that returns too many or duplicate papers, an answer
 that does not echo its question, or a verdict whose evidence does not re-locate in its abstract raises
 instead of becoming a number. A cite outside the retrieved set is never sent to the verifier; it is
-recorded as CitationNotRetrieved (FLAGGED) and as a finding (invariant I18).
+recorded as CitationNotRetrieved (FLAGGED) and as a finding (invariant I18). Claims that refer to
+something outside themselves are flagged after the invented citations; they are still verified.
 Must not: do I/O (the caller writes the report), catch errors to keep going, or import the container,
 the driving adapters or infrastructure: it receives its ports in `RunPorts` (S05b).
 """
@@ -13,6 +14,7 @@ from dataclasses import dataclass
 
 from bio_claim_check.features.answer.base_answerer import BaseAnswerer
 from bio_claim_check.features.checks.citations import invented_citations
+from bio_claim_check.features.checks.self_containment import dangling_claims
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import AnswerMode
 from bio_claim_check.features.contracts.rulepack import RulePack
@@ -70,6 +72,6 @@ def run_question(c: RunPorts, question: str, mode: AnswerMode, *, k: int) -> Rep
         provenance=c.provenance,
         answer=answer,
         papers=papers,
-        findings=invented_citations(answer, by_id.keys()),
+        findings=(*invented_citations(answer, by_id.keys()), *dangling_claims(answer)),
         outcomes=outcomes,
     )

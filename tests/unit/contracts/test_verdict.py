@@ -5,6 +5,7 @@ import itertools
 import pytest
 from pydantic import ValidationError
 
+from bio_claim_check.common.negation import NEGATION_RULES
 from bio_claim_check.common.text import CleanedText, Span, clean_abstract, locate_quote
 from bio_claim_check.features.contracts.labels import (
     Disposition,
@@ -14,6 +15,7 @@ from bio_claim_check.features.contracts.labels import (
     OverstatedReason,
 )
 from bio_claim_check.features.contracts.verdict import (
+    NegationRulesMismatchError,
     Verdict,
     VerifierOutput,
     disposition,
@@ -26,6 +28,9 @@ ABSTRACT = clean_abstract(
     "compared with vehicle controls."
 )
 QUOTE = "metformin treatment significantly reduced tumour growth"
+NEGATED_ABSTRACT = clean_abstract(
+    "It is not true that metformin treatment significantly reduced tumour growth. Mice were weighed."
+)
 
 
 def _fields(label: Label, status: EvidenceStatus, negation: NegationCheck) -> dict[str, object]:
@@ -40,6 +45,7 @@ def _fields(label: Label, status: EvidenceStatus, negation: NegationCheck) -> di
         "evidence_status": status,
         "evidence_span": Span(0, 4) if status is EvidenceStatus.LOCATED else None,
         "negation": negation,
+        "negation_rules": NEGATION_RULES,
     }
 
 
@@ -126,34 +132,16 @@ def test_span_offsets_from_json_must_be_ints(bad: object) -> None:
         Verdict.model_validate(base | {"evidence_span": {"start": 0, "end": bad}})
 
 
-def _clear(span: Span, text: CleanedText) -> NegationCheck:
-    assert span.of(text)
-    return NegationCheck.CLEAR
-
-
-def _negated(span: Span, text: CleanedText) -> NegationCheck:
-    return NegationCheck.NEGATED
-
-
-def _never(span: Span, text: CleanedText) -> NegationCheck:
-    raise AssertionError("the detector must only run on a located span")
-
-
 def _out(label: Label, evidence: str | None, reason: OverstatedReason | None = None) -> VerifierOutput:
     return VerifierOutput(label=label, overstated_reason=reason, evidence=evidence, reason="because")
 
 
 def test_finalise_locates_the_quote_in_code() -> None:
-    v = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT, _clear)
+    v = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT)
     assert v.evidence_status is EvidenceStatus.LOCATED
     assert v.evidence_span == locate_quote(QUOTE, ABSTRACT)
+    assert (v.negation, v.negation_rules) == (NegationCheck.CLEAR, NEGATION_RULES)
     assert v.disposition is Disposition.PASSED
-
-
-def test_finalise_without_a_negation_check_needs_review() -> None:
-    v = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT)
-    assert v.negation is NegationCheck.NOT_RUN
-    assert v.disposition is Disposition.NEEDS_REVIEW
 
 
 @pytest.mark.parametrize(
@@ -200,12 +188,13 @@ def test_finalise_carries_the_overstated_reason() -> None:
 @pytest.mark.parametrize("quote", ["nothing like it", None])
 def test_finalise_runs_the_detector_only_on_a_located_span(quote: str | None) -> None:
     label = Label.NOT_IN_SOURCE if quote is None else Label.SUPPORTED
-    v = Verdict.finalise("c1", "MED:1", _out(label, quote), ABSTRACT, _never)
+    v = Verdict.finalise("c1", "MED:1", _out(label, quote), NEGATED_ABSTRACT)
     assert v.negation is NegationCheck.NOT_RUN
 
 
-def test_finalise_records_a_negated_span_for_review() -> None:
-    v = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT, _negated)
+def test_a_supported_quote_from_a_negated_sentence_needs_review() -> None:
+    """The verifier said supported, but the sentence around the quote says the opposite (L18)."""
+    v = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), NEGATED_ABSTRACT)
     assert (v.negation, v.disposition) == (NegationCheck.NEGATED, Disposition.NEEDS_REVIEW)
 
 
@@ -236,24 +225,38 @@ def test_verify_against_accepts_its_own_abstract() -> None:
     ],
 )
 def test_verify_against_rejects_forged_spans(forged: dict[str, object]) -> None:
-    honest = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT, _clear)
-    honest.verify_against(ABSTRACT, _clear)
-    forgery = Verdict.model_validate(honest.model_dump() | forged)
-    with pytest.raises(ValueError, match=r"stored evidence .* does not match the abstract"):
-        forgery.verify_against(ABSTRACT, _clear)
-
-
-def test_a_stored_negation_result_must_be_reproduced() -> None:
     honest = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT)
     honest.verify_against(ABSTRACT)
-    honest.verify_against(ABSTRACT, _negated)  # NOT_RUN can only lower the disposition
-    forgery = Verdict.model_validate(honest.model_dump() | {"negation": "clear"})
-    assert forgery.disposition is Disposition.PASSED
-    with pytest.raises(ValueError, match="negation=clear cannot be re-checked"):
+    forgery = Verdict.model_validate(honest.model_dump() | forged)
+    with pytest.raises(ValueError, match=r"stored evidence .* does not match the abstract"):
         forgery.verify_against(ABSTRACT)
-    with pytest.raises(ValueError, match="stored negation=clear does not match the abstract"):
-        forgery.verify_against(ABSTRACT, _negated)
-    forgery.verify_against(ABSTRACT, _clear)  # an honest detector agreeing is the only way to PASSED
+
+
+@pytest.mark.parametrize("stored", ["clear", "not_run"])
+def test_a_stored_negation_result_must_be_reproduced(stored: str) -> None:
+    """Forging NEGATED to CLEAR would fake a PASSED; a located NOT_RUN is stale. Both are rejected."""
+    honest = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), NEGATED_ABSTRACT)
+    honest.verify_against(NEGATED_ABSTRACT)
+    forgery = Verdict.model_validate(honest.model_dump() | {"negation": stored})
+    with pytest.raises(ValueError, match=f"stored negation={stored} does not match the abstract"):
+        forgery.verify_against(NEGATED_ABSTRACT)
+
+
+@pytest.mark.parametrize("rules", [NEGATION_RULES - 1 or 99, NEGATION_RULES + 1])
+def test_a_verdict_made_under_other_negation_rules_is_rejected(rules: int) -> None:
+    """A rule change never silently re-scores a stored verdict (ADR 0017)."""
+    honest = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT)
+    other = Verdict.model_validate(honest.model_dump() | {"negation_rules": rules})
+    with pytest.raises(NegationRulesMismatchError, match="re-run it") as caught:
+        other.verify_against(ABSTRACT)
+    assert caught.value.code == "verdict.negation_rules_mismatch"
+
+
+def test_a_verdict_without_its_negation_rules_does_not_load() -> None:
+    honest = Verdict.finalise("c1", "MED:1", _out(Label.SUPPORTED, QUOTE), ABSTRACT)
+    old = {k: v for k, v in honest.model_dump().items() if k != "negation_rules"}
+    with pytest.raises(ValidationError, match="negation_rules"):
+        Verdict.model_validate(old)
 
 
 def test_verify_against_rejects_a_different_abstract() -> None:

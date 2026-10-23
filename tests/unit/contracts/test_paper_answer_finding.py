@@ -89,6 +89,26 @@ def test_finding_requires_detail() -> None:
         Finding(kind=FindingKind.INVENTED_CITATION, claim_id="c1", source_id="FAKE:9", detail=" ")
 
 
+@pytest.mark.parametrize(
+    ("kind", "source_id", "ok"),
+    [
+        (FindingKind.INVENTED_CITATION, "FAKE:9", True),
+        (FindingKind.INVENTED_CITATION, None, False),
+        (FindingKind.DANGLING_REFERENCE, None, True),
+        (FindingKind.DANGLING_REFERENCE, "FAKE:9", False),
+    ],
+)
+def test_only_a_citation_finding_names_a_source(kind: FindingKind, source_id: str | None, ok: bool) -> None:
+    def make() -> Finding:
+        return Finding(kind=kind, claim_id="c1", source_id=source_id, detail="d")
+
+    if ok:
+        assert make().source_id == source_id
+    else:
+        with pytest.raises(ValidationError, match=f"a {kind.value} finding"):
+            make()
+
+
 def test_citation_not_retrieved_is_flagged() -> None:
     assert CitationNotRetrieved(claim_id="c1", source_id="FAKE:9").disposition is Disposition.FLAGGED
 

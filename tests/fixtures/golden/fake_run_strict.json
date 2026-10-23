@@ -2,8 +2,8 @@
   "claim_counts": {
     "failed": 0,
     "flagged": 1,
-    "needs_review": 2,
-    "passed": 0
+    "needs_review": 1,
+    "passed": 1
   },
   "claims": [
     {
@@ -14,10 +14,10 @@
         "id": "s1",
         "text": "OS-912 reduced amyloid plaque load in APP/PS1 mice."
       },
-      "disposition": "needs_review",
+      "disposition": "passed",
       "pairs": [
         {
-          "disposition": "needs_review",
+          "disposition": "passed",
           "outcome": "verdict",
           "verdict": {
             "claim_id": "s1",
@@ -27,7 +27,8 @@
               "start": 83
             },
             "evidence_status": "located",
-            "negation": "not_run",
+            "negation": "clear",
+            "negation_rules": 2,
             "overstated_reason": null,
             "reason": "The mouse result is stated.",
             "semantic_label": "supported",
@@ -48,7 +49,7 @@
       "disposition": "flagged",
       "pairs": [
         {
-          "disposition": "needs_review",
+          "disposition": "passed",
           "outcome": "verdict",
           "verdict": {
             "claim_id": "s2",
@@ -58,7 +59,8 @@
               "start": 20
             },
             "evidence_status": "located",
-            "negation": "not_run",
+            "negation": "clear",
+            "negation_rules": 2,
             "overstated_reason": null,
             "reason": "The association is stated as an association.",
             "semantic_label": "supported",
@@ -74,6 +76,7 @@
             "evidence_span": null,
             "evidence_status": "not_required",
             "negation": "not_run",
+            "negation_rules": 2,
             "overstated_reason": null,
             "reason": "The review does not mention OS-912 or dementia incidence.",
             "semantic_label": "not_in_source",
@@ -103,7 +106,8 @@
               "start": 44
             },
             "evidence_status": "located",
-            "negation": "not_run",
+            "negation": "negated",
+            "negation_rules": 2,
             "overstated_reason": null,
             "reason": "The null result is stated.",
             "semantic_label": "supported",
@@ -115,15 +119,12 @@
   ],
   "findings": [],
   "mode": "strict",
-  "notes": [
-    "Negation check not run (arrives in S10): supported claims with located evidence are needs_review, never passed."
-  ],
   "notice": "FAKE RUN: fictional papers, scripted answer and verdicts. Not a result.",
   "pair_counts": {
     "failed": 0,
     "flagged": 1,
-    "needs_review": 3,
-    "passed": 0
+    "needs_review": 1,
+    "passed": 2
   },
   "papers": [
     {

@@ -26,17 +26,20 @@ Q = "Does OS-912 slow cognitive decline?"
 GOLDEN = ROOT / "tests" / "fixtures" / "golden"
 
 # Hand-computed from the scripts in features/answer/scripted_answerer.py and
-# features/verify/scripted_verifier.py (see the S05 dev-log).
+# features/verify/scripted_verifier.py (see the S05 dev-log). Since S10 the negation check runs: the
+# s1/FAKE:1 and s2/FAKE:3 sentences carry no cue (passed), the s3/FAKE:2 quote holds "did not" (review).
 EXPECTED_COUNTS = {
     AnswerMode.STRICT: {
-        "pair_counts": {"passed": 0, "needs_review": 3, "failed": 0, "flagged": 1},
-        "claim_counts": {"passed": 0, "needs_review": 2, "failed": 0, "flagged": 1},
+        "pair_counts": {"passed": 2, "needs_review": 1, "failed": 0, "flagged": 1},
+        "claim_counts": {"passed": 1, "needs_review": 1, "failed": 0, "flagged": 1},
     },
     AnswerMode.OVER_EAGER: {
         "pair_counts": {"passed": 0, "needs_review": 1, "failed": 1, "flagged": 4},
         "claim_counts": {"passed": 0, "needs_review": 1, "failed": 1, "flagged": 4},
     },
 }
+
+EXPECTED_PASSED = {AnswerMode.STRICT: ["s1"], AnswerMode.OVER_EAGER: []}
 
 
 def _run(out: Path, *args: str) -> tuple[str, Path]:
@@ -62,7 +65,8 @@ def test_fake_run_matches_golden_and_hand_counts(
     assert report["notice"] == FAKE_NOTICE
     assert stdout.splitlines()[0] == FAKE_NOTICE
     assert f"report: {path}" in stdout
-    assert '"passed"' not in json.dumps([c["disposition"] for c in report["claims"]])
+    passed = [c["claim"]["id"] for c in report["claims"] if c["disposition"] == "passed"]
+    assert passed == EXPECTED_PASSED[mode]
 
 
 def test_a_second_run_is_byte_identical(tmp_path: Path) -> None:

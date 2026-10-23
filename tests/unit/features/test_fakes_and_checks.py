@@ -45,8 +45,8 @@ def test_scripted_answer_echoes_question_and_mode(mode: AnswerMode) -> None:
 
 
 EXPECTED = {
-    ("s1", "FAKE:1"): (Disposition.NEEDS_REVIEW, EvidenceStatus.LOCATED),
-    ("s2", "FAKE:3"): (Disposition.NEEDS_REVIEW, EvidenceStatus.LOCATED),
+    ("s1", "FAKE:1"): (Disposition.PASSED, EvidenceStatus.LOCATED),
+    ("s2", "FAKE:3"): (Disposition.PASSED, EvidenceStatus.LOCATED),
     ("s2", "FAKE:4"): (Disposition.FLAGGED, EvidenceStatus.NOT_REQUIRED),
     ("s3", "FAKE:2"): (Disposition.NEEDS_REVIEW, EvidenceStatus.LOCATED),
     ("o1", "FAKE:1"): (Disposition.FLAGGED, EvidenceStatus.LOCATED),

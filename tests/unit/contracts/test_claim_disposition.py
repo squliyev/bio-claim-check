@@ -5,8 +5,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 from pydantic import BaseModel, ValidationError
 
-from bio_claim_check.common.text import CleanedText, Span, clean_abstract
-from bio_claim_check.features.contracts.labels import Disposition, FailureKind, Label, NegationCheck
+from bio_claim_check.common.text import clean_abstract
+from bio_claim_check.features.contracts.labels import Disposition, FailureKind, Label
 from bio_claim_check.features.contracts.verdict import (
     Claim,
     Verdict,
@@ -18,19 +18,16 @@ from bio_claim_check.features.contracts.verdict import (
 pytestmark = pytest.mark.unit
 
 ABSTRACT = clean_abstract("Metformin reduced tumour growth in mice.")
-
-
-def _clear(span: Span, text: CleanedText) -> NegationCheck:
-    return NegationCheck.CLEAR
+NEGATED_ABSTRACT = clean_abstract("Metformin reduced tumour growth in mice but not in rats.")
 
 
 def _verdict(source: str, want: Disposition, claim: str = "c1") -> Verdict | VerifierFailure:
     if want is Disposition.FAILED:
         return VerifierFailure(claim_id=claim, source_id=source, kind=FailureKind.PROVIDER_ERROR)
     label = Label.CONTRADICTED if want is Disposition.FLAGGED else Label.SUPPORTED
-    detector = _clear if want is Disposition.PASSED else None
+    abstract = NEGATED_ABSTRACT if want is Disposition.NEEDS_REVIEW else ABSTRACT
     out = VerifierOutput(label=label, overstated_reason=None, evidence="reduced tumour growth", reason="r")
-    verdict = Verdict.finalise(claim, source, out, ABSTRACT, detector)
+    verdict = Verdict.finalise(claim, source, out, abstract)
     assert verdict.disposition is want
     return verdict
 

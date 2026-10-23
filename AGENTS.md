@@ -60,6 +60,11 @@ before speed.
   a row in `docs/adr/README.md`.
 - A new invariant needs a row in `docs/invariants.md`, with its guard and test.
 - At the end of a work session, update `docs/backlog.md` and write `docs/dev-log/Sxx.md`.
+- Each session has one plan review and one implementation review, both by the same reviewer brief: a
+  paranoid senior engineer, read-only, hunting for bugs, hidden failure paths, rule and ADR breaches and
+  dishonest measurement. The reviewer lists **every** suggestion, uncapped. The author decides each one:
+  adopt, adapt (a minimal version) or reject as over-engineering, with a one-line reason. Both tables go
+  in the dev-log.
 - Every session or feature plan includes code sketches of new interfaces and key functions, and an ASCII
   tree of every file it creates (`+`), changes (`~`) or deletes (`−`), each with `# because …`. Skip a part
   only when it does not apply (for example, a docs-only plan has no code sketches), and say so.

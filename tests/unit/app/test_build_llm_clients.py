@@ -4,6 +4,7 @@ The tests read the backends' `_sdk` through `Any` on purpose: the wiring itself 
 """
 
 import json
+from pathlib import Path
 from typing import Any
 
 import anthropic
@@ -18,14 +19,17 @@ from bio_claim_check.app.container import (
     LLM_TIMEOUT_S,
     MissingProviderError,
     UnsupportedProviderError,
+    build_dev_answer_ports,
     build_llm_clients,
     foundry_urls,
 )
 from bio_claim_check.app.models import model_catalog
+from bio_claim_check.engine.cache.policy import CacheMissError, CacheMode
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
 from bio_claim_check.engine.llm.errors import LlmProviderError
 from bio_claim_check.engine.llm.model_spec import ModelSpec, Provider
 from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
+from bio_claim_check.features.answer.llm_answerer import LlmAnswerer
 
 pytestmark = pytest.mark.unit
 
@@ -124,3 +128,20 @@ def test_no_specs_build_nothing_and_need_no_settings() -> None:
 def test_pinned_versions_and_the_claude_budget() -> None:
     assert GPT.model_version == "2026-09-29"
     assert CLAUDE.params == {"max_output_tokens": 8192}
+
+
+def test_dev_answer_ports_replay_read_only_without_any_provider(tmp_path: Path) -> None:
+    settings = make_settings(cache_mode=CacheMode.READ_ONLY, var_dir=tmp_path)
+    with build_dev_answer_ports(settings, GPT, None) as ports:
+        assert isinstance(ports.answerer, LlmAnswerer)
+        with pytest.raises(CacheMissError):
+            ports.source.search("anything", limit=1)
+
+
+def test_dev_answer_ports_need_foundry_settings_outside_read_only(tmp_path: Path) -> None:
+    settings = make_settings(cache_mode=CacheMode.READ_WRITE, var_dir=tmp_path)
+    with (
+        pytest.raises(MissingProviderError, match=r"gpt-6\.1-sol"),
+        build_dev_answer_ports(settings, GPT, None),
+    ):
+        pass

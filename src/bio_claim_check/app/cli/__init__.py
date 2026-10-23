@@ -6,6 +6,7 @@ infrastructure only through ``app.container`` (contract ``driving-adapters-use-t
 """
 
 import re
+from collections import Counter
 from collections.abc import Sequence
 from datetime import date
 from enum import IntEnum
@@ -21,6 +22,7 @@ from bio_claim_check.app.container import (
     MissingProviderError,
     OutputConflictError,
     UnsupportedProviderError,
+    build_dev_answer_ports,
     build_fake_run_ports,
     build_llm_clients,
     build_replay,
@@ -35,11 +37,19 @@ from bio_claim_check.app.container import (
     publish_report,
     publish_sheet,
     read_dataset,
+    recording_emitter,
     write_seal,
 )
 from bio_claim_check.app.logging_setup import configure_logging
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.settings import Settings, load_settings
+from bio_claim_check.app.usecases.answer_dev import (
+    DevAnswer,
+    DevAnswerInputError,
+    EmptyDevPoolError,
+    answer_dev,
+    tally_calls,
+)
 from bio_claim_check.app.usecases.build_corpus import PoolConflictError, build_corpus
 from bio_claim_check.app.usecases.corpus_audit import (
     AUDIT_SPLIT,
@@ -50,8 +60,19 @@ from bio_claim_check.app.usecases.corpus_audit import (
 from bio_claim_check.app.usecases.llm_ping import PingResult, ping
 from bio_claim_check.app.usecases.run import run_question
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
+from bio_claim_check.engine.events.pipeline_event import PipelineEvent
+from bio_claim_check.engine.llm.errors import (
+    LlmCallError,
+    LlmPromptFilteredError,
+    LlmProviderError,
+    LlmRequestError,
+    LlmTransportError,
+    LlmUnexpectedResponseError,
+)
 from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
+from bio_claim_check.features.answer.answer_models import AnswerClaimsError
 from bio_claim_check.features.contracts.corpus import CorpusManifest, CorpusSpec, CorpusSpecError
+from bio_claim_check.features.contracts.finding import FindingKind
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
@@ -72,8 +93,8 @@ class ExitCode(IntEnum):
     UPSTREAM = 4  # the literature database failed
     LOCAL_CACHE = 5  # the cache file cannot be opened, read or written
     OUTPUT = 6  # an output file exists with different bytes or cannot be written (nothing is overwritten)
-    DATASET = 7  # the dataset folder is not intact (seal, hashes, splits, counts or audits)
-    PROVIDER = 8  # an LLM provider call failed (see the error code printed per deployment)
+    DATASET = 7  # the dataset is not intact (seal, hashes, splits, counts, audits), or a dev pool is empty
+    PROVIDER = 8  # an LLM call failed or returned an unusable answer (its error code is printed)
 
 
 _ISO_DAY = re.compile(r"\d{4}-\d{2}-\d{2}")  # date.fromisoformat also takes 20250115 and 2025-W03-3
@@ -105,6 +126,7 @@ def main(
 
 
 EnvFile = Annotated[Path, typer.Option(help="Dotenv file to read in addition to the environment.")]
+DatasetDir = Annotated[Path, typer.Option("--dataset", help="Dataset folder holding corpus.yaml.")]
 
 
 def _settings(env_file: Path) -> Settings:
@@ -192,8 +214,9 @@ def run(
     typer.echo(f"report: {path}")
     for name, counts in (("pairs", report.pair_counts), ("claims", report.claim_counts)):
         typer.echo(f"{name}: " + ", ".join(f"{d.value}={n}" for d, n in counts.items()))
-    for note in report.notes:
-        typer.echo(f"note: {note}")
+    # Claim-level findings are not folded into the dispositions above, so they are always shown beside them.
+    kinds = Counter(f.kind for f in report.findings)
+    typer.echo("findings: " + ", ".join(f"{kind.value}={kinds[kind]}" for kind in FindingKind))
 
 
 @app.command("retrieve")
@@ -266,6 +289,85 @@ def _print_ping(result: PingResult) -> None:
     )
 
 
+answer_app = typer.Typer(help="Answer dev questions live, to tune the prompts (S10).", no_args_is_help=True)
+app.add_typer(answer_app, name="answer")
+
+
+@answer_app.command("dev")
+def answer_dev_command(
+    question_id: Annotated[str, typer.Argument(help="A dev question id from the sealed dataset.")],
+    mode: Annotated[AnswerMode, typer.Option(help="How the answering agent behaves.")] = AnswerMode.STRICT,
+    k: Annotated[int, typer.Option("--k", min=1, help="Maximum number of dev papers to answer from.")] = 8,
+    dataset: DatasetDir = Path("datasets"),
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Answer one dev question from its sealed dev pool and run the deterministic checks. Costs tokens."""
+    settings = _settings(env_file)
+    files, spec = _dataset(dataset)
+    if problems := dataset_problems(files, spec):
+        _print_problems(f"{dataset} is not intact", problems)
+        raise typer.Exit(code=ExitCode.DATASET)
+    emitter, events = recording_emitter()
+    try:
+        model = model_catalog().lookup(settings.answer_model)
+        with build_dev_answer_ports(settings, model, emitter) as ports:
+            result = answer_dev(ports, files, spec, question_id, mode, k=k)
+    except DevAnswerInputError as err:
+        _print_problems("Cannot answer", err.problems)
+        raise typer.Exit(code=ExitCode.INPUT) from None
+    except (UnknownDeploymentError, MissingProviderError, UnsupportedProviderError) as err:
+        _fail(ExitCode.INPUT, str(err))
+    except EmptyDevPoolError as err:
+        _fail(ExitCode.DATASET, str(err))
+    except CacheMissError:
+        _fail(ExitCode.CACHE_MISS, "not in the cache and BCC_CACHE_MODE=read-only; run once with read-write")
+    except RetrievalError as err:
+        _fail(ExitCode.UPSTREAM, f"retrieval failed: {err}")
+    except CacheError as err:
+        _fail(ExitCode.LOCAL_CACHE, f"cache problem: {err}")
+    except (
+        LlmCallError,
+        LlmTransportError,
+        LlmProviderError,
+        LlmPromptFilteredError,
+        LlmRequestError,
+        LlmUnexpectedResponseError,
+        AnswerClaimsError,
+    ) as err:
+        _fail(ExitCode.PROVIDER, f"{err.code}: {err}")
+    finally:
+        _print_usage(events.events)
+    _print_dev_answer(result, k)
+
+
+def _print_dev_answer(result: DevAnswer, k: int) -> None:
+    pool = result.pool
+    dropped = ", ".join(f"{reason.value}={n}" for reason, n in pool.dropped.items()) or "none"
+    typer.echo(
+        f"{result.question.id} ({result.answer.mode.value}): {len(pool.papers)} paper(s); dropped: {dropped}"
+    )
+    if pool.usable < k:
+        typer.echo(f"warning: only {pool.usable} usable dev paper(s), fewer than k={k}", err=True)
+    if not result.answer.claims:
+        typer.echo("abstained: no claims")
+    for claim in result.answer.claims:
+        typer.echo(f"  {claim.id} [{', '.join(claim.cites)}] {claim.text}")
+    typer.echo(f"findings: {len(result.findings)}")
+    for finding in result.findings:
+        typer.echo(f"  {finding.kind.value} {finding.claim_id}: {finding.detail}")
+
+
+def _print_usage(events: Sequence[PipelineEvent]) -> None:
+    tally = tally_calls(events)
+    typer.echo(
+        f"llm calls: live={tally.live_calls} cache_hit={tally.cached_calls} failed={tally.failed_calls}; "
+        f"live tokens in={tally.input_tokens} out={tally.output_tokens} "
+        f"reasoning={tally.reasoning_tokens} (unreported on {tally.reasoning_unreported} call(s)); "
+        "failed calls may be billed, usage unknown; money: unpriced",
+        err=True,
+    )
+
+
 corpus_app = typer.Typer(help="Build the evaluation corpus (ADR 0010).", no_args_is_help=True)
 app.add_typer(corpus_app, name="corpus")
 
@@ -328,9 +430,6 @@ def build_corpus_command(
     typer.echo("candidates (domain, split, kind: n):")
     for c in manifest.candidate_counts:
         typer.echo(f"  {c.domain} {c.split.value} {c.kind.value}: {c.n}")
-
-
-DatasetDir = Annotated[Path, typer.Option("--dataset", help="Dataset folder holding corpus.yaml.")]
 
 
 def _dataset(folder: Path) -> tuple[dict[str, bytes], CorpusSpec]:

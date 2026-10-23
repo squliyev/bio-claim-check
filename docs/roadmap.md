@@ -5,7 +5,7 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S09 done):** S01–S09 are done. Next is **S10**, the answer agent.
+**Status (S10 done):** S01–S10 are done. Next is **S11**, the run record (events, manifest, ledger).
 
 ## Product
 
@@ -46,13 +46,15 @@ can be contributed here as their own credited rule pack. No results from this re
    - an ASCII tree of every file created (`+`), changed (`~`) or deleted (`−`), each with `# because …`;
    - a decisions table, edge-case tests, new invariants and ADRs, out of scope and exit criteria.
 2. **Ask** the maintainer about real decisions; never guess.
-3. **One plan review** by a reviewer whose only brief is to hunt for problems. The author triages each
-   finding (adopt, adapt or reject, with a one-line reason), then does a balance pass that cuts anything
-   whose cost exceeds the risk it removes.
+3. **One plan review** by a reviewer whose only brief is to hunt for problems: a paranoid senior
+   engineer, read-only, looking for bugs, hidden failure paths, rule and ADR breaches and dishonest
+   measurement. The reviewer lists **every** suggestion, with no cap. The author triages each one (adopt,
+   adapt to a minimal version, or reject as over-engineering, with a one-line reason), then does a
+   balance pass that cuts anything whose cost exceeds the risk it removes.
 4. **Implement** in the planned order (characterisation tests first when refactoring). `make verify`
    must be green.
-5. **One implementation review** of the actual diff, triaged the same way. Fixes are verified by
-   `make verify` and targeted tests, not re-reviewed.
+5. **One implementation review** of the actual diff by the same reviewer brief, uncapped, triaged the
+   same way. Fixes are verified by `make verify` and targeted tests, not re-reviewed.
 6. **Docs:** ADRs and their index row, invariants, glossary, error codes, backlog, `docs/dev-log/Sxx.md`
    with both triage tables, `make graph` / `make schemas` when imports or contracts change.
 7. **IP and secret scans** clean, commit, push, CI green.
@@ -81,8 +83,8 @@ can be contributed here as their own credited rule pack. No results from this re
 | S08 | LLM engine core: runner, processors, one repair, cache key with repeat index and model identity, honest cost | ✅ |
 | S08b | Retrofit: canonical JSON, typed errors with codes, exit-code enum, redacted logging, unreported reasoning = `None` | ✅ |
 | S09 | Provider adapters, the LLM agent base and the pipeline event vocabulary (see below) | ✅ |
-| S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | ⏳ next |
-| S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | |
+| S10 | Answer agent (Strict / Over-eager, stated non-scope, abstention), negation and self-containment checks, invented citations; tuned on dev sources only | ✅ |
+| S11 | `events.jsonl` sink and run events (the vocabulary and emitters landed in S09), manifest, budgets, append-only ledger (incl. failed and cancelled runs), byte-identical replay | ⏳ next |
 | S12 | Verifier prompt, context isolation, dev smoke gold set in CI, model-family independence, first live `run`, retraction re-check; tag `prompts-frozen-v1` | |
 
 ### Phase C — Measurement
@@ -133,6 +135,18 @@ can be contributed here as their own credited rule pack. No results from this re
   deferred (backlog A10). Pulled forward by the maintainer: the `BaseLlmAgent` base (ADR 0015) and the
   pipeline event vocabulary with its emitters and an injected clock (ADR 0016). S11 keeps the
   `events.jsonl` sink, run events, manifest, ledger and budgets.
+
+### S10 — answer agent (done)
+
+- Strict and Over-eager answer agents with their own prompt constants and stated non-scope; Strict
+  abstains with an empty answer. Claim ids and citation defects are handled by code, never by a repair
+  turn. Self-containment is flagged (`dangling_reference`), not rewritten. Negation is one conservative,
+  versioned detector, so a pair can be `passed` only when its evidence sentence has no negation.
+- `bio-claim-check answer dev QUESTION_ID --mode strict|over_eager` answers from the sealed dev pool only
+  and counts every drop (ADR 0017).
+- **Done (see [dev-log S10](dev-log/S10.md)):** all 8 dev questions ran live in both modes; Strict
+  abstained on both unanswerable questions. Over-eager on gpt-6.1-sol hedged more than intended
+  (author-read); recorded, not chased.
 
 ## Dependencies
 

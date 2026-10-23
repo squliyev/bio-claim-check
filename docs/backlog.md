@@ -35,6 +35,9 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | B2b | As a scientist, I want `surrogate_as_clinical` as a scored trap kind (biomarker or imaging result stated as a clinical benefit), so that the most common spin type in drug trials is covered | ⏸ (sieve precision too low in the consult, ~15 test candidates; S13 generates it as an unscored pitch example. Scoring it needs sieve v3 + a new ADR) |
 | B3 | As a user, I want `bio-claim-check run "<question>"` to give a per-claim trust report | ⏳ |
 | B4 | As a user, I want the S17 Streamlit UI layered as protocol → pure fold → render, so that the UI logic is tested offline without Streamlit | ⏳ (S17. Design note from S09: `app/ui/protocol.py` reads `events.jsonl` and artifacts through `app/events.parse_event`; `run_view.py` is a pure, total fold of events + artifacts into a `RunView`; `classify.py` splits the trace (stages, retries, repairs, usage) from the deliverable (verdict, quotes, disposition); `page.py` only renders and is the one `streamlit` importer, guarded by an import-linter contract. No streaming: the UI reads a finished run) |
+| B5 | As a scientist, I want the answer agent itself to answer in self-contained claims (S10 answers in that style and flags `dangling_reference` claims), so that every claim can be checked alone | ✅ (S10, ADR 0017: Strict and Over-eager agents, abstention, flag-only self-containment, invented citations, `answer dev` on the sealed dev pool) |
+| B6 | As a reviewer, I want a flagged dangling claim rewritten to stand alone with the original kept beside it (an audit trail), so that the rewrite is visible and reversible | ⏸ (S10 flags only, maintainer decision; a rewrite changes meaning) |
+| B7 | As a reviewer, I want a stored report rejected if its `dangling_reference` findings differ from the ones the check re-derives, so that a tampered artifact cannot look cleaner | ⏸ (S10 implementation review #6: needs the check outside `checks`, since slices never import each other; revisit with the S15 report) |
 
 ## Feature C — Measurement
 
@@ -43,6 +46,8 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 | C1 | As a scientist, I want planted traps with ground truth, so that I know what the verifier catches | ⏳ |
 | C2 | As a reviewer, I want simple baselines next to every verifier, so that I can see whether the LLM adds anything | ⏳ |
 | C3 | As a reviewer, I want a pre-registered protocol and paired, clustered statistics, so that the numbers are honest | ⏳ |
+| C4 | As a scientist, I want the negation detector's precision measured on labelled pairs, so that the share of correct null results sent to `needs_review` is known | ⏸ (needs labels, S18; S10's rule is conservative on purpose) |
+| C5 | As a scientist, I want to know whether Over-eager actually overstates on the answer model, so that the mode comparison measures something | ⏸ (S10 dev, author-read: gpt-6.1-sol kept hedging after one prompt revision; revisit at the proof checkpoint) |
 
 ## Feature D — Ship
 
