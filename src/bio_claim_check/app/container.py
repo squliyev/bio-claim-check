@@ -67,6 +67,7 @@ from bio_claim_check.app.usecases.retractions import (
     validate_run_id,
 )
 from bio_claim_check.app.usecases.run import RunPorts
+from bio_claim_check.app.usecases.traps import TrapWriterPorts
 from bio_claim_check.common.base_clock import BaseClock
 from bio_claim_check.common.canonical_json import compact_json
 from bio_claim_check.common.errors import BccError
@@ -77,7 +78,9 @@ from bio_claim_check.engine.cache.policy import CacheMode
 from bio_claim_check.engine.cache.sqlite_cache import SqliteCache
 from bio_claim_check.engine.events.emitter import EventEmitter
 from bio_claim_check.engine.events.errors import EventWriteError
+from bio_claim_check.engine.events.in_memory_event_sink import InMemoryEventSink
 from bio_claim_check.engine.events.logging_event_sink import LoggingEventSink
+from bio_claim_check.engine.events.tee_event_sink import TeeEventSink
 from bio_claim_check.engine.llm.anthropic_llm_client import AnthropicLlmClient
 from bio_claim_check.engine.llm.base_llm_client import BaseLlmClient
 from bio_claim_check.engine.llm.budgeted_llm_client import BudgetedLlmClient, CallBudget
@@ -102,6 +105,8 @@ from bio_claim_check.features.corpus.seal import sealed_bytes
 from bio_claim_check.features.report.models import ModelUse, RunModels
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import InMemoryLiteratureSource
+from bio_claim_check.features.traps.llm_trap_writer import LlmTrapWriter
+from bio_claim_check.features.traps.trap_llm_agent import TrapLlmAgent
 from bio_claim_check.features.verify.llm_verifier import LlmVerifier
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
 from bio_claim_check.features.verify.verify_llm_agent import VerifyLlmAgent
@@ -475,6 +480,12 @@ def logging_emitter() -> EventEmitter:
     return EventEmitter(LoggingEventSink(), SystemClock())
 
 
+def tallying_emitter() -> tuple[EventEmitter, InMemoryEventSink]:
+    """`logging_emitter` that also keeps the events, so a command can print its LLM usage at the end."""
+    kept = InMemoryEventSink()
+    return EventEmitter(TeeEventSink(LoggingEventSink(), kept), SystemClock()), kept
+
+
 def foundry_urls(base_url: str) -> tuple[str, str]:
     """The `/openai/v1/` and `/anthropic` endpoints of one Foundry resource (same endpoint and key)."""
     root = base_url.rstrip("/")
@@ -747,3 +758,44 @@ def build_challenge_ports(
             emitter=emitter,
         )
         yield ports, verifier
+
+
+@contextmanager
+def build_trap_ports(
+    settings: Settings,
+    emitter: EventEmitter | None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    anthropic_http: anthropic.DefaultHttpxClient | None = None,
+    openai_http: openai.DefaultHttpxClient | None = None,
+) -> Generator[tuple[TrapWriterPorts, ModelSpec]]:
+    """Europe PMC and the LLM trap writer (the trap role) through one cache, behind one budget.
+
+    A read-only replay builds no provider client. `transport`/`*_http` are for tests.
+    """
+    writer = build_models(settings, model_catalog()).trap
+    with ExitStack() as stack:
+        cache = _cache(settings, stack)
+        source = _europe_pmc(settings, stack, cache, transport, sleep)
+        live: BaseLlmClient | None = None
+        if settings.cache_mode is not CacheMode.READ_ONLY:
+            clients = stack.enter_context(
+                build_llm_clients(
+                    settings,
+                    [writer],
+                    sleep=sleep,
+                    emitter=emitter,
+                    openai_http=openai_http,
+                    anthropic_http=anthropic_http,
+                )
+            )
+            live = BudgetedLlmClient(clients[writer.deployment], CallBudget(settings.max_live_llm_calls))
+        client = CachingLlmClient(live, cache, settings.cache_mode)
+        ports = TrapWriterPorts(
+            literature=source,
+            writer=LlmTrapWriter(TrapLlmAgent(client, writer, emitter=emitter)),
+            rules=default_rulepack_hashed().pack,
+            emitter=emitter,
+        )
+        yield ports, writer

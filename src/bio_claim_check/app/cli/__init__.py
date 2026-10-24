@@ -36,6 +36,7 @@ from bio_claim_check.app.container import (
     build_replay,
     build_retraction_source,
     build_retrieval,
+    build_trap_ports,
     current_judge,
     declared_answerer,
     default_rulepack,
@@ -52,6 +53,7 @@ from bio_claim_check.app.container import (
     read_run_files,
     record_run,
     run_path,
+    tallying_emitter,
     write_seal,
 )
 from bio_claim_check.app.freeze import ACTIVE_FREEZE, FREEZE_DIR, freeze_record
@@ -91,6 +93,18 @@ from bio_claim_check.app.usecases.retractions import (
 )
 from bio_claim_check.app.usecases.run import RunInputError, run_question
 from bio_claim_check.app.usecases.run_dev import DevRunRecord, run_dev
+from bio_claim_check.app.usecases.traps import (
+    TrapBudgetError,
+    TrapInputError,
+    TrapPoolError,
+    TrapVerifyPorts,
+    apply_audit,
+    draft_bytes,
+    generate,
+    sheet_for,
+    trap_result_bytes,
+    verify_set,
+)
 from bio_claim_check.common.canonical_json import pretty_json_bytes
 from bio_claim_check.common.negation import NEGATION_RULES
 from bio_claim_check.common.system_clock import SystemClock
@@ -119,6 +133,8 @@ from bio_claim_check.features.corpus.seal import dataset_problems
 from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes
 from bio_claim_check.features.report.models import Report
 from bio_claim_check.features.retrieval.errors import RetrievalError
+from bio_claim_check.features.traps.audit_sheet import TrapAuditError
+from bio_claim_check.features.traps.sampling import TrapSamplingError
 
 DEFAULT_K = 4
 DEFAULT_RETRIEVE_K = 10
@@ -887,6 +903,190 @@ def _print_challenge(result: ChallengeResult) -> None:
     typer.echo(
         f"challenge rule: {'met' if s.passed else 'NOT met'} (author-confirmed, single rater; not accuracy)"
     )
+
+
+traps_app = typer.Typer(
+    help="The dev trap set: planted misreadings with ground truth (ADR 0022).", no_args_is_help=True
+)
+app.add_typer(traps_app, name="traps")
+DEFAULT_TRAPS = Path("traps/dev-v1.jsonl")
+TRAPS_DIR = "traps"  # drafts and verify attempts under the var dir
+DraftFile = Annotated[
+    Path, typer.Option("--draft", help="A draft written by `traps generate` (under the var dir).")
+]
+TrapSetFile = Annotated[Path, typer.Option("--traps", help="The committed trap set (JSONL).")]
+
+
+@contextmanager
+def _trap_exit_codes(dataset: Path) -> Generator[None]:
+    """`_live_exit_codes` plus the trap use cases' own failures."""
+    with _live_exit_codes(dataset):
+        try:
+            yield
+        except (TrapInputError, TrapAuditError) as err:
+            _print_problems("Cannot use the trap input", list(err.problems))
+            raise typer.Exit(code=ExitCode.INPUT) from None
+        except TrapBudgetError as err:
+            _fail(ExitCode.INPUT, str(err))
+        except TrapSamplingError as err:
+            _print_problems("The dev dataset cannot meet the target", list(err.problems))
+            raise typer.Exit(code=ExitCode.DATASET) from None
+        except TrapPoolError as err:
+            _fail(ExitCode.DATASET, str(err))
+        except OutputConflictError as err:
+            _fail(ExitCode.OUTPUT, str(err))
+
+
+@traps_app.command("generate")
+def traps_generate_command(
+    per_kind: Annotated[int, typer.Option("--per-kind", min=1, help="Sources drafted per scored kind.")],
+    dataset: DatasetDir = Path("datasets"),
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Draft a parent and a trap per sampled dev source with the trap model, then gate them. Costs tokens.
+
+    Refuses before any call unless BCC_MAX_LIVE_LLM_CALLS covers a call and a repair per source. The draft
+    holds no abstract text but stays under the var dir; a larger --per-kind extends the same order.
+    """
+    settings = _settings(env_file)
+    emitter, kept = tallying_emitter()
+    try:
+        with _trap_exit_codes(dataset):
+            files = read_dataset(dataset)
+            spec = load_corpus_spec(dataset / SPEC)
+            with build_trap_ports(settings, emitter) as (ports, writer):
+                rows = generate(
+                    ports,
+                    files,
+                    spec,
+                    per_kind=per_kind,
+                    origin_id=writer.deployment,
+                    max_live_calls=settings.max_live_llm_calls,
+                )
+            data = draft_bytes(rows)
+            path = publish_document(
+                settings.var_dir / TRAPS_DIR, f"dev-draft-{per_kind}-{_sha256(data)[:12]}.jsonl", data
+            )
+    finally:
+        _print_usage(kept.events)
+    failed = sum(1 for r in rows if r.failure is not None)
+    gated = sum(1 for r in rows if r.problems)
+    typer.echo(f"rows: {len(rows)}; writer failures: {failed}; excluded by the gate: {gated}")
+    typer.echo(f"wrote: {path}")
+    typer.echo("next: traps audit-sheet --draft " + str(path))
+
+
+@traps_app.command("audit-sheet")
+def traps_audit_sheet_command(
+    draft: DraftFile,
+    dataset: DatasetDir = Path("datasets"),
+    out: Annotated[
+        Path, typer.Option(help="Folder for the sheet (keep it git-ignored).")
+    ] = DEFAULT_AUDIT_DIR,
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Export the audit sheet of a draft, replaying abstracts from the cache (never the network)."""
+    settings = _settings(env_file)
+    data = _read_input(draft)
+    with _trap_exit_codes(dataset):
+        files = read_dataset(dataset)
+        spec = load_corpus_spec(dataset / SPEC)
+        with build_replay(settings) as source:
+            sheet = sheet_for(source, data, files, spec)
+        path = publish_document(out, f"traps-dev-{_sha256(data)[:12]}.csv", sheet.encode("utf-8"))
+    typer.echo(f"wrote: {path}")
+    typer.echo("decide every row (confirm/reject, a reason for every reject), then run traps apply-audit")
+
+
+@traps_app.command("apply-audit")
+def traps_apply_audit_command(
+    draft: DraftFile,
+    sheet: Annotated[Path, typer.Option("--sheet", help="The filled-in audit sheet (CSV).")],
+    out: Annotated[Path, typer.Option("--out", help="The trap set to write, once.")] = DEFAULT_TRAPS,
+    dataset: DatasetDir = Path("datasets"),
+) -> None:
+    """Write the trap set from the confirmed rows of a filled-in sheet bound to its draft (claims only)."""
+    data = _read_input(draft)
+    try:
+        text = sheet.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as err:
+        _fail(ExitCode.INPUT, f"cannot read {sheet}: {type(err).__name__}")
+    with _trap_exit_codes(dataset):
+        files = read_dataset(dataset)
+        spec = load_corpus_spec(dataset / SPEC)
+        out_bytes = apply_audit(data, text, files, spec, default_rulepack())
+        path = publish_document(out.parent, out.name, out_bytes)
+    typer.echo(
+        f"wrote: {path} ({len(out_bytes.splitlines())} confirmed item(s); author-confirmed, single rater)"
+    )
+
+
+@traps_app.command("verify")
+def traps_verify_command(
+    traps: TrapSetFile = DEFAULT_TRAPS,
+    record: Annotated[
+        bool, typer.Option("--record", help="Also publish results/<name>-<set>.json beside the set, once.")
+    ] = False,
+    name: FreezeName = ACTIVE_FREEZE,
+    dataset: DatasetDir = Path("datasets"),
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Judge every trap and parent with the active frozen verifier. Costs tokens. Exploratory (dev).
+
+    Refuses when this code is not the active freeze: trap outcomes never tune the judge.
+    """
+    settings = _settings(env_file)
+    data = _read_input(traps)
+    try:
+        active_freeze_sha256(settings, Path(FREEZE_DIR), _result_path(DEFAULT_CHALLENGE, ACTIVE_FREEZE))
+    except FreezeError as err:
+        _print_problems("Refused: this code is not the active frozen judge", err.problems)
+        raise typer.Exit(code=ExitCode.INPUT) from None
+    emitter, kept = tallying_emitter()
+    try:
+        with _trap_exit_codes(dataset):
+            files = read_dataset(dataset)
+            spec = load_corpus_spec(dataset / SPEC)
+            judge = current_judge(settings)
+            catalog = model_catalog()
+            with build_challenge_ports(settings, emitter) as (ports, verifier):
+                result = verify_set(
+                    TrapVerifyPorts(ports.literature, ports.verifier, ports.rules, ports.emitter),
+                    data,
+                    files,
+                    spec,
+                    judge_sha256=judge.sha256,
+                    verifier=verifier.deployment,
+                    verifier_family=verifier.family,
+                    family_of=lambda deployment: catalog.lookup(deployment).family,
+                    max_live_calls=settings.max_live_llm_calls,
+                )
+            out = trap_result_bytes(result)
+            attempt = publish_document(
+                settings.var_dir / TRAPS_DIR / "results",
+                f"{judge.sha256[:16]}-{result.trap_set_sha256[:8]}.json",
+                out,
+            )
+    except JudgeReadError as err:
+        _fail(ExitCode.INPUT, str(err))
+    finally:
+        _print_usage(kept.events)
+    typer.echo(f"verifier: {result.verifier}; judge {result.judge_sha256[:16]}")
+    if result.writer_family_flag:
+        typer.echo("warning: the trap writer and the verifier are the same model family", err=True)
+    for row in result.counts.rows:
+        typer.echo(
+            f"  {row.kind.value} {row.role} {row.generator}: n={row.n} flagged={row.flagged} "
+            f"passed={row.passed} needs_review={row.needs_review} failed={row.failed} exact={row.exact}"
+        )
+    typer.echo("exploratory, dev only; author-confirmed, single rater")
+    typer.echo(f"attempt: {attempt}")
+    if record:
+        try:
+            path = publish_document(traps.parent / "results", f"{name}-{traps.stem}.json", out)
+        except OutputConflictError as err:
+            _fail(ExitCode.OUTPUT, str(err))
+        typer.echo(f"recorded: {path}")
 
 
 freeze_app = typer.Typer(help="The prompt freeze record (ADR 0020).", no_args_is_help=True)

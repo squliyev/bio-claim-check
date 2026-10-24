@@ -1,0 +1,416 @@
+"""[RING:app/usecases] Generate, audit, commit and verify the dev trap set (S13, ADR 0022).
+
+Why: the trap set combines three slices (corpus for eligibility, traps for drafting and gating, verify for
+judging) and only `app` may combine slices. Every abstract comes from its dev question's sealed pool
+(`dev_papers`: seal check, dev question only, dev-split papers with their sealed hashes), so no test
+source can reach the writer or the verifier (I78). The verifier receives a claim built from the item's
+text alone; kind, role, pair and ground truth never leave this module (I69). `set_problems` and
+`result_problems` are also what CI runs on every committed set and result (I76, I77).
+Must not: do I/O itself, touch a test question or source, retry or drop an item, tune anything on trap
+outcomes (the judge is frozen), or let a writer or verifier failure disappear (it is a counted row).
+"""
+
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Final
+
+from pydantic import ValidationError
+
+from bio_claim_check.app.usecases.answer_dev import dev_papers
+from bio_claim_check.common.canonical_json import compact_json, pretty_json_bytes
+from bio_claim_check.common.errors import BccError
+from bio_claim_check.common.model_family import ModelFamily
+from bio_claim_check.common.text import CleanedText
+from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.features.contracts.corpus import CorpusSpec, CorpusSplit, QuestionEntry, SourceEntry
+from bio_claim_check.features.contracts.ids import SourceId
+from bio_claim_check.features.contracts.labels import OverstatedReason
+from bio_claim_check.features.contracts.outcome import PairOutcome
+from bio_claim_check.features.contracts.paper import Paper
+from bio_claim_check.features.contracts.rulepack import Rule, RulePack
+from bio_claim_check.features.contracts.verdict import Claim
+from bio_claim_check.features.corpus.layout import DEV_SOURCES, MANIFEST, QUESTIONS
+from bio_claim_check.features.corpus.seal import dataset_problems
+from bio_claim_check.features.corpus.serialise import sha256_hex
+from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.traps.audit_sheet import confirmed_items, parse_decisions, sheet_csv
+from bio_claim_check.features.traps.base_trap_writer import BaseTrapWriter
+from bio_claim_check.features.traps.counts import TrapResult, counts
+from bio_claim_check.features.traps.models import DraftRow, TrapDraft, TrapItem, TrapWriterFailure, opaque_id
+from bio_claim_check.features.traps.rule_floor import mutate
+from bio_claim_check.features.traps.sampling import Pick, sample
+from bio_claim_check.features.traps.validity import claim_problems, contamination, pair_problems
+from bio_claim_check.features.verify.base_verifier import BaseVerifier
+
+SCORED_KINDS: Final = (
+    OverstatedReason.BACKGROUND_AS_RESULT,
+    OverstatedReason.CORRELATION_AS_CAUSATION,
+    OverstatedReason.NONSIGNIFICANT_AS_EFFECT,
+    OverstatedReason.PRECLINICAL_TO_CLINICAL,
+    OverstatedReason.CERTAINTY_INFLATION,
+)
+"""The kinds the sieve proposes dev candidates for; surrogate traps wait for H1 (ADR 0022)."""
+
+CALLS_PER_ITEM: Final = 2
+"""A call plus at most one repair: the budget preflight refuses a run the budget cannot finish."""
+
+
+class TrapInputError(BccError):
+    """The dataset, a draft or a trap set cannot be used. One line per problem."""
+
+    code = "traps.input"
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__("\n".join(problems))
+        self.problems = tuple(problems)
+
+
+class TrapPoolError(BccError):
+    """A sampled or committed source did not come back, with its sealed hash, in its dev pool."""
+
+    code = "traps.pool"
+
+
+class TrapBudgetError(BccError):
+    """`BCC_MAX_LIVE_LLM_CALLS` cannot cover the run; refused before any call."""
+
+    code = "traps.budget"
+
+
+@dataclass(frozen=True, slots=True)
+class TrapWriterPorts:
+    literature: BaseLiteratureSource
+    writer: BaseTrapWriter
+    rules: RulePack
+    emitter: EventEmitter | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TrapVerifyPorts:
+    literature: BaseLiteratureSource
+    verifier: BaseVerifier
+    rules: RulePack
+    emitter: EventEmitter | None = None
+
+
+def _rows[M: SourceEntry | QuestionEntry](data: bytes, model: type[M]) -> list[M]:
+    return [model.model_validate_json(line) for line in data.decode("utf-8").splitlines()]
+
+
+def _sealed(files: Mapping[str, bytes], spec: CorpusSpec) -> None:
+    if problems := dataset_problems(files, spec):
+        raise TrapInputError(["the dataset is not intact and sealed:", *problems])
+
+
+def _budget(needed: int, max_live_calls: int | None) -> None:
+    if max_live_calls is not None and max_live_calls < CALLS_PER_ITEM * needed:
+        raise TrapBudgetError(
+            f"{needed} item(s) need up to {CALLS_PER_ITEM * needed} live calls; "
+            f"BCC_MAX_LIVE_LLM_CALLS is {max_live_calls}"
+        )
+
+
+def _pools(
+    source: BaseLiteratureSource,
+    files: Mapping[str, bytes],
+    spec: CorpusSpec,
+    wanted: Sequence[tuple[str, SourceId]],
+    emitter: EventEmitter | None,
+) -> dict[SourceId, Paper]:
+    """Each wanted source's paper from its question's dev pool; raises if one did not come back."""
+    found: dict[SourceId, Paper] = {}
+    for question_id in sorted({q for q, _ in wanted}):
+        _, pool = dev_papers(source, files, spec, question_id, k=spec.pool_hits, emitter=emitter)
+        found.update({p.source_id: p for p in pool.papers})
+    if missing := sorted({s for _, s in wanted if s not in found}):
+        raise TrapPoolError(f"{', '.join(missing)}: did not come back in the dev pool")
+    return found
+
+
+def _rule(pack: RulePack, kind: OverstatedReason) -> Rule:
+    return next(r for r in pack.rules if r.reason is kind)
+
+
+def plan_picks(
+    files: Mapping[str, bytes],
+    spec: CorpusSpec,
+    per_kind: int,
+    kinds: Sequence[OverstatedReason] = SCORED_KINDS,
+) -> tuple[Pick, ...]:
+    """The sources a run would draft, in order; raises before any fetch if the dataset or target fails."""
+    _sealed(files, spec)
+    questions = {q.id for q in _rows(files[QUESTIONS], QuestionEntry) if q.split is CorpusSplit.DEV}
+    entries = _rows(files[DEV_SOURCES], SourceEntry)
+    return sample(entries, kinds, per_kind, questions=questions, max_rank=spec.pool_hits)
+
+
+def _draft_rows(
+    pick: Pick, out: TrapDraft | TrapWriterFailure, paper: Paper, pack: RulePack, origin_id: str
+) -> list[DraftRow]:
+    pid = opaque_id(pick.source_id, "parent", None)
+    common = {
+        "pair_id": pid,
+        "kind": pick.kind,
+        "question_id": pick.question_id,
+        "source_id": pick.source_id,
+        "abstract_sha256": pick.abstract_sha256,
+        "origin_id": origin_id,
+    }
+    if isinstance(out, TrapWriterFailure):
+        return [
+            DraftRow.model_validate(
+                {
+                    **common,
+                    "id": pid,
+                    "role": "parent",
+                    "claim": None,
+                    "generator": "model",
+                    "rule": None,
+                    "failure": out.kind,
+                }
+            )
+        ]
+    parent, trap = out.parent, out.trap
+    abstract = paper.abstract
+    rows = [
+        DraftRow.model_validate(
+            {
+                **common,
+                "id": pid,
+                "role": "parent",
+                "claim": parent,
+                "generator": "model",
+                "rule": None,
+                "problems": tuple(claim_problems(parent, abstract, pack)),
+            }
+        ),
+        DraftRow.model_validate(
+            {
+                **common,
+                "id": opaque_id(pick.source_id, "trap", None),
+                "role": "trap",
+                "claim": trap,
+                "generator": "model",
+                "rule": None,
+                "problems": tuple(claim_problems(trap, abstract, pack) + pair_problems(parent, trap)),
+            }
+        ),
+    ]
+    for floor in mutate(parent):
+        rows.append(
+            DraftRow.model_validate(
+                {
+                    **common,
+                    "id": opaque_id(pick.source_id, "trap", floor.rule),
+                    "role": "trap",
+                    "claim": floor.claim,
+                    "generator": "rule_floor",
+                    "rule": floor.rule,
+                    "problems": tuple(
+                        claim_problems(floor.claim, abstract, pack) + pair_problems(parent, floor.claim)
+                    ),
+                }
+            )
+        )
+    return rows
+
+
+def generate(
+    ports: TrapWriterPorts,
+    files: Mapping[str, bytes],
+    spec: CorpusSpec,
+    *,
+    per_kind: int,
+    origin_id: str,
+    max_live_calls: int | None,
+    kinds: Sequence[OverstatedReason] = SCORED_KINDS,
+) -> tuple[DraftRow, ...]:
+    """Sample, preflight the budget, fetch the dev pools, draft each source once, gate every claim.
+
+    Rows come out in pick order (parent, model trap, then rule-floor traps); a writer failure is one row.
+    """
+    picks = plan_picks(files, spec, per_kind, kinds)
+    _budget(len(picks), max_live_calls)
+    papers = _pools(
+        ports.literature, files, spec, [(p.question_id, p.source_id) for p in picks], ports.emitter
+    )
+    rows: list[DraftRow] = []
+    for pick in picks:
+        paper = papers[pick.source_id]
+        out = ports.writer.draft(pick.kind, _rule(ports.rules, pick.kind), paper)
+        rows.extend(_draft_rows(pick, out, paper, ports.rules, origin_id))
+    return tuple(rows)
+
+
+def draft_bytes(rows: Sequence[DraftRow]) -> bytes:
+    """The draft file (`var/` only): one canonical JSON row per line."""
+    return "".join(compact_json(r.model_dump(mode="json")) + "\n" for r in rows).encode("utf-8")
+
+
+def parse_draft(data: bytes) -> tuple[DraftRow, ...]:
+    try:
+        rows = tuple(DraftRow.model_validate_json(line) for line in data.decode("utf-8").splitlines())
+    except (UnicodeDecodeError, ValidationError):
+        raise TrapInputError(["the draft file is not a valid trap draft"]) from None
+    if not rows:
+        raise TrapInputError(["the draft file is empty"])
+    if data != draft_bytes(rows):
+        raise TrapInputError(["the draft file is not in canonical form (was it edited?)"])
+    return rows
+
+
+def sheet_for(
+    source: BaseLiteratureSource, draft: bytes, files: Mapping[str, bytes], spec: CorpusSpec
+) -> str:
+    """The audit sheet of a draft, with abstracts from the dev pools (replay `source` from the cache)."""
+    rows = parse_draft(draft)
+    _sealed(files, spec)
+    papers = _pools(source, files, spec, sorted({(r.question_id, r.source_id) for r in rows}), None)
+    abstracts: dict[SourceId, CleanedText] = {s: p.abstract for s, p in papers.items()}
+    return sheet_csv(rows, sha256_hex(draft), abstracts)
+
+
+def set_bytes(items: Sequence[TrapItem]) -> bytes:
+    """The committed set: one canonical JSON item per line, sorted by id."""
+    ordered = sorted(items, key=lambda i: i.id)
+    return "".join(compact_json(i.model_dump(mode="json")) + "\n" for i in ordered).encode("utf-8")
+
+
+def apply_audit(
+    draft: bytes, sheet: str, files: Mapping[str, bytes], spec: CorpusSpec, pack: RulePack
+) -> bytes:
+    """The committed set from a draft and its filled-in sheet; refuses a set that would fail CI."""
+    rows = parse_draft(draft)
+    _sealed(files, spec)
+    items = confirmed_items(rows, parse_decisions(sheet, rows, sha256_hex(draft)))
+    if not items:
+        raise TrapInputError(["no row was confirmed; nothing to commit"])
+    data = set_bytes(items)
+    if problems := set_problems(data, files, pack):
+        raise TrapInputError(problems)
+    return data
+
+
+def parse_set(data: bytes) -> tuple[TrapItem, ...]:
+    try:
+        items = tuple(TrapItem.model_validate_json(line) for line in data.decode("utf-8").splitlines())
+    except UnicodeDecodeError:
+        raise TrapInputError(["the trap set is not UTF-8"]) from None
+    except ValidationError as err:
+        raise TrapInputError([f"the trap set is not valid: {err.error_count()} problem(s)"]) from None
+    if not items:
+        raise TrapInputError(["the trap set is empty"])
+    return items
+
+
+def set_problems(data: bytes, files: Mapping[str, bytes], pack: RulePack) -> list[str]:
+    """Why a committed trap set breaks I76 or I77; empty if it holds. Needs no abstract (CI runs it)."""
+    try:
+        items = parse_set(data)
+    except TrapInputError as err:
+        return list(err.problems)
+    problems: list[str] = []
+    if data != set_bytes(items):
+        problems.append("the set is not canonical (one sorted JSON line per item, sorted by id)")
+    if len({i.id for i in items}) != len(items):
+        problems.append("duplicate ids")
+    questions = {q.id: q for q in _rows(files[QUESTIONS], QuestionEntry)}
+    sources = {e.source_id: e for e in _rows(files[DEV_SOURCES], SourceEntry)}
+    parents = {i.id: i for i in items if i.role == "parent"}
+    if len({p.source_id for p in parents.values()}) != len(parents):
+        problems.append("a source has more than one parent")
+    for item in items:
+        question = questions.get(item.question_id)
+        entry = sources.get(item.source_id)
+        if question is None or question.split is not CorpusSplit.DEV:
+            problems.append(f"{item.id}: {item.question_id} is not a dev question")
+        elif entry is None or entry.split is not CorpusSplit.DEV:
+            problems.append(f"{item.id}: {item.source_id} is not a dev source")
+        elif item.question_id not in {r.question_id for r in entry.ranks}:
+            problems.append(f"{item.id}: {item.source_id} is not in the pool of {item.question_id}")
+        elif item.abstract_sha256 != entry.abstract_sha256:
+            problems.append(f"{item.id}: abstract_sha256 differs from the sealed dataset")
+        parent = parents.get(item.pair_id)
+        if parent is None:
+            problems.append(f"{item.id}: its parent {item.pair_id} is not in the set")
+        elif (parent.source_id, parent.question_id, parent.kind) != (
+            item.source_id,
+            item.question_id,
+            item.kind,
+        ):
+            problems.append(f"{item.id}: differs from its parent in source, question or kind")
+        problems.extend(f"{item.id}: {p}" for p in contamination(item.claim, pack))
+    return problems
+
+
+def verify_set(
+    ports: TrapVerifyPorts,
+    data: bytes,
+    files: Mapping[str, bytes],
+    spec: CorpusSpec,
+    *,
+    judge_sha256: str,
+    verifier: str,
+    verifier_family: ModelFamily,
+    family_of: Callable[[str], ModelFamily],
+    max_live_calls: int | None,
+) -> TrapResult:
+    """Judge every item once, as a live run judges a pair. Bad input raises before any fetch."""
+    if problems := set_problems(data, files, ports.rules):
+        raise TrapInputError(problems)
+    _sealed(files, spec)
+    items = parse_set(data)
+    _budget(len(items), max_live_calls)
+    papers = _pools(
+        ports.literature, files, spec, [(i.question_id, i.source_id) for i in items], ports.emitter
+    )
+    outcomes = tuple(
+        PairOutcome.of(
+            item.id,
+            ports.verifier.verify(
+                Claim(id=item.id, text=item.claim, cites=(item.source_id,)),
+                papers[item.source_id],
+                ports.rules,
+            ),
+        )
+        for item in items
+    )
+    return TrapResult(
+        trap_set_sha256=sha256_hex(data),
+        corpus_seal=sha256_hex(files[MANIFEST]),
+        judge_sha256=judge_sha256,
+        verifier=verifier,
+        writer_family_flag=any(family_of(i.origin_id) is verifier_family for i in items),
+        outcomes=outcomes,
+        counts=counts(items, outcomes),
+    )
+
+
+def trap_result_bytes(result: TrapResult) -> bytes:
+    return pretty_json_bytes(result.model_dump(mode="json"))
+
+
+def result_problems(data: bytes, result: bytes) -> list[str]:
+    """Why a committed result does not belong to this set or miscounts it (I76); empty if it holds.
+
+    Self-reported, like the challenge result: it proves consistency, not that a model produced it.
+    """
+    try:
+        items = parse_set(data)
+        recorded = TrapResult.model_validate_json(result)
+    except TrapInputError as err:
+        return list(err.problems)
+    except ValidationError as err:
+        return [f"the result is not valid: {err.error_count()} problem(s)"]
+    problems: list[str] = []
+    if result != trap_result_bytes(recorded):
+        problems.append("the result is not in canonical form")
+    if recorded.trap_set_sha256 != sha256_hex(data):
+        problems.append("the result is for another trap set")
+    try:
+        again = counts(items, recorded.outcomes)
+    except ValueError as err:
+        return [*problems, str(err)]
+    if again != recorded.counts:
+        problems.append("the recorded counts do not match the outcomes")
+    return problems
