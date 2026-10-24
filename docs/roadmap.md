@@ -5,8 +5,9 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S12c done):** S01–S12c are done; tag `prompts-frozen-v2`. Next: the maintainer's test-split audit, then
-**S13** (trap generator).
+**Status (S12c done):** S01–S12c are done; tag `prompts-frozen-v2`. Next: **S13** (trap generator) on dev, with
+the maintainer's test-split audit running in parallel (it gates only test-split traps). Then the **demo track**
+(proof checkpoint → S17a → H1) before returning to S14.
 
 ## Product
 
@@ -94,13 +95,15 @@ can be contributed here as their own credited rule pack. No results from this re
 
 | Session | Scope |
 |---|---|
-| (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2` |
-| S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test |
-| Proof checkpoint | Catch and false-alarm rate per trap kind on dev (exploratory, go / adjust) |
+| (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2`; runs in parallel with S13 and gates only test-split traps |
+| S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test; dev first. Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a `Report` (S13 ADR) |
+| Proof checkpoint | Trap disposition counts and catch rate per trap kind on dev; a false-alarm rate only on an author-confirmed dev-parent subset. Exploratory, never pitched (go / adjust) |
+| S17a | Demo track: slim Streamlit UI, Ask page (recorded runs, live under the call budget) and Trust report page, in the final layered form; Docker offline mode with live controls disabled (see below) |
+| H1 | Demo track: hackathon prep (trap papers, demo, pitch, disclosure); what is shown on the day is decided here and must respect the option C rule (no claimcheck results on the day) or change it by ADR |
 | S14 | Baselines: AlwaysFlag, MeSH-cue, optional NLI; shared verifier contract suite |
 | S15 | Related work (spin, exaggeration NLP, SciFact family), pre-registered `protocol.md`, tag `protocol-v1`, readiness checklist |
 | S16 | Benchmark harness and statistics (cluster bootstrap, Newcombe paired, McNemar, Holm, Wilson) |
-| S17 | Trust report and Streamlit UI (offline demo from cache) |
+| S17b | Rest of the UI: Benchmark page (S16 artifacts), Markdown export, trap-outcome view, trace view if wanted |
 | S18 | Annotation workflow and agreement (κ with raw agreement, author vs external labels) |
 | S19 | Study run on the sealed test split |
 | S20 | External anchor (SciFact, evaluation only) and honest write-up |
@@ -113,7 +116,26 @@ can be contributed here as their own credited rule pack. No results from this re
 | S22 | Documentation site (mkdocs on Read the Docs) |
 | S23 | Dataset and scrubbed replay bundle, `hydrate` with drift report, Zenodo / HF cards, preprint draft |
 | S24 | 1.0 release: public repo, DOI, credits |
-| H1 | Hackathon prep: trap papers, offline demo, pitch, disclosure |
+
+### Demo track (S13 → proof → S17a → H1, then back to S14)
+
+A safe demo early, built so that little is redone later:
+
+- **S17a is the final UI, not a throwaway.** Three layers import only downward: `app/ui/protocol.py` loads
+  `Report` and `RunManifest` from `var/runs/<id>` (no Streamlit) → `run_view.py`, a pure, total function into a
+  `RunView` → `page.py`, render only and the one `streamlit` importer, guarded by an import-linter contract.
+  S17b only adds pages.
+- **Safe rendering:** `html.escape` on all abstract text; highlights only from spans that `locate_quote`
+  produced; error text from a curated `BccError.code` → message map with a parity test against
+  [error-codes.md](error-codes.md); unknown codes get a generic message. The "abstracts only" disclaimer is on
+  every page.
+- **Kept small:** no streaming, no trace view, no single-flight state (a live run is synchronous behind a
+  spinner), no feature flags, no demo manifest (the Ask page lists `var/runs`).
+- **Docker:** Streamlit is added as a dependency, with an explicit server command and port. An offline mode
+  (`BCC_CACHE_MODE=read-only`) disables the live controls, so a click can never call a provider.
+- **Contract drift:** if S15 or S16 change `Report`, cached demo runs are regenerated; there is no migration
+  code. The UI stays outside `JUDGE_FILES`, so freeze v2 holds.
+- **No numbers in the demo.** The proof-checkpoint figures are exploratory.
 
 ### S09 — provider adapters (done)
 
@@ -164,13 +186,13 @@ can be contributed here as their own credited rule pack. No results from this re
 ## Dependencies
 
 ```
-S01 → … → S07b → S08 → S08b → S09 → S10 → S11 → S12a → S12b → S12c → (test audit) → S13 → proof → S14 → S15 → S16
-    → {S17, S18} → S19 → S20 → S21 → S22 → S23 → S24
+S01 → … → S12c → S13 (dev; test traps after the test audit) → proof → S17a → H1
+    → S14 → S15 → S16 → {S17b, S18} → S19 → S20 → S21 → S22 → S23 → S24
 ```
 
 - The sealed split (S07b) precedes any prompt tuning (S10).
 - `protocol-v1` (S15) precedes the study run (S19).
-- Demoable points: S05 (fakes), S12a (real product), S17 (UI).
+- Demoable points: S05 (fakes), S12a (real product), S17a (UI), S17b (benchmark page).
 
 ## Risks and mitigations
 

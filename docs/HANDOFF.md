@@ -10,7 +10,8 @@ the repo; ask the maintainer for the rows relevant to your session.
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
   S12b, S12c (tag `prompts-frozen-v2`).
   CI is green on `main`.
-- **Next: the maintainer's test-split audit, then S13 (trap generator)** (section 4).
+- **Next: S13 (trap generator) on dev**, with the maintainer's test-split audit in parallel (section 4). Then
+  the demo track: proof checkpoint → S17a (slim UI) → H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
 - Next free ids: invariant **I76**, ADR **0022**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
@@ -41,10 +42,10 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: the test-split audit (maintainer), then S13 — the trap generator
+## 4. Next: S13 — the trap generator (dev first), with the test-split audit in parallel
 
-**Before S13 (maintainer, not an agent session):** the test-split eligibility audit and the unanswerable
-check. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
+**In parallel with S13 (maintainer, not an agent session):** the test-split eligibility audit and the
+unanswerable check. It gates only test-split traps; S13 starts on dev. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
 `datasets/corpus.yaml`, the author reads the first `audit_n` (50) candidates in the public order:
 
 ```bash
@@ -62,6 +63,12 @@ uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var
 
 **S13 goal:** see the roadmap row (rule floor + model traps within eligibility, validity gate, audit
 sheet, parent pairing, structural leakage test).
+
+**Demo-track bindings for S13:**
+- Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a
+  `Report` (`run` always calls the answerer; a Report is an answered question). The S13 ADR fixes that contract.
+- The proof checkpoint reports trap disposition counts and catch rate on dev, and a false-alarm rate only on an
+  author-confirmed dev-parent subset, labelled exploratory. Real clean-parent labels stay in S18.
 
 **Bindings from S12b and S12c (must hold):**
 - Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside
@@ -123,9 +130,14 @@ sheet, parent pairing, structural leakage test).
 
 ## 6. Bindings for later sessions
 
-- **Before S13:** the maintainer runs the test-split eligibility audit and unanswerable check; the audit
-  records the active `freeze_sha256` (computed, never typed).
-- **S17:** layered Streamlit UI (backlog B4).
+- **Before test-split traps:** the maintainer runs the test-split eligibility audit and unanswerable check; the
+  audit records the active `freeze_sha256` (computed, never typed).
+- **S17a (demo track):** layered Streamlit UI (backlog B4): Ask and Trust report pages only; reads `Report` +
+  `RunManifest`; no trace view; Docker offline mode disables live controls; cached runs are regenerated after
+  contract changes (no migrations); stays outside `JUDGE_FILES`. Writes the UI ADR.
+- **H1:** decides what is shown on the day; option C (no claimcheck results on the day, no numbers) holds
+  unless changed by ADR. Trap papers from dev or outside the corpus, checked against the test split by id only.
+- **S17b:** Benchmark page, Markdown export, trap-outcome view.
 - **S15:** protocol hashes must equal `prompts-frozen-v2`, or each deviation is disclosed.
 - **S16/S19:** a pre-flight token estimate is a labelled heuristic range, never mixed with measured usage
   and never turned into a money estimate without a defensible price.
