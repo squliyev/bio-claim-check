@@ -44,12 +44,21 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
 ## 4. Next: the test-split audit (maintainer), then S13 — the trap generator
 
 **Before S13 (maintainer, not an agent session):** the test-split eligibility audit and the unanswerable
-check. The test audit is gated on the active freeze (I74):
+check. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
+`datasets/corpus.yaml`, the author reads the first `audit_n` (50) candidates in the public order:
 
 ```bash
 uv run bio-claim-check corpus audit-sheet --kind <kind> --split test   # recomputes freeze v2, refuses if stale
+# fill in decision (confirm/reject) and a reason for every reject
 uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var/audit/test-<kind>.csv
 ```
+
+- The sheet is built from the local cache only (`var/cache.sqlite`); a missing page exits with a cache miss.
+- `apply-audit` writes `datasets/audit/test/<kind>.json` once. `SEALED` does not cover that folder; the
+  audit manifest deferred in S07b is due once the audits exist.
+- The test unanswerable check has no tooling. It uses the dev rubric in [data-card.md](data-card.md) §5.
+- An agent may run these commands but never reads a test sheet or test abstract, and never commits a sheet
+  (abstract text).
 
 **S13 goal:** see the roadmap row (rule floor + model traps within eligibility, validity gate, audit
 sheet, parent pairing, structural leakage test).
@@ -64,7 +73,7 @@ sheet, parent pairing, structural leakage test).
 
 **Exit:** the roadmap's S13 row; `make verify` and CI green.
 
-## 5. Engine contracts you build on (S08–S12b)
+## 5. Engine contracts you build on (S08–S12c)
 
 - `engine/llm`: `LlmRequest`, `LlmResponse`, `Message`, `FinishReason`, `Usage`, `Price`, `Spend`,
   `cost()`, `ModelSpec`, `ModelCatalog`, `Provider`, `LlmCallError` (kinds: invalid output, truncated,
@@ -108,6 +117,9 @@ sheet, parent pairing, structural leakage test).
   `app/usecases/challenge.py` (`run_challenge`, `attestation_problems`); `app/container.py::current_judge`,
   `active_freeze_sha256`, `build_challenge_ports`; `corpus_audit` with `split`. Commands: `challenge run
   [--record]`, `freeze write`, `corpus audit-sheet|apply-audit --split test` (ADR 0020).
+- **S12c:** `tests/arch/test_prompt_neutrality.py` (I75); rule pack `0.2.0`; challenge results in
+  `challenge/results/<freeze>.json`; `challenge run --record` and `freeze write` default to `ACTIVE_FREEZE`
+  (ADR 0021). `features/traps/` and `features/baselines/` are empty packages for S13 and S14.
 
 ## 6. Bindings for later sessions
 
@@ -126,7 +138,22 @@ sheet, parent pairing, structural leakage test).
   expert-labelled.
 - Never copy code from other codebases.
 
-## 8. Useful commands
+## 8. Gotchas (each has cost a session time)
+
+- **Judge files are wider than the verifier.** `JUDGE_FILES` also holds the answer prompts and agents,
+  `contracts/labels.py`, `contracts/verdict.py`, `common/negation.py`, `common/text.py` and the codecs. A new
+  label or a verdict change breaks freeze v2; put trap-only types elsewhere.
+- **No test ids outside `datasets/`.** The seal guard scans tracked *and staged* files. Write "a test
+  question", never its id or PMID. Dev ids are fine.
+- **A rule-pack edit changes run ids.** Update the expected ids in `tests/unit/app/test_cli_characterisation.py`.
+- **New example or prompt topics** must appear in no question, query or source MeSH of either split (I75
+  matches exact terms only).
+- **Pinned bytes move with `git mv`** (freeze records, challenge results), never by rewriting.
+- **Replays need the local cache.** `var/cache.sqlite` is git-ignored and machine-local; on another machine
+  `BCC_CACHE_MODE=read-only` fails closed.
+- **Live calls cost money.** Announce the call count first; re-runs use `BCC_CACHE_MODE=read-only`.
+
+## 9. Useful commands
 
 ```bash
 make verify          # the gate: ruff, format, pyright strict, lint-imports, tests, core coverage

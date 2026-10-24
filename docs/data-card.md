@@ -107,7 +107,7 @@ population or quantity.
 
 **Not done yet, by design:**
 - **Test audit.** The author confirms the first 50 test candidates per kind in the public order, only
-  after the prompts and rule packs are frozen (`prompts-frozen-v1`, end of S12). Until then nobody on the
+  after the prompts and rule packs are frozen (now `prompts-frozen-v2`, S12c). Until then nobody on the
   project reads test abstracts.
 - **Test unanswerable check**, at the same time.
 
