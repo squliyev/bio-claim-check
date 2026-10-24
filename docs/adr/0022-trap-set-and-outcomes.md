@@ -82,7 +82,7 @@ anyone reads a trap outcome. Without a written design, three things would go wro
    call in the sheet.
 8. **The narrow reading of ADR 0008 is extended.** A model-drafted claim of at most 30 words that passed the
    copy gate and that the author confirmed as not a close paraphrase may be committed, like an
-   author-written challenge claim. **The maintainer should confirm this reading.**
+   author-written challenge claim. Confirmed by the maintainer on 2026-10-24.
 9. **The audit is bound to its draft.** The sheet carries the draft's sha256. `apply-audit` refuses a sheet
    from another draft, and any added, missing, duplicated, edited or undecided row, or a rejection
    without a reason. It also refuses a row whose abstract no longer hashes to its sealed hash, and a set

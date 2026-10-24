@@ -64,21 +64,32 @@ uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var
 
 **Finishing S13 (the dev trap set, [ADR 0022](adr/0022-trap-set-and-outcomes.md)):**
 
+Done:
+- The maintainer confirmed `TRAP_PROMPT` and ADR 0022 decision 8.
+- Live drafting finished with a top-up to `--per-kind 20`. Draft: `var/traps/dev-draft-20-b222f76d60fb.jsonl`.
+  Candidates: 9, 15, 17, 18 and 19 model traps per kind, plus 21 direction swaps (dev-log S13).
+
+Next:
+
 ```bash
-# 1. the maintainer confirms TRAP_PROMPT (features/traps/trap_prompts.py), then, announced (live, costs tokens):
-BCC_MAX_LIVE_LLM_CALLS=120 uv run bio-claim-check traps generate --per-kind 12   # 60 drafts + 1 repair each
-# 2. export the sheet (cache only) and let the author decide every row (confirm/reject + a reason per reject):
-uv run bio-claim-check traps audit-sheet --draft var/traps/dev-draft-12-<sha>.jsonl
-# 3. commit F: the confirmed set (claims only), counts vs the 12-per-kind target and attrition in dev-log S13:
-uv run bio-claim-check traps apply-audit --draft var/traps/dev-draft-12-<sha>.jsonl --sheet var/audit/traps-dev-<sha>.csv
+# 1. the author fills in every row: decision confirm/reject, and a reason for every reject
+#    sheet: var/audit/traps-dev-b222f76d60fb.csv (177 rows; the var dir is local, so re-export it if it is lost:)
+uv run bio-claim-check traps audit-sheet --draft var/traps/dev-draft-20-b222f76d60fb.jsonl
+# 2. commit F: the confirmed set, then fill the dev-log S13 table (parents rejected, traps confirmed per kind)
+uv run bio-claim-check traps apply-audit --draft var/traps/dev-draft-20-b222f76d60fb.jsonl \
+  --sheet var/audit/traps-dev-b222f76d60fb.csv
 ```
 
-- `background_as_result` has only 9 eligible dev sources, so it gets 9 drafts at most. The run prints
-  each kind's shortfall, and the maintainer chose this cap over widening the pool (ADR 0022 §6).
-  60 − 3 = 57 drafts.
-- Any other kind short of 12 confirmed traps is topped up by a larger `--per-kind`. The order is deterministic, so
-  earlier drafts are cache hits, but the new draft has a new sha256 and needs a new sheet. Decisions
-  already made can be copied over, row by row.
+- The author checks each row:
+  - the parent is fully supported and not a close paraphrase;
+  - a model trap commits its kind and only its kind;
+  - a direction swap changes what the parent states.
+- `background_as_result` is capped at 9 (ADR 0022 §6). A kind still short of 12 confirmed traps after the
+  audit is reported as short, not topped up: correlation has only 21 eligible sources in all. A further
+  top-up would need a new sheet.
+- The draft, the sheet and the LLM cache (`var/cache.sqlite`) are all local. If only the draft or the sheet is
+  lost, rerun `generate --per-kind 20` with a budget of 180: every call is a cache hit, so the draft is
+  identical. If the cache is lost too, the drafts change, and the counts above no longer apply.
 - `traps verify` is the proof checkpoint's step, not S13's. It refuses unless this code is the active
   freeze. Use `--record` once the counts have been read.
 - Never commit a draft or a sheet: drafts list gate problems, and sheets hold abstract text.
