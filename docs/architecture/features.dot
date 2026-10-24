@@ -9,7 +9,7 @@ digraph {
     ".corpus" [label=".corpus/"]
     ".report" [label=".report/"]
     ".retrieval" [label=".retrieval/"]
-    ".traps"
+    ".traps" [label=".traps/"]
     ".verify" [label=".verify/"]
     ".answer" ->  ".contracts"
     ".bench" ->  ".contracts"
@@ -17,5 +17,6 @@ digraph {
     ".corpus" ->  ".contracts"
     ".report" ->  ".contracts"
     ".retrieval" ->  ".contracts"
+    ".traps" ->  ".contracts"
     ".verify" ->  ".contracts"
 }

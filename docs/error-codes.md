@@ -65,4 +65,6 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `retrieval.malformed_record` | `MalformedRecordError` | A record field has a type the API was not seen to return |
 | `run.input` | `RunInputError` | `run`: the question is blank or `k` is not a positive int |
 | `retractions.input` | `RetractionInputError` | `retractions`: the run id is malformed, or the run is missing, altered, not a live `run`, or not a report (checked before any request) |
+| `traps.audit_sheet` | `TrapAuditError` | A filled-in trap audit sheet was made from another draft, or has an added, missing, duplicated, edited or undecided row, or a rejection without a reason |
+| `traps.infeasible` | `TrapSamplingError` | The dev corpus has too few eligible sources (one per cluster) for the requested traps per kind; nothing was drafted |
 | `verdict.negation_rules_mismatch` | `NegationRulesMismatchError` | A stored verdict was made under other negation rules; re-run it rather than re-score it (ADR 0017) |
