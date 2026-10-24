@@ -22,11 +22,11 @@ from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import (
     Disposition,
     EvidenceStatus,
-    FailureKind,
     Label,
     NegationCheck,
     OverstatedReason,
 )
+from bio_claim_check.features.contracts.outcome import PairOutcome
 
 MAX_CLAIM_WORDS = 30
 """A challenge claim is a short statement about an abstract, never a copied sentence of it (ADR 0020)."""
@@ -56,28 +56,8 @@ class ChallengeItem(ValidatedModel):
         return self
 
 
-class ChallengeOutcome(ValidatedModel):
-    """What the verifier and the code checks made of one item. No quote and no reason text."""
-
-    id: ClaimId
-    label: Label | None
-    reason: OverstatedReason | None
-    evidence_status: EvidenceStatus | None
-    negation: NegationCheck | None
-    disposition: Disposition
-    failure_kind: FailureKind | None
-
-    @model_validator(mode="after")
-    def _consistent(self) -> Self:
-        failed = self.failure_kind is not None
-        judged = (self.label, self.evidence_status, self.negation)
-        if failed and (any(v is not None for v in judged) or self.reason is not None):
-            raise ValueError("a failed item has no label, reason, evidence or negation")
-        if failed != (self.disposition is Disposition.FAILED):
-            raise ValueError("disposition: failed if and only if failure_kind is set")
-        if not failed and any(v is None for v in judged):
-            raise ValueError("a judged item has a label, evidence status and negation check")
-        return self
+ChallengeOutcome = PairOutcome
+"""The challenge set's outcome record; the shared contract since S13."""
 
 
 Count = Annotated[int, Field(strict=True, ge=0)]

@@ -24,10 +24,9 @@ from bio_claim_check.engine.events.emitter import EventEmitter
 from bio_claim_check.features.bench.challenge import ChallengeItem, ChallengeOutcome, ChallengeScore, score
 from bio_claim_check.features.contracts.corpus import CorpusSpec, CorpusSplit, QuestionEntry, SourceEntry
 from bio_claim_check.features.contracts.ids import SourceId
-from bio_claim_check.features.contracts.labels import Disposition
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import RulePack
-from bio_claim_check.features.contracts.verdict import Claim, Verdict
+from bio_claim_check.features.contracts.verdict import Claim
 from bio_claim_check.features.corpus.layout import DEV_SOURCES, QUESTIONS
 from bio_claim_check.features.corpus.seal import dataset_problems
 from bio_claim_check.features.corpus.serialise import sha256_hex
@@ -127,26 +126,7 @@ def item_problems(items: tuple[ChallengeItem, ...], files: Mapping[str, bytes]) 
 
 def _outcome(item: ChallengeItem, ports: ChallengePorts, paper: Paper) -> ChallengeOutcome:
     claim = Claim(id=item.id, text=item.claim, cites=(item.source_id,))
-    result = ports.verifier.verify(claim, paper, ports.rules)
-    if not isinstance(result, Verdict):
-        return ChallengeOutcome(
-            id=item.id,
-            label=None,
-            reason=None,
-            evidence_status=None,
-            negation=None,
-            disposition=Disposition.FAILED,
-            failure_kind=result.kind,
-        )
-    return ChallengeOutcome(
-        id=item.id,
-        label=result.semantic_label,
-        reason=result.overstated_reason,
-        evidence_status=result.evidence_status,
-        negation=result.negation,
-        disposition=result.disposition,
-        failure_kind=None,
-    )
+    return ChallengeOutcome.of(item.id, ports.verifier.verify(claim, paper, ports.rules))
 
 
 def run_challenge(
