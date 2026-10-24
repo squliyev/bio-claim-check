@@ -10,11 +10,16 @@ from collections.abc import Callable
 import pytest
 
 from bio_claim_check.app.container import default_rulepack
+from bio_claim_check.engine.llm.messages import FinishReason
+from bio_claim_check.engine.llm.scripted_llm_client import ScriptedLlmClient
 from bio_claim_check.features.contracts.labels import FailureKind, OverstatedReason
 from bio_claim_check.features.retrieval.in_memory_literature_source import FAKE_CORPUS
 from bio_claim_check.features.traps.base_trap_writer import BaseTrapWriter
+from bio_claim_check.features.traps.llm_trap_writer import LlmTrapWriter
 from bio_claim_check.features.traps.models import TrapDraft, TrapWriterFailure
 from bio_claim_check.features.traps.scripted_trap_writer import ScriptedTrapWriter
+from bio_claim_check.features.traps.trap_llm_agent import TrapLlmAgent
+from tests.support.llm import response, spec
 
 pytestmark = pytest.mark.contract
 
@@ -29,8 +34,20 @@ def _scripted(out: Scripted) -> BaseTrapWriter:
     return ScriptedTrapWriter({PAPER.source_id: out})
 
 
-IMPLEMENTATIONS: tuple[type[BaseTrapWriter], ...] = (ScriptedTrapWriter,)
-BUILD: dict[type[BaseTrapWriter], Callable[[Scripted], BaseTrapWriter]] = {ScriptedTrapWriter: _scripted}
+def _llm(out: Scripted) -> BaseTrapWriter:
+    reply = (
+        response(out.model_dump_json())
+        if isinstance(out, TrapDraft)
+        else response("{", finish=FinishReason.LENGTH)
+    )
+    return LlmTrapWriter(TrapLlmAgent(ScriptedLlmClient([reply]), spec()))
+
+
+IMPLEMENTATIONS: tuple[type[BaseTrapWriter], ...] = (ScriptedTrapWriter, LlmTrapWriter)
+BUILD: dict[type[BaseTrapWriter], Callable[[Scripted], BaseTrapWriter]] = {
+    ScriptedTrapWriter: _scripted,
+    LlmTrapWriter: _llm,
+}
 
 
 @pytest.fixture(params=IMPLEMENTATIONS, ids=lambda cls: cls.__name__)

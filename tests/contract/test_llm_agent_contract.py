@@ -20,6 +20,8 @@ from bio_claim_check.features.answer.answer_models import AnswerPayload
 from bio_claim_check.features.answer.over_eager_answer_llm_agent import OverEagerAnswerLlmAgent
 from bio_claim_check.features.answer.strict_answer_llm_agent import StrictAnswerLlmAgent
 from bio_claim_check.features.retrieval.in_memory_literature_source import FAKE_CORPUS
+from bio_claim_check.features.traps.models import TrapPayload
+from bio_claim_check.features.traps.trap_llm_agent import TrapLlmAgent
 from bio_claim_check.features.verify.verify_llm_agent import VerifyLlmAgent
 from bio_claim_check.features.verify.verify_models import VerifyPayload
 from tests.support.events import stepping_clock
@@ -34,6 +36,7 @@ IMPLEMENTATIONS: tuple[type[AnyAgent], ...] = (
     StrictAnswerLlmAgent,
     OverEagerAnswerLlmAgent,
     VerifyLlmAgent,
+    TrapLlmAgent,
 )
 
 
@@ -59,6 +62,15 @@ CASES: dict[type[AnyAgent], AgentCase] = {
             rules=default_rulepack(),
         ),
         reply='{"label": "not_in_source", "overstated_reason": null, "evidence": null, "reason": "Absent."}',
+    ),
+    TrapLlmAgent: AgentCase(
+        payload=TrapPayload(
+            reason="preclinical_to_clinical",
+            definition="A finding in animals stated as if shown in people.",
+            title=FAKE_CORPUS[0].title,
+            abstract=FAKE_CORPUS[0].abstract,
+        ),
+        reply='{"parent": "OS-912 reduced plaque in mice.", "trap": "OS-912 reduces plaque in people."}',
     ),
 }
 

@@ -11,11 +11,13 @@ No LLM is involved in this module.
 """
 
 import hashlib
+from dataclasses import dataclass
 from typing import Final, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from bio_claim_check.common.models import NonBlankStr, Sha256Hex, ValidatedModel
+from bio_claim_check.common.text import CleanedText
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
 from bio_claim_check.features.contracts.labels import Disposition, FailureKind, Label, OverstatedReason
 
@@ -35,6 +37,16 @@ def opaque_id(source_id: SourceId, role: Role, rule: FloorRule | None) -> ClaimI
     """`t` + 11 hex characters: stable for a (source, role, rule), and says nothing about any of them."""
     digest = hashlib.sha256(f"{TRAP_SALT}|{source_id}|{role}|{rule or '-'}".encode()).hexdigest()
     return "t" + digest[:11]
+
+
+@dataclass(frozen=True, slots=True)
+class TrapPayload:
+    """What the trap writer sees: one kind's definition and one paper. No id, question or other paper."""
+
+    reason: str
+    definition: str
+    title: str
+    abstract: CleanedText
 
 
 class TrapDraft(BaseModel):

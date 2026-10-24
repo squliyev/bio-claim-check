@@ -84,7 +84,8 @@ class Settings(BaseSettings):
 
     answer_model: str = "gpt-6.1-sol"
     verifier_model: str = "claude-opus-4-8"
-    trap_model: str = "Kimi-K2.6-1"
+    trap_model: str = "gpt-6.1-sol"
+    """S13 (ADR 0022): the answerer's deployment; not the verifier's family. Kimi is deferred (A10)."""
 
     # No global "a provider must be configured" check: retrieval (S06) needs none. The LLM roles check
     # their own provider when they are built (S08), so the error names the role that needs it.

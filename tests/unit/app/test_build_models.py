@@ -38,7 +38,7 @@ def test_roles_resolve_when_their_provider_is_configured() -> None:
     assert (roles.answer.deployment, roles.verifier.deployment, roles.trap.deployment) == (
         "gpt-6.1-sol",
         "claude-opus-4-8",
-        "Kimi-K2.6-1",
+        "gpt-6.1-sol",
     )
 
 

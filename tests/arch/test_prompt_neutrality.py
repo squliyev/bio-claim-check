@@ -13,8 +13,9 @@ import re
 import pytest
 
 from bio_claim_check.app.container import default_rulepack
-from bio_claim_check.features.answer.answer_prompts import OVER_EAGER_PROMPT, STRICT_PROMPT
-from bio_claim_check.features.verify.verify_prompts import VERIFY_PROMPT, render_rules
+from bio_claim_check.engine.prompts.prompt_template import PromptTemplate
+from bio_claim_check.features.verify.verify_prompts import render_rules
+from tests.support.guards import import_package
 from tests.support.paths import ROOT
 
 pytestmark = pytest.mark.arch
@@ -57,8 +58,18 @@ def topic_terms() -> dict[str, list[str]]:
     return terms
 
 
+def feature_prompts() -> dict[str, PromptTemplate]:
+    """Every module-level prompt in a feature slice, by name, found at runtime (so a new one is covered)."""
+    return {
+        value.name: value
+        for module in import_package("bio_claim_check.features").values()
+        for value in vars(module).values()
+        if isinstance(value, PromptTemplate)
+    }
+
+
 def _prompt_text() -> str:
-    prompts = (VERIFY_PROMPT, STRICT_PROMPT, OVER_EAGER_PROMPT)
+    prompts = tuple(feature_prompts().values())
     return " ".join([p.system for p in prompts] + [render_rules(default_rulepack())]).lower()
 
 
@@ -71,6 +82,10 @@ def test_no_prompt_or_rule_text_names_a_benchmark_topic() -> None:
     text = _prompt_text()
     named = [f"{t} {ids}" for t, ids in sorted(topic_terms().items()) if t not in GENERIC and _named(t, text)]
     assert named == []
+
+
+def test_every_feature_prompt_is_covered() -> None:
+    assert {"verify", "answer_strict", "answer_over_eager", "trap"} <= set(feature_prompts())
 
 
 def test_the_topic_terms_are_read_and_every_generic_term_is_one() -> None:

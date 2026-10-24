@@ -21,7 +21,7 @@ def test_defaults_bind_three_model_roles() -> None:
     assert (s.answer_model, s.verifier_model, s.trap_model) == (
         "gpt-6.1-sol",
         "claude-opus-4-8",
-        "Kimi-K2.6-1",
+        "gpt-6.1-sol",
     )
     assert s.cache_mode == "read-write"
     assert s.var_dir == Path("var")
