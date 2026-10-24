@@ -8,11 +8,12 @@ the repo; ask the maintainer for the rows relevant to your session.
 ## 1. Where things stand
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
-  S12b, S12c (tag `prompts-frozen-v2`).
+  S12b, S12c (tag `prompts-frozen-v2`). **S13 code is done** (ADR 0022); its data step is not (section 4).
   CI is green on `main`.
-- **Next: S13 (trap generator) on dev**, with the maintainer's test-split audit in parallel (section 4). Then
+- **Next: finish S13** (live `traps generate`, the author's audit, commit the dev set), with the maintainer's
+  test-split audit in parallel (section 4). Then
   the demo track: proof checkpoint → S17a (slim UI) → H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
-- Next free ids: invariant **I76**, ADR **0022**.
+- Next free ids: invariant **I79**, ADR **0023**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
 - The judge is **frozen** (`freeze/v2.json` active, ADR 0020, 0021). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
@@ -42,10 +43,10 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S13 — the trap generator (dev first), with the test-split audit in parallel
+## 4. Next: finish S13 (dev trap set), with the test-split audit in parallel
 
-**In parallel with S13 (maintainer, not an agent session):** the test-split eligibility audit and the
-unanswerable check. It gates only test-split traps; S13 starts on dev. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
+**In parallel (maintainer, not an agent session):** the test-split eligibility audit and the
+unanswerable check. It gates only test-split traps. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
 `datasets/corpus.yaml`, the author reads the first `audit_n` (50) candidates in the public order:
 
 ```bash
@@ -61,14 +62,27 @@ uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var
 - An agent may run these commands but never reads a test sheet or test abstract, and never commits a sheet
   (abstract text).
 
-**S13 goal:** see the roadmap row (rule floor + model traps within eligibility, validity gate, audit
-sheet, parent pairing, structural leakage test).
+**Finishing S13 (the dev trap set, [ADR 0022](adr/0022-trap-set-and-outcomes.md)):**
 
-**Demo-track bindings for S13:**
-- Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a
-  `Report` (`run` always calls the answerer; a Report is an answered question). The S13 ADR fixes that contract.
-- The proof checkpoint reports trap disposition counts and catch rate on dev, and a false-alarm rate only on an
-  author-confirmed dev-parent subset, labelled exploratory. Real clean-parent labels stay in S18.
+```bash
+# 1. the maintainer confirms TRAP_PROMPT (features/traps/trap_prompts.py), then, announced (live, costs tokens):
+BCC_MAX_LIVE_LLM_CALLS=120 uv run bio-claim-check traps generate --per-kind 12   # 60 drafts + 1 repair each
+# 2. export the sheet (cache only) and let the author decide every row (confirm/reject + a reason per reject):
+uv run bio-claim-check traps audit-sheet --draft var/traps/dev-draft-12-<sha>.jsonl
+# 3. commit F: the confirmed set (claims only), counts vs the 12-per-kind target and attrition in dev-log S13:
+uv run bio-claim-check traps apply-audit --draft var/traps/dev-draft-12-<sha>.jsonl --sheet var/audit/traps-dev-<sha>.csv
+```
+
+- `background_as_result` has only 9 eligible dev sources, so it gets 9 drafts at most. The run prints
+  each kind's shortfall, and the maintainer chose this cap over widening the pool (ADR 0022 §6).
+  60 − 3 = 57 drafts.
+- Any other kind short of 12 confirmed traps is topped up by a larger `--per-kind`. The order is deterministic, so
+  earlier drafts are cache hits, but the new draft has a new sha256 and needs a new sheet. Decisions
+  already made can be copied over, row by row.
+- `traps verify` is the proof checkpoint's step, not S13's. It refuses unless this code is the active
+  freeze. Use `--record` once the counts have been read.
+- Never commit a draft or a sheet: drafts list gate problems, and sheets hold abstract text.
+  `tests/arch/test_trap_set.py` allows only sets, results and the README under `traps/`.
 
 **Bindings from S12b and S12c (must hold):**
 - Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside
@@ -126,7 +140,13 @@ sheet, parent pairing, structural leakage test).
   [--record]`, `freeze write`, `corpus audit-sheet|apply-audit --split test` (ADR 0020).
 - **S12c:** `tests/arch/test_prompt_neutrality.py` (I75); rule pack `0.2.0`; challenge results in
   `challenge/results/<freeze>.json`; `challenge run --record` and `freeze write` default to `ACTIVE_FREEZE`
-  (ADR 0021). `features/traps/` and `features/baselines/` are empty packages for S13 and S14.
+  (ADR 0021). `features/baselines/` is an empty package for S14.
+- **S13:** `features/contracts/outcome.py` (`PairOutcome`, read by challenge, traps and later S16).
+  `features/traps/` is the full slice: sampling, the validity gate, the rule floor, the audit sheet and counts
+  (all pure), plus `LlmTrapWriter` with `TRAP_PROMPT`. `app/usecases/traps.py` holds `generate`,
+  `sheet_for`, `apply_audit`, `verify_set`, and `set_problems`/`result_problems` (I76–I78). Commands:
+  `traps generate | audit-sheet | apply-audit | verify [--record]` (ADR 0022). The neutrality guard (I75)
+  now finds every `PromptTemplate` under `features` by kind.
 
 ## 6. Bindings for later sessions
 

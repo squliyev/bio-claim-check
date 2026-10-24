@@ -48,10 +48,9 @@ def test_a_source_goes_to_its_scarcest_kind_and_is_used_once() -> None:
     assert len({p.source_id for p in picks}) == len(picks)
 
 
-def test_one_source_per_cluster() -> None:
+def test_one_source_per_cluster_and_a_short_kind_gets_what_it_has() -> None:
     entries = [_with(source_entry(n), cluster_id="MED:1") for n in (1, 2, 3)]
-    with pytest.raises(TrapSamplingError, match="1 eligible"):
-        sample(entries, (PRE,), 2, questions=QS, max_rank=20)
+    assert len(sample(entries, (PRE,), 2, questions=QS, max_rank=20)) == 1
 
 
 def test_a_larger_per_kind_extends_the_earlier_picks() -> None:
@@ -62,9 +61,9 @@ def test_a_larger_per_kind_extends_the_earlier_picks() -> None:
         assert [p for p in large if p.kind is kind][:3] == [p for p in small if p.kind is kind]
 
 
-def test_infeasible_targets_name_every_short_kind_and_per_kind_must_be_positive() -> None:
+def test_only_a_kind_with_no_source_is_refused_and_per_kind_must_be_positive() -> None:
     with pytest.raises(TrapSamplingError) as err:
         sample([source_entry(1)], (PRE, BG), 2, questions=QS, max_rank=20)
-    assert len(err.value.problems) == 2
+    assert err.value.problems == ("background_as_result: no eligible dev source",)
     with pytest.raises(ValueError, match="at least 1"):
         sample([], (PRE,), 0, questions=QS, max_rank=20)

@@ -9,7 +9,7 @@ import contextlib
 import csv
 import io
 import json
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from pathlib import Path
 
 import pytest
@@ -25,12 +25,13 @@ from bio_claim_check.app.usecases.challenge import ChallengePorts
 from bio_claim_check.app.usecases.traps import TrapWriterPorts, draft_bytes, generate, parse_set
 from bio_claim_check.engine.events.emitter import EventEmitter
 from bio_claim_check.engine.llm.model_spec import ModelSpec
+from bio_claim_check.features.contracts.corpus import CorpusSpec
 from bio_claim_check.features.contracts.labels import Label, OverstatedReason
 from bio_claim_check.features.contracts.verdict import VerifierOutput
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED
 from bio_claim_check.features.corpus.seal import sealed_bytes
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
-from bio_claim_check.features.traps.models import TrapDraft
+from bio_claim_check.features.traps.models import DraftRow, TrapDraft
 from bio_claim_check.features.traps.scripted_trap_writer import ScriptedTrapWriter
 from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
 
@@ -112,6 +113,40 @@ def test_generate_refuses_an_infeasible_target_before_any_call(
     )
     assert (code, "cannot meet the target" in err) == (ExitCode.DATASET, True)
     assert not (tmp_path / "var" / "traps").exists()
+
+
+def test_generate_writes_the_draft_and_reports_each_kind_short_of_its_target(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _writer(monkeypatch)
+
+    def certainty_only(
+        ports: TrapWriterPorts,
+        files: Mapping[str, bytes],
+        spec: CorpusSpec,
+        *,
+        per_kind: int,
+        origin_id: str,
+        max_live_calls: int | None,
+    ) -> tuple[DraftRow, ...]:  # the fixture has dev candidates for one kind only
+        return generate(
+            ports,
+            files,
+            spec,
+            per_kind=per_kind,
+            origin_id=origin_id,
+            max_live_calls=max_live_calls,
+            kinds=(OverstatedReason.CERTAINTY_INFLATION,),
+        )
+
+    monkeypatch.setattr(cli, "generate", certainty_only)
+    code, out, _ = invoke(
+        tmp_path, "traps", "generate", "--per-kind", "2", "--dataset", str(_dataset(tmp_path))
+    )
+    assert code == 0
+    assert "  certainty_inflation: 1 sources (short of 2: the dev corpus has no more)" in out
+    assert "  background_as_result: 0 sources (short of 2: the dev corpus has no more)" in out
+    assert len(list((tmp_path / "var" / "traps").glob("dev-draft-2-*.jsonl"))) == 1
 
 
 def test_generate_refuses_a_budget_it_cannot_finish(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

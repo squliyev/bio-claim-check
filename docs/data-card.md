@@ -105,6 +105,17 @@ population or quantity.
 | glp1-q4 | semaglutide CSF/plasma ratio in Alzheimer's disease | 11 | **Holds.** No abstract in the top 10 states the ratio |
 | metformin-q4 | metformin concentration in glioblastoma tissue at antidiabetic doses | 47 | **Holds.** A phase I dose study and cell/xenograft work, but no tissue concentration |
 
+**Dev trap set (S13, [ADR 0022](adr/0022-trap-set-and-outcomes.md)).** Traps are planted only on
+dev sources. Each sampled source has one model call (`gpt-6.1-sol`) that drafts a supported parent and a
+trap of the sampled kind. A pure gate drops claims over 30 words, claims copying an 8-word run of the
+abstract, and claims echoing a 6-word run of a rule-pack example. The author confirms each parent and
+each trap in one sheet, including the rule-floor swaps. Only confirmed rows are committed, with
+`origin = model` and `confirmed_by = author`. This is a **controlled paired design**: one call writes
+both claims, which favours lexical contrasts, so trap catch rates are not rates on natural spin.
+The target is 12 confirmed traps per kind. `background_as_result` is capped at its 9 eligible dev
+sources (18 sieve candidates, 9 within a question's pool), so its counts are smaller and less precise.
+Counts and attrition are in `docs/dev-log/S13.md`.
+
 **Not done yet, by design:**
 - **Test audit.** The author confirms the first 50 test candidates per kind in the public order, only
   after the prompts and rule packs are frozen (now `prompts-frozen-v2`, S12c). Until then nobody on the
@@ -124,8 +135,8 @@ population or quantity.
   candidate set leans towards older, indexed primary research.
 - **Title-anchored, relevance-ranked pools.** "Citable records among the first 100 hits" depends on
   Europe PMC's ranking on the snapshot date; it is not a systematic search.
-- **Planted vs natural errors.** Traps will be planted by a model; natural overstatement may look
-  different. The two will be reported separately.
+- **Planted vs natural errors.** Traps are planted by a model in a paired design (ADR 0022); natural
+  overstatement may look different. The two are reported separately.
 - **Faithfulness is not truth.** A claim faithful to a 2023 abstract can be wrong today; the 2024 cutoff
   misses later null results.
 - **The MeSH-cue baseline shares the sieve's signal.** Paired catch-rate vs false-alarm comparisons

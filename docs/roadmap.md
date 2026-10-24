@@ -5,9 +5,10 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S12c done):** S01–S12c are done; tag `prompts-frozen-v2`. Next: **S13** (trap generator) on dev, with
-the maintainer's test-split audit running in parallel (it gates only test-split traps). Then the **demo track**
-(proof checkpoint → S17a → H1) before returning to S14.
+**Status (S13 code done):** S01–S12c are done; tag `prompts-frozen-v2`. S13's generator, audit sheet,
+`apply-audit` and `traps verify` are built (ADR 0022); its dev trap set lands after a live `traps generate`
+run and the author's audit. Then the **demo track** (proof checkpoint → S17a → H1) before returning to S14.
+The maintainer's test-split audit runs in parallel and gates only test-split traps.
 
 ## Product
 

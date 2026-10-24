@@ -4,9 +4,13 @@ Why: the trap set must not be hand-picked, and a larger `--per-kind` must extend
 than reshuffle it (so earlier drafts stay cache hits). Each eligible source is therefore assigned once, to
 its scarcest candidate kind (fewest eligible sources, then the order of `kinds`), before anything is cut.
 Within a kind the order is `sha256(TRAP_SALT|source_id)`, and at most one source per cluster is used, so
-near-duplicate papers do not inflate a kind. A sieve candidate is not a label: the author's audit is the
-eligibility check. Only dev sources are eligible (I78); a source that can never be a trap (retracted, a
-review, unindexed) has no candidates by the `SourceEntry` contract, so it is never picked.
+near-duplicate papers do not inflate a kind. A kind with fewer sources than `per_kind` gets every source
+it has (the shortfall is the caller's to report); only a kind with none is refused. The one-pass greedy
+assignment can leave a kind short that a full matching would fill; it is kept because a matching would
+reorder picks as `per_kind` grows, breaking the cache-hit top-up. A sieve candidate is not a label: the
+author's audit is the eligibility check. Only dev sources are eligible (I78); a source that can never be a
+trap (retracted, a review, unindexed) has no candidates by the `SourceEntry` contract, so it is never
+picked.
 Must not: read files, call a model, or look at the test split.
 
 No LLM is involved in this module.
@@ -33,7 +37,7 @@ class Pick(ValidatedModel):
 
 
 class TrapSamplingError(BccError):
-    """The dev corpus cannot supply the requested number of sources for some kind."""
+    """Some kind has no eligible dev source at all; nothing was drafted."""
 
     code = "traps.infeasible"
 
@@ -60,7 +64,7 @@ def sample(
     questions: Collection[str],
     max_rank: int,
 ) -> tuple[Pick, ...]:
-    """`per_kind` picks per kind, kinds in the order given; raises if any kind has too few sources."""
+    """Up to `per_kind` picks per kind, kinds in the order given; raises if any kind has none."""
     if per_kind < 1:
         raise ValueError("per_kind must be at least 1")
     eligible: dict[SourceId, tuple[SourceEntry, str]] = {}
@@ -100,8 +104,8 @@ def sample(
             )
             if len(chosen) == per_kind:
                 break
-        if len(chosen) < per_kind:
-            problems.append(f"{kind.value}: {len(chosen)} eligible dev sources, {per_kind} requested")
+        if not chosen:
+            problems.append(f"{kind.value}: no eligible dev source")
         picks.extend(chosen)
     if problems:
         raise TrapSamplingError(problems)

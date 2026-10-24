@@ -94,6 +94,7 @@ from bio_claim_check.app.usecases.retractions import (
 from bio_claim_check.app.usecases.run import RunInputError, run_question
 from bio_claim_check.app.usecases.run_dev import DevRunRecord, run_dev
 from bio_claim_check.app.usecases.traps import (
+    SCORED_KINDS,
     TrapBudgetError,
     TrapInputError,
     TrapPoolError,
@@ -972,6 +973,10 @@ def traps_generate_command(
     failed = sum(1 for r in rows if r.failure is not None)
     gated = sum(1 for r in rows if r.problems)
     typer.echo(f"rows: {len(rows)}; writer failures: {failed}; excluded by the gate: {gated}")
+    for kind in SCORED_KINDS:
+        drafted = sum(1 for r in rows if r.role == "parent" and r.kind is kind)
+        short = f" (short of {per_kind}: the dev corpus has no more)" if drafted < per_kind else ""
+        typer.echo(f"  {kind.value}: {drafted} sources{short}")
     typer.echo(f"wrote: {path}")
     typer.echo("next: traps audit-sheet --draft " + str(path))
 
@@ -1025,9 +1030,11 @@ def traps_apply_audit_command(
 def traps_verify_command(
     traps: TrapSetFile = DEFAULT_TRAPS,
     record: Annotated[
-        bool, typer.Option("--record", help="Also publish results/<name>-<set>.json beside the set, once.")
+        bool,
+        typer.Option(
+            "--record", help="Also publish results/<active freeze>-<set>.json beside the set, once."
+        ),
     ] = False,
-    name: FreezeName = ACTIVE_FREEZE,
     dataset: DatasetDir = Path("datasets"),
     env_file: EnvFile = Path(".env"),
 ) -> None:
@@ -1083,7 +1090,7 @@ def traps_verify_command(
     typer.echo(f"attempt: {attempt}")
     if record:
         try:
-            path = publish_document(traps.parent / "results", f"{name}-{traps.stem}.json", out)
+            path = publish_document(traps.parent / "results", f"{ACTIVE_FREEZE}-{traps.stem}.json", out)
         except OutputConflictError as err:
             _fail(ExitCode.OUTPUT, str(err))
         typer.echo(f"recorded: {path}")

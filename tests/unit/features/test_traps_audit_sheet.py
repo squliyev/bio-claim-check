@@ -1,6 +1,7 @@
 """The trap audit sheet: bound to its draft, every candidate decided, nothing edited, parents gate traps."""
 
 import csv
+import hashlib
 import io
 
 import pytest
@@ -16,9 +17,11 @@ from bio_claim_check.features.traps.audit_sheet import (
     parse_decisions,
     sheet_csv,
 )
+from bio_claim_check.features.traps.models import DraftRow
 
 SHA = "c" * 64
-ROWS = (
+ABSTRACTS = {f"MED:{n}": CleanedText(f"=abstract {n}") for n in range(1, 6)}
+_DRAFTED = (
     parent("MED:1"),
     trap("MED:1"),
     trap("MED:1", "Drug X raised plaque in mice.", rule="direction"),
@@ -29,7 +32,12 @@ ROWS = (
     parent("MED:4", None, failure=FailureKind.STRUCTURED_OUTPUT),
     trap("MED:5", problems=("copies",)),
 )
-ABSTRACTS = {f"MED:{n}": CleanedText(f"=abstract {n}") for n in range(1, 6)}
+ROWS = tuple(
+    DraftRow.model_validate(
+        {**r.model_dump(), "abstract_sha256": hashlib.sha256(ABSTRACTS[r.source_id].encode()).hexdigest()}
+    )
+    for r in _DRAFTED
+)
 
 
 def _rows(text: str) -> list[dict[str, str]]:
@@ -111,5 +119,14 @@ def test_added_duplicated_missing_and_undecided_rows_are_refused() -> None:
 
 def test_missing_columns_are_refused() -> None:
     assert _problems("id,decision\n") == (
-        "missing column(s): draft_sha256, pair_id, role, kind, generator, rule, source_id, claim, reason",
+        "missing column(s): draft_sha256, pair_id, role, kind, generator, rule, source_id, claim, abstract, "
+        "reason",
     )
+
+
+def test_an_edited_or_blanked_abstract_is_refused() -> None:
+    filled = _fill(sheet_csv(ROWS, SHA, ABSTRACTS), {})
+    edited = filled.replace("'=abstract 2", "'=abstract two")
+    assert sum("edited column(s) abstract" in p for p in _problems(edited)) == 2
+    blanked = _fill(sheet_csv(ROWS, SHA, {**ABSTRACTS, "MED:1": CleanedText("")}), {})
+    assert sum("edited column(s) abstract" in p for p in _problems(blanked)) == 3

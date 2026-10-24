@@ -4,8 +4,10 @@ Why: a model drafted the claims, so ground truth exists only once the author con
 The sheet lists every row that passed the validity gate, parents before their traps, with the abstract to
 read against. It carries the draft file's sha256, so a sheet made for another draft cannot be applied, and
 the author may change only `decision` and `reason`: an added, missing, duplicated or edited row is
-refused. A trap is confirmed only with its parent; a rejected parent drops its traps. No model rationale is
-shown (the draft has none), so the author judges the claim, not the writer's argument.
+refused, and so is a row whose abstract no longer hashes to its sealed `abstract_sha256` (the decision
+was made against the real abstract, without this module ever holding it). A trap is confirmed only with
+its parent; a rejected parent drops its traps. No model rationale is shown (the draft has none), so the
+author judges the claim, not the writer's argument.
 The author checks: the parent is fully supported and not a close paraphrase of a sentence; a model trap
 commits its kind and only its kind; a rule-floor trap changes what the parent states.
 Must not: read files (abstracts are passed in), or decide anything itself.
@@ -14,6 +16,7 @@ No LLM is involved in this module.
 """
 
 import csv
+import hashlib
 import io
 from collections.abc import Mapping, Sequence
 from typing import Final, Literal, Self
@@ -71,6 +74,12 @@ def _cell(text: str) -> str:
     return "'" + text if text.startswith(_FORMULA_START) else text
 
 
+def _shows(cell: str, abstract_sha256: str) -> bool:
+    """Whether a cell is the sealed abstract, as written (formula-escaped or not)."""
+    shown = {cell, cell[1:]} if cell.startswith("'") else {cell}
+    return any(hashlib.sha256(text.encode()).hexdigest() == abstract_sha256 for text in shown)
+
+
 def candidates(rows: Sequence[DraftRow]) -> tuple[DraftRow, ...]:
     """The rows the author decides: gate-passing rows whose parent also passed, parent first in each pair."""
     parents = {r.id for r in rows if r.role == "parent" and r.candidate}
@@ -116,7 +125,7 @@ def parse_decisions(
 ) -> tuple[TrapDecision, ...]:
     """Read a filled-in sheet made from exactly these rows; decisions come back in candidate order."""
     reader = csv.DictReader(io.StringIO(csv_text))
-    missing_columns = [c for c in COLUMNS if c != "abstract" and c not in (reader.fieldnames or ())]
+    missing_columns = [c for c in COLUMNS if c not in (reader.fieldnames or ())]
     if missing_columns:
         raise TrapAuditError([f"missing column(s): {', '.join(missing_columns)}"])
     cells_by_line = list(enumerate(reader, start=2))
@@ -140,6 +149,8 @@ def parse_decisions(
             continue
         seen.add(row_id)
         edited = [k for k, v in _fixed(row, draft_sha256).items() if (cells[k] or "") != v]
+        if not _shows(cells["abstract"] or "", row.abstract_sha256):
+            edited.append("abstract")
         if edited:
             problems.append(f"line {line}: {row_id}: edited column(s) {', '.join(edited)}")
             continue

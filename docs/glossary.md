@@ -45,6 +45,17 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
 - **Prompt freeze:** `freeze/<name>.json`, which binds one judge fingerprint to the committed challenge
   result. `app/freeze.py` pins its bytes and names the active one (v2, ADR 0021). A test-split audit records the active
   `freeze_sha256` as its `prompts_sha256`. A dev audit's `prompts_sha256` is typed by the author.
+- **Trap set:** `traps/dev-v1.jsonl`, author-confirmed dev items with predeclared ground truth
+  ([ADR 0022](./adr/0022-trap-set-and-outcomes.md)). Each source gives a **parent** (a supported claim),
+  a **model trap** (the parent rewritten to commit one kind) and up to three **rule-floor traps** (a
+  direction, operator or dose swap of the parent). Claims only, never abstract text.
+- **Caught / exact / false alarm:** a trap is *caught* when its disposition is `flagged`, and *exact* when
+  its label (and reason, if declared) is also the expected one. A *false alarm* is a flagged parent.
+  `needs_review` and `failed` stay in every denominator. All are exploratory on dev.
+- **Trap draft:** `var/traps/dev-draft-*.jsonl`, every row a run produced, including writer failures and
+  gate exclusions. It is never committed. The audit sheet is bound to its sha256.
+- **Writer family flag:** `writer_family_flag` in a trap result is true when the trap writer and the
+  verifier share a model family, which is a disclosed bias.
 - **Split:** `dev` (for tuning prompts and rule packs) or `test` (sealed, for reported numbers only).
 - **Repeat:** one of several identical model requests made on purpose to measure instability. Its
   `repeat_idx` is part of the cache key, so repeats are distinct provider calls and replay keeps them

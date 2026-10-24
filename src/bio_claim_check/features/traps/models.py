@@ -138,8 +138,8 @@ class TrapItem(ValidatedModel):
         truth = (self.expected_disposition, self.expected_label, self.expected_reason)
         if truth != expected_truth(self.role, self.generator, self.kind):
             raise ValueError("expected_*: not the ground truth for this role and generator (ADR 0022)")
-        if self.role == "parent" and self.pair_id != self.id:
-            raise ValueError("pair_id: a parent is its own pair")
+        if self.role == "parent" and (self.generator != "model" or self.pair_id != self.id):
+            raise ValueError("a parent is drafted by the model and is its own pair")
         return self
 
 

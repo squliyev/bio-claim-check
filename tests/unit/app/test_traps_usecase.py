@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from typing import override
 
 import pytest
+from pydantic import ValidationError
 from tests.support.corpus import SPEC_FILE, QueryLiteratureSource, dataset_files, world
 
 from bio_claim_check.app.container import default_rulepack, load_corpus_spec
@@ -30,11 +31,12 @@ from bio_claim_check.app.usecases.traps import (
     verify_set,
 )
 from bio_claim_check.common.model_family import ModelFamily
+from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
 from bio_claim_check.features.contracts.labels import Disposition, FailureKind, Label, OverstatedReason
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.contracts.rulepack import Rule, RulePack
 from bio_claim_check.features.contracts.verdict import Claim, Verdict, VerifierFailure, VerifierOutput
-from bio_claim_check.features.corpus.layout import MANIFEST, SEALED
+from bio_claim_check.features.corpus.layout import DEV_SOURCES, MANIFEST, SEALED
 from bio_claim_check.features.corpus.seal import sealed_bytes
 from bio_claim_check.features.corpus.serialise import sha256_hex
 from bio_claim_check.features.traps.audit_sheet import TrapAuditError
@@ -224,13 +226,15 @@ def _set_of(rows: Sequence[Mapping[str, object]]) -> bytes:
 
 
 def test_a_committed_set_passes_its_own_checks() -> None:
-    assert set_problems(_committed_set(), FILES, PACK) == []
+    assert set_problems(_committed_set(), FILES, SPEC, PACK) == []
 
 
 def test_a_test_question_is_refused() -> None:
     rows = _items(_committed_set())
     rows[0]["question_id"] = "fx-glp1-q2"
-    assert f"{rows[0]['id']}: fx-glp1-q2 is not a dev question" in set_problems(_set_of(rows), FILES, PACK)
+    assert f"{rows[0]['id']}: fx-glp1-q2 is not a dev question" in set_problems(
+        _set_of(rows), FILES, SPEC, PACK
+    )
 
 
 def test_a_test_source_is_refused() -> None:
@@ -243,18 +247,18 @@ def test_a_test_source_is_refused() -> None:
         }
         for i in parse_set(_committed_set())
     ]
-    assert any("MED:4 is not a dev source" in p for p in set_problems(_set_of(rows), FILES, PACK))
+    assert any("MED:4 is not a dev source" in p for p in set_problems(_set_of(rows), FILES, SPEC, PACK))
 
 
 def test_a_changed_abstract_hash_is_refused() -> None:
     rows = _items(_committed_set())
     rows[0]["abstract_sha256"] = "d" * 64
-    assert any("differs from the sealed dataset" in p for p in set_problems(_set_of(rows), FILES, PACK))
+    assert any("differs from the sealed dataset" in p for p in set_problems(_set_of(rows), FILES, SPEC, PACK))
 
 
 def test_a_trap_without_its_parent_is_refused() -> None:
     rows = [r for r in _items(_committed_set()) if r["role"] == "trap"]
-    assert any("is not in the set" in p for p in set_problems(_set_of(rows), FILES, PACK))
+    assert any("is not in the set" in p for p in set_problems(_set_of(rows), FILES, SPEC, PACK))
 
 
 def test_a_claim_echoing_a_rule_pack_example_is_refused() -> None:
@@ -262,13 +266,13 @@ def test_a_claim_echoing_a_rule_pack_example_is_refused() -> None:
     rows = _items(_committed_set())
     trap = next(r for r in rows if r["id"] == TRAP_ID)
     trap["claim"] = " ".join(example.split()[:30])
-    assert any(p.startswith(f"{TRAP_ID}: ") for p in set_problems(_set_of(rows), FILES, PACK))
+    assert any(p.startswith(f"{TRAP_ID}: ") for p in set_problems(_set_of(rows), FILES, SPEC, PACK))
 
 
 def test_a_non_canonical_set_is_refused() -> None:
     data = _committed_set()
     assert "the set is not canonical" in " ".join(
-        set_problems(b"\n".join(reversed(data.splitlines())) + b"\n", FILES, PACK)
+        set_problems(b"\n".join(reversed(data.splitlines())) + b"\n", FILES, SPEC, PACK)
     )
 
 
@@ -314,6 +318,18 @@ def _verify(
     return trap_result_bytes(result), source
 
 
+def _families(deployment: str) -> ModelFamily:
+    if deployment == "unknown-writer":
+        raise UnknownDeploymentError(deployment, {})
+    return ModelFamily.ANTHROPIC if deployment == "verifier-deployment" else ModelFamily.OPENAI
+
+
+def _result_problems(data: bytes, result: bytes, judge: str = "b" * 64) -> list[str]:
+    return result_problems(
+        data, result, FILES, judge_sha256=judge, verifier="verifier-deployment", family_of=_families
+    )
+
+
 def test_the_verifier_receives_exactly_the_claim_text() -> None:
     data = _committed_set()
     verifier = RecordingVerifier(ScriptedVerifier(SCRIPT))
@@ -338,7 +354,7 @@ def test_verify_counts_every_item_and_a_failure_is_not_caught() -> None:
         by["trap", "model"]["exact"],
     ) == (1, 1, 1)
     assert (by["trap", "rule_floor"]["failed"], by["trap", "rule_floor"]["flagged"]) == (1, 0)
-    assert result_problems(data, out) == []
+    assert _result_problems(data, out) == []
 
 
 def test_the_same_family_is_flagged() -> None:
@@ -367,6 +383,85 @@ def test_a_result_with_edited_counts_or_for_another_set_is_refused() -> None:
     flagged = next(r for r in result["counts"]["rows"] if r["role"] == "parent")
     flagged["passed"], flagged["flagged"] = 0, 1
     edited = (json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode()
-    assert "the recorded counts do not match the outcomes" in result_problems(data, edited)
+    assert "the recorded counts do not match the outcomes" in _result_problems(data, edited)
     other = _set_of([r for r in _items(data) if r["generator"] == "model"])
-    assert "the result is for another trap set" in result_problems(other, out)
+    assert "the result is for another trap set" in _result_problems(other, out)
+
+
+def test_a_result_with_another_judge_seal_or_family_flag_is_refused() -> None:
+    data = _committed_set()
+    out, _ = _verify(data, ScriptedVerifier(SCRIPT))
+    assert "names another judge or verifier" in " ".join(_result_problems(data, out, judge="e" * 64))
+    result = json.loads(out)
+    result["corpus_seal"], result["writer_family_flag"] = "f" * 64, True
+    edited = (json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n").encode()
+    problems = _result_problems(data, edited)
+    assert "the result is for another sealed dataset" in problems
+    assert "writer_family_flag does not match the writers and the verifier" in problems
+
+
+def test_an_edited_rule_floor_claim_is_refused() -> None:
+    rows = _items(_committed_set())
+    floor = next(r for r in rows if r["id"] == FLOOR_ID)
+    floor["claim"] = "Memory vanished in treated mice."
+    assert f"{FLOOR_ID}: not the direction rule-floor mutation of its parent" in set_problems(
+        _set_of(rows), FILES, SPEC, PACK
+    )
+
+
+def test_a_kind_the_source_is_not_a_candidate_for_is_refused() -> None:
+    rows = _items(_committed_set())
+    for row in rows:
+        row["kind"] = OverstatedReason.CORRELATION_AS_CAUSATION.value
+        if row["id"] == TRAP_ID:
+            row["expected_reason"] = OverstatedReason.CORRELATION_AS_CAUSATION.value
+    problems = set_problems(_set_of(rows), FILES, SPEC, PACK)
+    assert f"{PARENT_ID}: correlation_as_causation is not a scored sieve candidate of its source" in problems
+
+
+def test_a_source_ranked_outside_its_questions_pool_is_refused() -> None:
+    lines: list[str] = []
+    for line in FILES[DEV_SOURCES].decode().splitlines():
+        row = json.loads(line)
+        if row["source_id"] == SOURCE:
+            row["ranks"] = [{**r, "rank": SPEC.pool_hits + 1} for r in row["ranks"]]
+        lines.append(json.dumps(row))
+    files = {**FILES, DEV_SOURCES: ("\n".join(lines) + "\n").encode()}
+    problems = set_problems(_committed_set(), files, SPEC, PACK)
+    assert any("is not in the pool of fx-glp1-q1" in p for p in problems)
+
+
+FLOOR_PARENT = opaque_id(SOURCE, "parent", "direction")
+
+
+def test_a_rule_floor_parent_is_invalid() -> None:
+    row = next(r for r in _items(_committed_set()) if r["id"] == PARENT_ID)
+    with pytest.raises(ValidationError, match="drafted by the model"):
+        TrapItem.model_validate(
+            {
+                **row,
+                "id": FLOOR_PARENT,
+                "pair_id": FLOOR_PARENT,
+                "generator": "rule_floor",
+                "rule": "direction",
+            }
+        )
+
+
+def test_an_unknown_writer_is_refused_before_any_fetch() -> None:
+    rows = [{**r, "origin_id": "unknown-writer"} for r in _items(_committed_set())]
+    verifier = RecordingVerifier(ScriptedVerifier(SCRIPT))
+    source = QueryLiteratureSource(world())
+    with pytest.raises(TrapInputError, match="not in the model catalog"):
+        verify_set(
+            TrapVerifyPorts(literature=source, verifier=verifier, rules=PACK),
+            _set_of(rows),
+            FILES,
+            SPEC,
+            judge_sha256="b" * 64,
+            verifier="verifier-deployment",
+            verifier_family=ModelFamily.ANTHROPIC,
+            family_of=_families,
+            max_live_calls=40,
+        )
+    assert (source.calls, verifier.claims) == ([], [])

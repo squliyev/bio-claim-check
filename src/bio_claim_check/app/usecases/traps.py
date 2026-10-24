@@ -22,6 +22,7 @@ from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.common.text import CleanedText
 from bio_claim_check.engine.events.emitter import EventEmitter
+from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
 from bio_claim_check.features.contracts.corpus import CorpusSpec, CorpusSplit, QuestionEntry, SourceEntry
 from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import OverstatedReason
@@ -116,13 +117,13 @@ def _pools(
     spec: CorpusSpec,
     wanted: Sequence[tuple[str, SourceId]],
     emitter: EventEmitter | None,
-) -> dict[SourceId, Paper]:
-    """Each wanted source's paper from its question's dev pool; raises if one did not come back."""
-    found: dict[SourceId, Paper] = {}
+) -> dict[tuple[str, SourceId], Paper]:
+    """Each wanted source's paper from its own question's dev pool; raises if one did not come back."""
+    found: dict[tuple[str, SourceId], Paper] = {}
     for question_id in sorted({q for q, _ in wanted}):
         _, pool = dev_papers(source, files, spec, question_id, k=spec.pool_hits, emitter=emitter)
-        found.update({p.source_id: p for p in pool.papers})
-    if missing := sorted({s for _, s in wanted if s not in found}):
+        found.update({(question_id, p.source_id): p for p in pool.papers})
+    if missing := sorted({f"{s} ({q})" for q, s in wanted if (q, s) not in found}):
         raise TrapPoolError(f"{', '.join(missing)}: did not come back in the dev pool")
     return found
 
@@ -236,7 +237,7 @@ def generate(
     )
     rows: list[DraftRow] = []
     for pick in picks:
-        paper = papers[pick.source_id]
+        paper = papers[(pick.question_id, pick.source_id)]
         out = ports.writer.draft(pick.kind, _rule(ports.rules, pick.kind), paper)
         rows.extend(_draft_rows(pick, out, paper, ports.rules, origin_id))
     return tuple(rows)
@@ -266,7 +267,7 @@ def sheet_for(
     rows = parse_draft(draft)
     _sealed(files, spec)
     papers = _pools(source, files, spec, sorted({(r.question_id, r.source_id) for r in rows}), None)
-    abstracts: dict[SourceId, CleanedText] = {s: p.abstract for s, p in papers.items()}
+    abstracts: dict[SourceId, CleanedText] = {s: p.abstract for (_, s), p in papers.items()}
     return sheet_csv(rows, sha256_hex(draft), abstracts)
 
 
@@ -286,7 +287,7 @@ def apply_audit(
     if not items:
         raise TrapInputError(["no row was confirmed; nothing to commit"])
     data = set_bytes(items)
-    if problems := set_problems(data, files, pack):
+    if problems := set_problems(data, files, spec, pack):
         raise TrapInputError(problems)
     return data
 
@@ -303,8 +304,13 @@ def parse_set(data: bytes) -> tuple[TrapItem, ...]:
     return items
 
 
-def set_problems(data: bytes, files: Mapping[str, bytes], pack: RulePack) -> list[str]:
-    """Why a committed trap set breaks I76 or I77; empty if it holds. Needs no abstract (CI runs it)."""
+def set_problems(data: bytes, files: Mapping[str, bytes], spec: CorpusSpec, pack: RulePack) -> list[str]:
+    """Why a committed trap set breaks I76 or I77; empty if it holds. Needs no abstract (CI runs it).
+
+    Everything a hand edit could change and CI can recompute is checked: the source is in its question's
+    retrieved pool, the kind is a scored sieve candidate of the source, and a rule-floor claim is exactly
+    the mutation of its parent. Whether a claim is true of the abstract stays the author's call.
+    """
     try:
         items = parse_set(data)
     except TrapInputError as err:
@@ -326,10 +332,12 @@ def set_problems(data: bytes, files: Mapping[str, bytes], pack: RulePack) -> lis
             problems.append(f"{item.id}: {item.question_id} is not a dev question")
         elif entry is None or entry.split is not CorpusSplit.DEV:
             problems.append(f"{item.id}: {item.source_id} is not a dev source")
-        elif item.question_id not in {r.question_id for r in entry.ranks}:
+        elif not any(r.question_id == item.question_id and r.rank <= spec.pool_hits for r in entry.ranks):
             problems.append(f"{item.id}: {item.source_id} is not in the pool of {item.question_id}")
         elif item.abstract_sha256 != entry.abstract_sha256:
             problems.append(f"{item.id}: abstract_sha256 differs from the sealed dataset")
+        elif item.kind not in SCORED_KINDS or not any(c.kind is item.kind for c in entry.candidates):
+            problems.append(f"{item.id}: {item.kind.value} is not a scored sieve candidate of its source")
         parent = parents.get(item.pair_id)
         if parent is None:
             problems.append(f"{item.id}: its parent {item.pair_id} is not in the set")
@@ -339,6 +347,10 @@ def set_problems(data: bytes, files: Mapping[str, bytes], pack: RulePack) -> lis
             item.kind,
         ):
             problems.append(f"{item.id}: differs from its parent in source, question or kind")
+        elif item.generator == "rule_floor" and (item.rule, item.claim) not in {
+            (f.rule, f.claim) for f in mutate(parent.claim)
+        }:
+            problems.append(f"{item.id}: not the {item.rule} rule-floor mutation of its parent")
         problems.extend(f"{item.id}: {p}" for p in contamination(item.claim, pack))
     return problems
 
@@ -356,10 +368,11 @@ def verify_set(
     max_live_calls: int | None,
 ) -> TrapResult:
     """Judge every item once, as a live run judges a pair. Bad input raises before any fetch."""
-    if problems := set_problems(data, files, ports.rules):
+    if problems := set_problems(data, files, spec, ports.rules):
         raise TrapInputError(problems)
     _sealed(files, spec)
     items = parse_set(data)
+    flag = _writer_family_flag(items, verifier_family, family_of)
     _budget(len(items), max_live_calls)
     papers = _pools(
         ports.literature, files, spec, [(i.question_id, i.source_id) for i in items], ports.emitter
@@ -369,7 +382,7 @@ def verify_set(
             item.id,
             ports.verifier.verify(
                 Claim(id=item.id, text=item.claim, cites=(item.source_id,)),
-                papers[item.source_id],
+                papers[(item.question_id, item.source_id)],
                 ports.rules,
             ),
         )
@@ -380,20 +393,39 @@ def verify_set(
         corpus_seal=sha256_hex(files[MANIFEST]),
         judge_sha256=judge_sha256,
         verifier=verifier,
-        writer_family_flag=any(family_of(i.origin_id) is verifier_family for i in items),
+        writer_family_flag=flag,
         outcomes=outcomes,
         counts=counts(items, outcomes),
     )
+
+
+def _writer_family_flag(
+    items: Sequence[TrapItem], verifier_family: ModelFamily, family_of: Callable[[str], ModelFamily]
+) -> bool:
+    """Whether any writer shares the verifier's family; an unknown writer is refused before any call."""
+    try:
+        return any(family_of(w) is verifier_family for w in sorted({i.origin_id for i in items}))
+    except UnknownDeploymentError as err:
+        raise TrapInputError([f"the trap writer is not in the model catalog: {err}"]) from None
 
 
 def trap_result_bytes(result: TrapResult) -> bytes:
     return pretty_json_bytes(result.model_dump(mode="json"))
 
 
-def result_problems(data: bytes, result: bytes) -> list[str]:
-    """Why a committed result does not belong to this set or miscounts it (I76); empty if it holds.
+def result_problems(
+    data: bytes,
+    result: bytes,
+    files: Mapping[str, bytes],
+    *,
+    judge_sha256: str,
+    verifier: str,
+    family_of: Callable[[str], ModelFamily],
+) -> list[str]:
+    """Why a committed result does not belong to this set, dataset and frozen judge, or miscounts (I76).
 
-    Self-reported, like the challenge result: it proves consistency, not that a model produced it.
+    `judge_sha256` and `verifier` come from the freeze record the result is named after. Self-reported,
+    like the challenge result: it proves consistency, not that a model produced it.
     """
     try:
         items = parse_set(data)
@@ -407,6 +439,16 @@ def result_problems(data: bytes, result: bytes) -> list[str]:
         problems.append("the result is not in canonical form")
     if recorded.trap_set_sha256 != sha256_hex(data):
         problems.append("the result is for another trap set")
+    if recorded.corpus_seal != sha256_hex(files[MANIFEST]):
+        problems.append("the result is for another sealed dataset")
+    if (recorded.judge_sha256, recorded.verifier) != (judge_sha256, verifier):
+        problems.append("the result names another judge or verifier than its freeze record")
+    try:
+        flag = _writer_family_flag(items, family_of(verifier), family_of)
+    except (TrapInputError, UnknownDeploymentError) as err:
+        return [*problems, str(err)]
+    if recorded.writer_family_flag != flag:
+        problems.append("writer_family_flag does not match the writers and the verifier")
     try:
         again = counts(items, recorded.outcomes)
     except ValueError as err:
