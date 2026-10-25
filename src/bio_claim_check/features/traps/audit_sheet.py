@@ -10,6 +10,7 @@ its parent; a rejected parent drops its traps. No model rationale is shown (the 
 author judges the claim, not the writer's argument.
 The author checks: the parent is fully supported and not a close paraphrase of a sentence; a model trap
 commits its kind and only its kind; a rule-floor trap changes what the parent states.
+A model panel (ADR 0023) fills one copy of the same sheet per rater; each copy passes the same checks.
 Must not: read files (abstracts are passed in), or decide anything itself.
 
 No LLM is involved in this module.
@@ -27,7 +28,7 @@ from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import NonBlankStr, Sha256Hex, ValidatedModel
 from bio_claim_check.common.text import CleanedText
 from bio_claim_check.features.contracts.ids import ClaimId, SourceId
-from bio_claim_check.features.traps.models import DraftRow, TrapItem, expected_truth
+from bio_claim_check.features.traps.models import Confirmer, DraftRow, TrapItem, expected_truth
 
 COLUMNS: Final[tuple[str, ...]] = (
     "draft_sha256",
@@ -171,18 +172,24 @@ def parse_decisions(
     return tuple(decided[i] for i in expected)
 
 
-def confirmed_items(rows: Sequence[DraftRow], decisions: Sequence[TrapDecision]) -> tuple[TrapItem, ...]:
+def confirmed_items(
+    rows: Sequence[DraftRow], decisions: Sequence[TrapDecision], confirmed_by: Confirmer = "author"
+) -> tuple[TrapItem, ...]:
     """The committed set: confirmed rows whose parent is confirmed too, sorted by id (I76)."""
     confirmed = {d.id for d in decisions if d.decision == "confirm"}
     return tuple(
         sorted(
-            (_item(r) for r in candidates(rows) if r.id in confirmed and r.pair_id in confirmed),
+            (
+                _item(r, confirmed_by)
+                for r in candidates(rows)
+                if r.id in confirmed and r.pair_id in confirmed
+            ),
             key=lambda i: i.id,
         )
     )
 
 
-def _item(r: DraftRow) -> TrapItem:
+def _item(r: DraftRow, confirmed_by: Confirmer) -> TrapItem:
     disposition, label, reason = expected_truth(r.role, r.generator, r.kind)
     return TrapItem(
         id=r.id,
@@ -200,5 +207,5 @@ def _item(r: DraftRow) -> TrapItem:
         rule=r.rule,
         origin="model",
         origin_id=r.origin_id,
-        confirmed_by="author",
+        confirmed_by=confirmed_by,
     )

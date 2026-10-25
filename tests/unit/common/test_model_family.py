@@ -8,4 +8,4 @@ pytestmark = pytest.mark.unit
 
 
 def test_the_vocabulary_is_locked() -> None:
-    assert [f.value for f in ModelFamily] == ["openai", "anthropic", "moonshot"]
+    assert [f.value for f in ModelFamily] == ["openai", "anthropic", "moonshot", "google", "xai"]

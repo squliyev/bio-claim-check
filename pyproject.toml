@@ -165,6 +165,7 @@ source_modules = [
     "bio_claim_check.features.traps.base_trap_writer",
     "bio_claim_check.features.traps.counts",
     "bio_claim_check.features.traps.models",
+    "bio_claim_check.features.traps.panel",
     "bio_claim_check.features.traps.rule_floor",
     "bio_claim_check.features.traps.sampling",
     "bio_claim_check.features.traps.scripted_trap_writer",

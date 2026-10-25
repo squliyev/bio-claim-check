@@ -45,13 +45,22 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
 - **Prompt freeze:** `freeze/<name>.json`, which binds one judge fingerprint to the committed challenge
   result. `app/freeze.py` pins its bytes and names the active one (v2, ADR 0021). A test-split audit records the active
   `freeze_sha256` as its `prompts_sha256`. A dev audit's `prompts_sha256` is typed by the author.
-- **Trap set:** `traps/dev-v1.jsonl`, author-confirmed dev items with predeclared ground truth
+- **Trap set:** `traps/dev-v1.jsonl`, confirmed dev items with predeclared expected outcomes; dev-v1 is
+  confirmed by a model panel, so it is a silver standard ([ADR 0023](./adr/0023-model-panel-confirmation.md))
   ([ADR 0022](./adr/0022-trap-set-and-outcomes.md)). Each source gives a **parent** (a supported claim),
   a **model trap** (the parent rewritten to commit one kind) and up to three **rule-floor traps** (a
   direction, operator or dose swap of the parent). Claims only, never abstract text.
 - **Caught / exact / false alarm:** a trap is *caught* when its disposition is `flagged`, and *exact* when
   its label (and reason, if declared) is also the expected one. A *false alarm* is a flagged parent.
   `needs_review` and `failed` stay in every denominator. All are exploratory on dev.
+- **Model panel:** two or more LLM raters of distinct model families, none the trap writer's or the
+  verifier's, that each fill one audit sheet under a committed protocol. Only a unanimous row is kept.
+- **Panel ledger:** `traps/<set>.panel.json`, the committed record of each rater's vote on each candidate,
+  with the draft, protocol and sheet hashes. No reasons and no claim text; CI recomputes the set from it.
+- **Rater:** a registered panel member (`app.models.RATER_FAMILIES`); its family comes from the registry,
+  never from the command line.
+- **Silver standard:** labels confirmed by a model panel, not by a domain expert. Never called ground
+  truth or expert-labelled; a catch rate on it is conditional on the panel's agreement.
 - **Trap draft:** `var/traps/dev-draft-*.jsonl`, every row a run produced, including writer failures and
   gate exclusions. It is never committed. The audit sheet is bound to its sha256.
 - **Writer family flag:** `writer_family_flag` in a trap result is true when the trap writer and the
@@ -96,7 +105,8 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   trace name, cache mode and usage per model. It is the run's money record.
 - **Unmeasured attempt:** an attempt that may have reached the provider but reported no usage (a failed
   call, or a start with no end). Counted apart, never as 0 tokens.
-- **Model family:** who trained a deployment (`openai`, `anthropic`, `moonshot`), apart from the
+- **Model family:** who trained a deployment (`openai`, `anthropic`, `moonshot`, and the panel raters'
+  `google`, `xai`), apart from the
   provider that serves it. A live report flags `same_family` when the answerer and the verifier share
   one, since they may share blind spots ([ADR 0019](./adr/0019-llm-verifier-and-live-run.md)).
 - **Live notice:** the notice on a live report: each claim, if any, was checked by an LLM verifier

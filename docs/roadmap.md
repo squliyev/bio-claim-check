@@ -6,8 +6,9 @@ ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for 
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
 **Status (S13 code done):** S01–S12c are done; tag `prompts-frozen-v2`. S13's generator, audit sheet,
-`apply-audit` and `traps verify` are built (ADR 0022); its dev trap set lands after a live `traps generate`
-run and the author's audit. Then the **demo track** (proof checkpoint → S17a → H1) before returning to S14.
+`apply-audit` and `traps verify` are built (ADR 0022), and the drafts are live. The maintainer is not a
+biomedical researcher, so the dev trap set is confirmed by a unanimous two-model panel and is a silver
+standard (ADR 0023); it lands after the panel run. Then the **demo track** (proof checkpoint → S17a → H1) before returning to S14.
 The maintainer's test-split audit runs in parallel and gates only test-split traps.
 
 ## Product
@@ -98,7 +99,7 @@ can be contributed here as their own credited rule pack. No results from this re
 |---|---|
 | (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2`; runs in parallel with S13 and gates only test-split traps |
 | S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test; dev first. Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a `Report` (S13 ADR) |
-| Proof checkpoint | Trap disposition counts and catch rate per trap kind on dev; a false-alarm rate only on an author-confirmed dev-parent subset. Exploratory, never pitched (go / adjust) |
+| Proof checkpoint | Trap disposition counts and catch rate per trap kind on dev; a false-alarm rate only on the confirmed dev parents. On dev-v1 these are silver-standard numbers (ADR 0023), model traps primary, rule floor apart. Exploratory, never pitched (go / adjust) |
 | S17a | Demo track: slim Streamlit UI, Ask page (recorded runs, live under the call budget) and Trust report page, in the final layered form; Docker offline mode with live controls disabled (see below) |
 | H1 | Demo track: hackathon prep (trap papers, demo, pitch, disclosure); what is shown on the day is decided here and must respect the option C rule (no claimcheck results on the day) or change it by ADR |
 | S14 | Baselines: AlwaysFlag, MeSH-cue, optional NLI; shared verifier contract suite |

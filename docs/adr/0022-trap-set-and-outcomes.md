@@ -6,7 +6,9 @@
   sets are sealed dev pairs; results are self-reported) and the narrow reading of
   [ADR 0008](./0008-citable-sources-medline-abstracts.md)
 - **Related:** [ADR 0006](./0006-two-axis-verdict-and-disposition.md), [ADR 0019](./0019-llm-verifier-and-live-run.md),
-  [ADR 0021](./0021-neutral-few-shot-examples.md)
+  [ADR 0021](./0021-neutral-few-shot-examples.md). Decisions 4 and 8 are amended by
+  [ADR 0023](./0023-model-panel-confirmation.md): dev-v1 is confirmed by a model panel
+  (`confirmed_by = model_panel`), a silver standard
 - **Enforced by:** `tests/arch/test_trap_set.py` (I76, I77) ·
   `tests/unit/app/test_traps_usecase.py` (I78 and the leakage regression) ·
   `tests/unit/features/test_traps_models.py::test_ground_truth_is_predeclared` ·

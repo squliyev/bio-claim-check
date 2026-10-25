@@ -8,12 +8,12 @@ the repo; ask the maintainer for the rows relevant to your session.
 ## 1. Where things stand
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
-  S12b, S12c (tag `prompts-frozen-v2`). **S13 code is done** (ADR 0022); its data step is not (section 4).
+  S12b, S12c (tag `prompts-frozen-v2`). **S13 code is done** (ADR 0022, 0023); its data step is not (section 4).
   CI is green on `main`.
-- **Next: finish S13** (live `traps generate`, the author's audit, commit the dev set), with the maintainer's
+- **Next: finish S13** (the model-panel run, then commit the dev set), with the maintainer's
   test-split audit in parallel (section 4). Then
   the demo track: proof checkpoint → S17a (slim UI) → H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
-- Next free ids: invariant **I79**, ADR **0023**.
+- Next free ids: invariant **I80**, ADR **0024**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
 - The judge is **frozen** (`freeze/v2.json` active, ADR 0020, 0021). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
@@ -69,31 +69,41 @@ Done:
 - Live drafting finished with a top-up to `--per-kind 20`. Draft: `var/traps/dev-draft-20-b222f76d60fb.jsonl`.
   Candidates: 9, 15, 17, 18 and 19 model traps per kind, plus 21 direction swaps (dev-log S13).
 
-Next:
+- The maintainer is not a biomedical researcher, so the author audit was replaced by a **two-model panel**
+  (ADR 0023, I79): gemini-4-argon and grok-4.7 at high reasoning effort, unanimous only, a **silver
+  standard**. The code is in commit F.
+- An advisory pass by gemini-4-argon read `VERIFY_PROMPT`, so it is discarded (ADR 0023 §7).
+
+Next (announced to the maintainer first):
 
 ```bash
-# 1. the author fills in every row: decision confirm/reject, and a reason for every reject
-#    sheet: var/audit/traps-dev-b222f76d60fb.csv (177 rows; the var dir is local, so re-export it if it is lost:)
-uv run bio-claim-check traps audit-sheet --draft var/traps/dev-draft-20-b222f76d60fb.jsonl
-# 2. commit F: the confirmed set, then fill the dev-log S13 table (parents rejected, traps confirmed per kind)
+# 1. delete the discarded advisory files
+rm var/audit/traps-dev-b222f76d60fb.advisory.csv var/audit/traps-dev-b222f76d60fb.advisory-summary.md
+# 2. one isolated folder per rater, holding only the protocol and a blank copy of the sheet
+for r in gemini-4-argon grok-4.7; do mkdir -p var/panel/$r
+  cp docs/protocols/trap-panel-v1.md var/panel/$r/protocol.md
+  cp var/audit/traps-dev-b222f76d60fb.csv var/panel/$r/sheet.csv; done
+# 3. run both raters as subagents in parallel (model = the rater id, high effort), each given the protocol
+#    verbatim and told to read and write only its own folder; then:
 uv run bio-claim-check traps apply-audit --draft var/traps/dev-draft-20-b222f76d60fb.jsonl \
-  --sheet var/audit/traps-dev-b222f76d60fb.csv
+  --sheet var/panel/gemini-4-argon/sheet.csv --rater gemini-4-argon \
+  --sheet var/panel/grok-4.7/sheet.csv --rater grok-4.7
+# 4. commit G: traps/dev-v1.jsonl and traps/dev-v1.panel.json; fill the dev-log S13 flow and 2x2 tables
 ```
 
-- The author checks each row:
-  - the parent is fully supported and not a close paraphrase;
-  - a model trap commits its kind and only its kind;
-  - a direction swap changes what the parent states.
+- The protocol `docs/protocols/trap-panel-v1.md` is hashed into the ledger; never edit it after the run.
+- The cohort is fixed at the 177 candidates. Nothing is topped up or replaced after the panel.
+- Report per ADR 0023 §5: model traps primary, rule floor apart, numerators and denominators per kind and
+  generator, the attrition flow. Never call dev-v1 ground truth or expert-labelled.
 - `background_as_result` is capped at 9 (ADR 0022 §6). A kind still short of 12 confirmed traps after the
-  audit is reported as short, not topped up: correlation has only 21 eligible sources in all. A further
-  top-up would need a new sheet.
+  panel is reported as short, not topped up (ADR 0023 §3).
 - The draft, the sheet and the LLM cache (`var/cache.sqlite`) are all local. If only the draft or the sheet is
   lost, rerun `generate --per-kind 20` with a budget of 180: every call is a cache hit, so the draft is
   identical. If the cache is lost too, the drafts change, and the counts above no longer apply.
 - `traps verify` is the proof checkpoint's step, not S13's. It refuses unless this code is the active
   freeze. Use `--record` once the counts have been read.
 - Never commit a draft or a sheet: drafts list gate problems, and sheets hold abstract text.
-  `tests/arch/test_trap_set.py` allows only sets, results and the README under `traps/`.
+  `tests/arch/test_trap_set.py` allows only sets, their panel ledgers, results and the README under `traps/`.
 
 **Bindings from S12b and S12c (must hold):**
 - Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside

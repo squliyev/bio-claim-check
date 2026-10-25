@@ -4,8 +4,10 @@ Why: the trap set combines three slices (corpus for eligibility, traps for draft
 judging) and only `app` may combine slices. Every abstract comes from its dev question's sealed pool
 (`dev_papers`: seal check, dev question only, dev-split papers with their sealed hashes), so no test
 source can reach the writer or the verifier (I78). The verifier receives a claim built from the item's
-text alone; kind, role, pair and ground truth never leave this module (I69). `set_problems` and
-`result_problems` are also what CI runs on every committed set and result (I76, I77).
+text alone; kind, role, pair and ground truth never leave this module (I69). `set_problems`,
+`panel_problems` and `result_problems` are also what CI runs on every committed set, ledger and result
+(I76, I77, I79). A model panel (ADR 0023) confirms a set when the author cannot: unanimous only, raters
+from a closed registry, none of the writer's or the verifier's family.
 Must not: do I/O itself, touch a test question or source, retry or drop an item, tune anything on trap
 outcomes (the judge is frozen), or let a writer or verifier failure disappear (it is a counted row).
 """
@@ -38,6 +40,7 @@ from bio_claim_check.features.traps.audit_sheet import confirmed_items, parse_de
 from bio_claim_check.features.traps.base_trap_writer import BaseTrapWriter
 from bio_claim_check.features.traps.counts import TrapResult, counts
 from bio_claim_check.features.traps.models import DraftRow, TrapDraft, TrapItem, TrapWriterFailure, opaque_id
+from bio_claim_check.features.traps.panel import PanelLedger, kept_ids, ledger_rows, unanimous
 from bio_claim_check.features.traps.rule_floor import mutate
 from bio_claim_check.features.traps.sampling import Pick, sample
 from bio_claim_check.features.traps.validity import claim_problems, contamination, pair_problems
@@ -292,6 +295,172 @@ def apply_audit(
     return data
 
 
+def ledger_bytes(ledger: PanelLedger) -> bytes:
+    return pretty_json_bytes(ledger.model_dump(mode="json"))
+
+
+def apply_panel(
+    draft: bytes,
+    sheets: Sequence[tuple[str, str]],
+    files: Mapping[str, bytes],
+    spec: CorpusSpec,
+    pack: RulePack,
+    *,
+    protocol: bytes,
+    intended_freeze: str,
+    verifier_family: ModelFamily,
+    rater_families: Mapping[str, ModelFamily],
+    writer_family_of: Callable[[str], ModelFamily],
+) -> tuple[bytes, bytes]:
+    """The committed set and its ledger from one filled-in sheet per rater, `(rater id, sheet)` in order.
+
+    A row is kept only if every rater confirmed it and its parent (ADR 0023). Refuses before reading a
+    sheet if the panel is malformed, and refuses a set or ledger that would fail CI.
+    """
+    rows = parse_draft(draft)
+    _sealed(files, spec)
+    raters = tuple(r for r, _ in sheets)
+    writers = _writer_families(rows, writer_family_of)
+    if problems := _rater_problems(raters, rater_families, writers, verifier_family):
+        raise TrapInputError(problems)
+    draft_sha = sha256_hex(draft)
+    panels = [parse_decisions(text, rows, draft_sha) for _, text in sheets]
+    items = confirmed_items(rows, unanimous(panels), "model_panel")
+    if not items:
+        raise TrapInputError(["no row was confirmed by every rater; nothing to commit"])
+    data = set_bytes(items)
+    if problems := set_problems(data, files, spec, pack):
+        raise TrapInputError(problems)
+    ledger = ledger_bytes(
+        PanelLedger(
+            set_sha256=sha256_hex(data),
+            draft_sha256=draft_sha,
+            protocol_sha256=sha256_hex(protocol),
+            intended_freeze=intended_freeze,
+            raters=raters,
+            sheet_sha256=tuple(sha256_hex(text.encode("utf-8")) for _, text in sheets),
+            rows=ledger_rows(rows, panels),
+        )
+    )
+    if problems := panel_problems(
+        data,
+        ledger,
+        protocol=protocol,
+        verifier_family=verifier_family,
+        rater_families=rater_families,
+        writer_family_of=writer_family_of,
+    ):
+        raise TrapInputError(problems)
+    return data, ledger
+
+
+def _writer_families(
+    rows: Sequence[DraftRow | TrapItem], writer_family_of: Callable[[str], ModelFamily]
+) -> frozenset[ModelFamily]:
+    try:
+        return frozenset(writer_family_of(w) for w in sorted({r.origin_id for r in rows}))
+    except UnknownDeploymentError as err:
+        raise TrapInputError([f"the trap writer is not in the model catalog: {err}"]) from None
+
+
+def _rater_problems(
+    raters: Sequence[str],
+    rater_families: Mapping[str, ModelFamily],
+    writer_families: frozenset[ModelFamily],
+    verifier_family: ModelFamily,
+) -> list[str]:
+    """Declared family separation (I79): known raters, distinct families, none the writer's or verifier's.
+
+    Family separation is conflict control, not statistical independence (ADR 0023).
+    """
+    if len(raters) < 2 or len(set(raters)) != len(raters):
+        return ["a panel needs at least two distinct raters, one sheet each"]
+    if unknown := [r for r in raters if r not in rater_families]:
+        return [f"{', '.join(unknown)}: not a registered panel rater (app.models.RATER_FAMILIES)"]
+    families = [rater_families[r] for r in raters]
+    problems: list[str] = []
+    if len(set(families)) != len(families):
+        problems.append("two raters share a model family")
+    if clash := sorted({f.value for f in families} & {w.value for w in writer_families}):
+        problems.append(f"a rater shares the trap writer's family ({', '.join(clash)})")
+    if verifier_family in families:
+        problems.append(f"a rater shares the verifier's family ({verifier_family.value})")
+    return problems
+
+
+def panel_families(ledger: bytes, rater_families: Mapping[str, ModelFamily]) -> frozenset[ModelFamily]:
+    """The families of a committed ledger's raters; a verifier of one of them must not judge the set."""
+    try:
+        raters = PanelLedger.model_validate_json(ledger).raters
+    except ValidationError:
+        raise TrapInputError(["the panel ledger is not valid"]) from None
+    if unknown := [r for r in raters if r not in rater_families]:
+        raise TrapInputError([f"{', '.join(unknown)}: not a registered panel rater"])
+    return frozenset(rater_families[r] for r in raters)
+
+
+def panel_problems(
+    data: bytes,
+    ledger: bytes | None,
+    *,
+    protocol: bytes,
+    verifier_family: ModelFamily | None,
+    rater_families: Mapping[str, ModelFamily],
+    writer_family_of: Callable[[str], ModelFamily],
+) -> list[str]:
+    """Why a set's confirmation is not what it claims (I79); empty if it holds. Needs no abstract.
+
+    A set without a ledger must be author-confirmed. With one, the ledger must belong to this set and to
+    the committed protocol, its raters must be separated by family from the writer and from the intended
+    freeze's verifier (`verifier_family`; `None` if that freeze is unknown), and the set must hold exactly
+    the rows every rater confirmed whose parent every rater confirmed.
+    """
+    try:
+        items = parse_set(data)
+    except TrapInputError as err:
+        return list(err.problems)
+    panel = {i.id for i in items if i.confirmed_by == "model_panel"}
+    if ledger is None:
+        return [f"{len(panel)} model_panel item(s) but no panel ledger"] if panel else []
+    try:
+        parsed = PanelLedger.model_validate_json(ledger)
+    except ValidationError as err:
+        return [f"the panel ledger is not valid: {err.error_count()} problem(s)"]
+    problems: list[str] = []
+    if ledger != ledger_bytes(parsed):
+        problems.append("the panel ledger is not in canonical form")
+    if parsed.set_sha256 != sha256_hex(data):
+        problems.append("the panel ledger is for another trap set")
+    if parsed.protocol_sha256 != sha256_hex(protocol):
+        problems.append("the panel ledger names another rater protocol than the committed one")
+    if verifier_family is None:
+        problems.append(f"the intended freeze {parsed.intended_freeze} is not a committed freeze record")
+    else:
+        try:
+            writers = _writer_families(items, writer_family_of)
+        except TrapInputError as err:
+            return [*problems, *err.problems]
+        problems.extend(_rater_problems(parsed.raters, rater_families, writers, verifier_family))
+    if len(panel) != len(items):
+        problems.append("a set with a panel ledger must be confirmed by the panel on every item")
+    kept = kept_ids(parsed)
+    if missing := sorted(kept - {i.id for i in items}):
+        problems.append(f"confirmed by every rater but missing from the set: {', '.join(missing)}")
+    if extra := sorted({i.id for i in items} - kept):
+        problems.append(f"in the set but not confirmed by every rater: {', '.join(extra)}")
+    rows = {r.id: r for r in parsed.rows}
+    for item in items:
+        row = rows.get(item.id)
+        if row is not None and (row.pair_id, row.role, row.generator, row.kind) != (
+            item.pair_id,
+            item.role,
+            item.generator,
+            item.kind,
+        ):
+            problems.append(f"{item.id}: differs from its ledger row")
+    return problems
+
+
 def parse_set(data: bytes) -> tuple[TrapItem, ...]:
     try:
         items = tuple(TrapItem.model_validate_json(line) for line in data.decode("utf-8").splitlines())
@@ -366,10 +535,17 @@ def verify_set(
     verifier_family: ModelFamily,
     family_of: Callable[[str], ModelFamily],
     max_live_calls: int | None,
+    rater_families: frozenset[ModelFamily] = frozenset(),
 ) -> TrapResult:
-    """Judge every item once, as a live run judges a pair. Bad input raises before any fetch."""
+    """Judge every item once, as a live run judges a pair. Bad input raises before any fetch.
+
+    `rater_families` are the families of the panel that confirmed the set (empty for the author); a
+    verifier of one of them would be judged against its own family's labels (I79).
+    """
     if problems := set_problems(data, files, spec, ports.rules):
         raise TrapInputError(problems)
+    if verifier_family in rater_families:
+        raise TrapInputError([f"the verifier shares a panel rater's family ({verifier_family.value})"])
     _sealed(files, spec)
     items = parse_set(data)
     flag = _writer_family_flag(items, verifier_family, family_of)
@@ -421,6 +597,7 @@ def result_problems(
     judge_sha256: str,
     verifier: str,
     family_of: Callable[[str], ModelFamily],
+    rater_families: frozenset[ModelFamily] = frozenset(),
 ) -> list[str]:
     """Why a committed result does not belong to this set, dataset and frozen judge, or miscounts (I76).
 
@@ -449,6 +626,8 @@ def result_problems(
         return [*problems, str(err)]
     if recorded.writer_family_flag != flag:
         problems.append("writer_family_flag does not match the writers and the verifier")
+    if family_of(verifier) in rater_families:
+        problems.append("the verifier shares a panel rater's family (I79)")
     try:
         again = counts(items, recorded.outcomes)
     except ValueError as err:

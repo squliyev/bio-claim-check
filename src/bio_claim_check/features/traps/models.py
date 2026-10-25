@@ -2,9 +2,10 @@
 
 Why: a trap is only useful with ground truth, a clean parent to pair it with, and an honest origin. A
 `DraftRow` is everything generation produced, including writer failures and gate exclusions, and stays in
-`var/`. A `TrapItem` is a row the author confirmed; only those are committed (ADR 0022). The origin
-records who drafted the text (`model` plus the deployment) and, separately, who confirmed it, so an AI
-draft is never relabelled human. A trap points to its parent through `pair_id` instead of copying it.
+`var/`. A `TrapItem` is a confirmed row; only those are committed (ADR 0022). The origin records who
+drafted the text (`model` plus the deployment) and, separately, who confirmed it: the author, or a model
+panel (ADR 0023, a silver standard whose raters sit in a committed ledger), so AI judgement is never
+relabelled human. A trap points to its parent through `pair_id` instead of copying it.
 Must not: hold abstract text (ADR 0008), or let a trap's metadata reach the verifier (ids are opaque).
 
 No LLM is involved in this module.
@@ -107,8 +108,11 @@ class DraftRow(ValidatedModel):
         return self.failure is None and not self.problems
 
 
+Confirmer = Literal["author", "model_panel"]
+
+
 class TrapItem(ValidatedModel):
-    """One author-confirmed row of the committed trap set (I76)."""
+    """One confirmed row of the committed trap set (I76); `model_panel` rows need a ledger (I79)."""
 
     id: ClaimId
     pair_id: ClaimId
@@ -125,7 +129,7 @@ class TrapItem(ValidatedModel):
     rule: FloorRule | None
     origin: Origin
     origin_id: NonBlankStr
-    confirmed_by: Literal["author"]
+    confirmed_by: Confirmer
 
     @model_validator(mode="after")
     def _ground_truth(self) -> Self:

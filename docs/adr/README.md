@@ -51,6 +51,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0020](./0020-challenge-set-and-judge-freeze.md) | The verifier challenge set and the judge freeze | Accepted | How the verifier is checked on dev; the narrow reading of ADR 0008 for authored claims; the judge fingerprint; the freeze that gates the test split |
 | [0021](./0021-neutral-few-shot-examples.md) | Few-shot examples off the benchmark's topics, and freeze v2 | Accepted | Rule-pack examples share no topic with any question (I75); freeze v2 is active |
 | [0022](./0022-trap-set-and-outcomes.md) | The dev trap set and its outcome artifact | Accepted | Author-confirmed parent/trap pairs on dev with predeclared truth and metrics; `traps verify` only under the active freeze (I76–I78) |
+| [0023](./0023-model-panel-confirmation.md) | Model-panel confirmation of the dev trap set (a silver standard) | Accepted | A unanimous two-model panel confirms dev-v1; declared family separation; a committed, attested ledger of votes; predeclared bias and reporting (I79) |
 
 ## Superseded / historical
 

@@ -19,8 +19,10 @@ from bio_claim_check.app.usecases.traps import (
     TrapVerifyPorts,
     TrapWriterPorts,
     apply_audit,
+    apply_panel,
     draft_bytes,
     generate,
+    panel_problems,
     parse_draft,
     parse_set,
     result_problems,
@@ -30,6 +32,7 @@ from bio_claim_check.app.usecases.traps import (
     trap_result_bytes,
     verify_set,
 )
+from bio_claim_check.common.canonical_json import pretty_json_bytes
 from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
 from bio_claim_check.features.contracts.labels import Disposition, FailureKind, Label, OverstatedReason
@@ -41,6 +44,7 @@ from bio_claim_check.features.corpus.seal import sealed_bytes
 from bio_claim_check.features.corpus.serialise import sha256_hex
 from bio_claim_check.features.traps.audit_sheet import TrapAuditError
 from bio_claim_check.features.traps.models import TrapDraft, TrapItem, TrapWriterFailure, opaque_id
+from bio_claim_check.features.traps.panel import PanelLedger
 from bio_claim_check.features.traps.sampling import TrapSamplingError
 from bio_claim_check.features.traps.scripted_trap_writer import ScriptedTrapWriter
 from bio_claim_check.features.verify.base_verifier import BaseVerifier
@@ -465,3 +469,150 @@ def test_an_unknown_writer_is_refused_before_any_fetch() -> None:
             max_live_calls=40,
         )
     assert (source.calls, verifier.claims) == ([], [])
+
+
+PROTOCOL = b"the rater protocol"
+RATERS = {
+    "rater-g": ModelFamily.GOOGLE,
+    "rater-x": ModelFamily.XAI,
+    "rater-g2": ModelFamily.GOOGLE,
+    "rater-o": ModelFamily.OPENAI,
+    "rater-a": ModelFamily.ANTHROPIC,
+}
+
+
+def _panel(
+    rejects: Sequence[frozenset[str]] = (frozenset(), frozenset()),
+    raters: Sequence[str] = ("rater-g", "rater-x"),
+) -> tuple[bytes, bytes]:
+    ports, source, _ = _writer_ports()
+    draft = _generate(ports)
+    sheet = sheet_for(source, draft, FILES, SPEC)
+    return apply_panel(
+        draft,
+        [(r, _decide(sheet, reject)) for r, reject in zip(raters, rejects, strict=True)],
+        FILES,
+        SPEC,
+        PACK,
+        protocol=PROTOCOL,
+        intended_freeze="v2",
+        verifier_family=ModelFamily.ANTHROPIC,
+        rater_families=RATERS,
+        writer_family_of=_families,
+    )
+
+
+def _panel_problems(data: bytes, ledger: bytes | None, protocol: bytes = PROTOCOL) -> list[str]:
+    return panel_problems(
+        data,
+        ledger,
+        protocol=protocol,
+        verifier_family=ModelFamily.ANTHROPIC,
+        rater_families=RATERS,
+        writer_family_of=_families,
+    )
+
+
+def test_a_panel_keeps_only_rows_every_rater_confirmed_and_writes_its_votes() -> None:
+    data, ledger = _panel((frozenset({FLOOR_ID}), frozenset()))
+    items = parse_set(data)
+    assert [i.id for i in items] == sorted([PARENT_ID, TRAP_ID])
+    assert all(i.confirmed_by == "model_panel" for i in items)
+    parsed = PanelLedger.model_validate_json(ledger)
+    assert parsed.raters == ("rater-g", "rater-x")
+    assert parsed.set_sha256 == sha256_hex(data)
+    assert parsed.protocol_sha256 == sha256_hex(PROTOCOL)
+    assert {r.id: r.votes for r in parsed.rows}[FLOOR_ID] == ("reject", "confirm")
+    assert b"Memory increased" not in ledger  # no claim
+    assert b'"no"' not in ledger  # no reason
+    assert _panel_problems(data, ledger) == []
+
+
+def test_one_raters_rejected_parent_drops_the_pair() -> None:
+    with pytest.raises(TrapInputError, match="no row was confirmed by every rater"):
+        _panel((frozenset(), frozenset({PARENT_ID})))
+
+
+@pytest.mark.parametrize(
+    ("raters", "message"),
+    [
+        (("rater-g", "rater-g"), "two distinct raters"),
+        (("rater-g", "nobody"), "not a registered panel rater"),
+        (("rater-g", "rater-g2"), "share a model family"),
+        (("rater-g", "rater-o"), "trap writer's family"),
+        (("rater-g", "rater-a"), "verifier's family"),
+    ],
+)
+def test_a_panel_without_declared_family_separation_is_refused(raters: tuple[str, str], message: str) -> None:
+    with pytest.raises(TrapInputError, match=message):
+        _panel(raters=raters)
+
+
+def test_a_single_rater_is_not_a_panel() -> None:
+    with pytest.raises(TrapInputError, match="at least two distinct raters"):
+        _panel((frozenset(),), ("rater-g",))
+
+
+def test_panel_problems_attest_the_set_against_its_ledger() -> None:
+    data, ledger = _panel((frozenset({FLOOR_ID}), frozenset()))
+    assert any("another rater protocol" in p for p in _panel_problems(data, ledger, b"edited"))
+    assert any("no panel ledger" in p for p in _panel_problems(data, None))
+    rows = _items(data)
+    dropped = _set_of([r for r in rows if r["id"] != TRAP_ID])
+    assert any("another trap set" in p for p in _panel_problems(dropped, ledger))
+    led = json.loads(ledger)
+    led["set_sha256"] = sha256_hex(dropped)
+    found = _panel_problems(dropped, pretty_json_bytes(led))
+    assert found == [f"confirmed by every rater but missing from the set: {TRAP_ID}"]
+
+
+def test_a_rejected_row_smuggled_into_the_set_is_refused() -> None:
+    _, ledger = _panel((frozenset({FLOOR_ID}), frozenset()))
+    led = json.loads(ledger)
+    full = _committed_set()
+    smuggled = _set_of([{**r, "confirmed_by": "model_panel"} for r in _items(full)])
+    led["set_sha256"] = sha256_hex(smuggled)
+    assert _panel_problems(smuggled, pretty_json_bytes(led)) == [
+        f"in the set but not confirmed by every rater: {FLOOR_ID}"
+    ]
+
+
+def test_an_author_set_needs_no_ledger_and_a_mixed_set_is_refused() -> None:
+    assert _panel_problems(_committed_set(), None) == []
+    data, ledger = _panel()
+    rows = _items(data)
+    mixed = _set_of([{**rows[0], "confirmed_by": "author"}, *rows[1:]])
+    led = json.loads(ledger)
+    led["set_sha256"] = sha256_hex(mixed)
+    assert "confirmed by the panel on every item" in " ".join(_panel_problems(mixed, pretty_json_bytes(led)))
+
+
+def test_a_verifier_of_a_raters_family_is_refused() -> None:
+    data, _ = _panel()
+    with pytest.raises(TrapInputError, match="shares a panel rater's family"):
+        verify_set(
+            TrapVerifyPorts(
+                literature=QueryLiteratureSource(world()), verifier=ScriptedVerifier(SCRIPT), rules=PACK
+            ),
+            data,
+            FILES,
+            SPEC,
+            judge_sha256="b" * 64,
+            verifier="verifier-deployment",
+            verifier_family=ModelFamily.GOOGLE,
+            family_of=_families,
+            max_live_calls=40,
+            rater_families=frozenset({ModelFamily.GOOGLE, ModelFamily.XAI}),
+        )
+    result, _ = _verify(data, ScriptedVerifier(SCRIPT))
+    assert _result_problems(data, result) == []
+    clash = result_problems(
+        data,
+        result,
+        FILES,
+        judge_sha256="b" * 64,
+        verifier="verifier-deployment",
+        family_of=_families,
+        rater_families=frozenset({ModelFamily.ANTHROPIC}),
+    )
+    assert clash == ["the verifier shares a panel rater's family (I79)"]

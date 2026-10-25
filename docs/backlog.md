@@ -43,12 +43,14 @@ a story is added. Design detail lives in the ADRs and the per-session dev-log, n
 
 | Story | As a … I want … so that … | Status |
 |---|---|---|
-| C1 | As a scientist, I want planted traps with ground truth, so that I know what the verifier catches | ⏳ (S13, ADR 0022: generator, audit sheet, `apply-audit` and `traps verify` built on dev with predeclared truth and metrics; the dev set lands after the author's audit; test traps need a later ADR and the test audit) |
+| C1 | As a scientist, I want planted traps with known expected outcomes, so that I know what the verifier catches | ⏳ (S13, ADR 0022/0023: generator, audit sheet, `apply-audit` and `traps verify` built on dev with predeclared outcomes and metrics. The maintainer cannot audit biomedical claims, so dev-v1 is confirmed by a unanimous two-model panel and is a silver standard (ADR 0023); it lands after the panel run. Test traps need a later ADR and the test audit) |
 | C2 | As a reviewer, I want simple baselines next to every verifier, so that I can see whether the LLM adds anything | ⏳ |
 | C3 | As a reviewer, I want a pre-registered protocol and paired, clustered statistics, so that the numbers are honest | ⏳ |
 | C4 | As a scientist, I want the negation detector's precision measured on labelled pairs, so that the share of correct null results sent to `needs_review` is known | ⏸ (needs labels, S18; S10's rule is conservative on purpose. S12b dev: 4/4 `negated_supported` pairs were `claim_shares_negation`, i.e. a correct negative claim blocked; a fix needs its own ADR) |
 | C5 | As a scientist, I want to know whether Over-eager actually overstates on the answer model, so that the mode comparison measures something | ⏸ (S10 dev, author-read: gpt-6.1-sol kept hedging after one prompt revision; revisit at the proof checkpoint) |
 | C6 | As a reviewer, I want the verifier challenge set re-labelled by an independent human rater, so that its labels are not one person's call | ⏸ (S12b: one human rater plus an AI blind second rater, 16/16; not an expert panel, ADR 0020) |
+| C7 | As a scientist, I want a dev-v2 trap set confirmed by an external biomedical expert, so that a catch rate can be called ground truth and compared with the panel's silver standard | ⏸ (after the hackathon; ADR 0023 follow-up. A new draft and a new set, never a relabelling of dev-v1) |
+| C8 | As a scientist, I want trap prompt v2 and sieve fixes, so that fewer drafts fail the audit: no `background_as_result` trap the study's own results settle, no `certainty_inflation` that only drops a hedge the results already drop, no `nonsignificant_as_effect` that says "statistically significant" outright, and reviews or trials not mistyped by the sieve | ⏸ (found by the discarded advisory pass, S13; applies to a new draft only, never to dev-v1) |
 
 ## Feature D — Ship
 

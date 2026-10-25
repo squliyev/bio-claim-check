@@ -215,6 +215,37 @@ def test_audit_sheet_then_apply_audit_writes_the_set_once(
     assert _apply(*args)[0] == ExitCode.OUTPUT
 
 
+def test_a_model_panel_writes_the_set_its_ledger_and_the_agreement(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _replay(monkeypatch)
+    folder = _dataset(tmp_path)
+    draft = _draft(tmp_path)
+    monkeypatch.chdir(ROOT)  # the freeze record and the rater protocol are read from the repository
+    first = _sheet(tmp_path, draft, folder)
+    _confirm_all(first)
+    second = tmp_path / "second.csv"
+    second.write_text(first.read_text(encoding="utf-8"), encoding="utf-8")
+    out = tmp_path / "traps" / "dev-v1.jsonl"
+    base = ["--draft", str(draft), "--out", str(out), "--dataset", str(folder), "--sheet", str(first)]
+    code, _, err = _apply(*base, "--sheet", str(second))
+    assert (code, "one --rater each" in err) == (ExitCode.INPUT, True)
+    code, _, err = _apply(*base, "--sheet", str(second), "--rater", "gemini-4-argon")
+    assert (code, "give one rater per sheet" in err) == (ExitCode.INPUT, True)
+    code, _, err = _apply(*base, "--rater", "gemini-4-argon", "--sheet", str(second), "--rater", "claude-x")
+    assert (code, "not a registered panel rater" in err) == (ExitCode.INPUT, True)
+    assert not out.exists()
+    code, stdout, err = _apply(
+        *base, "--rater", "gemini-4-argon", "--sheet", str(second), "--rater", "grok-4.7"
+    )
+    assert code == 0, err
+    assert {i.confirmed_by for i in parse_set(out.read_bytes())} == {"model_panel"}
+    ledger = json.loads((out.parent / "dev-v1.panel.json").read_text(encoding="utf-8"))
+    assert (ledger["raters"], ledger["intended_freeze"]) == (["gemini-4-argon", "grok-4.7"], "v2")
+    assert "parent model confirm/confirm: 1" in stdout
+    assert "silver standard" in stdout
+
+
 def test_an_edited_draft_is_refused_by_the_sheet(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _replay(monkeypatch)
     draft = _draft(tmp_path)

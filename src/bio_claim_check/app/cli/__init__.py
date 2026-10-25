@@ -56,9 +56,9 @@ from bio_claim_check.app.container import (
     tallying_emitter,
     write_seal,
 )
-from bio_claim_check.app.freeze import ACTIVE_FREEZE, FREEZE_DIR, freeze_record
+from bio_claim_check.app.freeze import ACTIVE_FREEZE, FREEZE_DIR, FreezeRecord, freeze_record
 from bio_claim_check.app.logging_setup import configure_logging
-from bio_claim_check.app.models import model_catalog
+from bio_claim_check.app.models import RATER_FAMILIES, model_catalog
 from bio_claim_check.app.run_record import RunDetails, RunInputs, RunRecorder
 from bio_claim_check.app.settings import ENV_PREFIX, Settings, load_settings
 from bio_claim_check.app.usecases.answer_dev import (
@@ -100,13 +100,16 @@ from bio_claim_check.app.usecases.traps import (
     TrapPoolError,
     TrapVerifyPorts,
     apply_audit,
+    apply_panel,
     draft_bytes,
     generate,
+    panel_families,
     sheet_for,
     trap_result_bytes,
     verify_set,
 )
 from bio_claim_check.common.canonical_json import pretty_json_bytes
+from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.common.negation import NEGATION_RULES
 from bio_claim_check.common.system_clock import SystemClock
 from bio_claim_check.engine.cache.policy import CacheError, CacheMissError
@@ -135,6 +138,7 @@ from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_byt
 from bio_claim_check.features.report.models import Report
 from bio_claim_check.features.retrieval.errors import RetrievalError
 from bio_claim_check.features.traps.audit_sheet import TrapAuditError
+from bio_claim_check.features.traps.panel import PanelLedger, agreement
 from bio_claim_check.features.traps.sampling import TrapSamplingError
 
 DEFAULT_K = 4
@@ -911,6 +915,7 @@ traps_app = typer.Typer(
 )
 app.add_typer(traps_app, name="traps")
 DEFAULT_TRAPS = Path("traps/dev-v1.jsonl")
+PANEL_PROTOCOL = Path("docs/protocols/trap-panel-v1.md")
 TRAPS_DIR = "traps"  # drafts and verify attempts under the var dir
 DraftFile = Annotated[
     Path, typer.Option("--draft", help="A draft written by `traps generate` (under the var dir).")
@@ -1003,27 +1008,88 @@ def traps_audit_sheet_command(
     typer.echo("decide every row (confirm/reject, a reason for every reject), then run traps apply-audit")
 
 
+def _panel_ledger_path(trap_set: Path) -> Path:
+    """`traps/<set>.jsonl` → `traps/<set>.panel.json`: the model panel's votes for that set (ADR 0023)."""
+    return trap_set.with_name(f"{trap_set.stem}.panel.json")
+
+
+def _freeze_verifier_family(name: str) -> ModelFamily | None:
+    """The verifier family of a committed freeze record, or `None` if there is no such record."""
+    path = Path(FREEZE_DIR) / f"{name}.json"
+    if not path.is_file():
+        return None
+    record = FreezeRecord.model_validate_json(_read_input(path))
+    return model_catalog().lookup(str(record.judge.verifier["deployment"])).family
+
+
 @traps_app.command("apply-audit")
 def traps_apply_audit_command(
     draft: DraftFile,
-    sheet: Annotated[Path, typer.Option("--sheet", help="The filled-in audit sheet (CSV).")],
+    sheet: Annotated[
+        list[Path], typer.Option("--sheet", help="A filled-in audit sheet (CSV); once per panel rater.")
+    ],
+    rater: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--rater", help="Panel rater id (app.models.RATER_FAMILIES), one per --sheet, in order."
+        ),
+    ] = None,
     out: Annotated[Path, typer.Option("--out", help="The trap set to write, once.")] = DEFAULT_TRAPS,
     dataset: DatasetDir = Path("datasets"),
 ) -> None:
-    """Write the trap set from the confirmed rows of a filled-in sheet bound to its draft (claims only)."""
+    """Write the trap set from the confirmed rows of filled-in sheets bound to their draft (claims only).
+
+    One sheet and no --rater: the author confirmed it. Several sheets, each with its --rater: a model panel
+    confirmed it (ADR 0023): a row is kept only if every rater confirmed it and its parent, and the panel's
+    votes are written beside the set as <set>.panel.json.
+    """
+    raters = rater or []
+    if raters and len(raters) != len(sheet):
+        _fail(ExitCode.INPUT, f"{len(sheet)} --sheet but {len(raters)} --rater: give one rater per sheet")
+    if not raters and len(sheet) != 1:
+        _fail(ExitCode.INPUT, "several sheets need one --rater each (a model panel)")
     data = _read_input(draft)
-    try:
-        text = sheet.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as err:
-        _fail(ExitCode.INPUT, f"cannot read {sheet}: {type(err).__name__}")
+    texts: list[str] = []
+    for path in sheet:
+        try:
+            texts.append(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError) as err:
+            _fail(ExitCode.INPUT, f"cannot read {path}: {type(err).__name__}")
     with _trap_exit_codes(dataset):
         files = read_dataset(dataset)
         spec = load_corpus_spec(dataset / SPEC)
-        out_bytes = apply_audit(data, text, files, spec, default_rulepack())
+        if not raters:
+            out_bytes = apply_audit(data, texts[0], files, spec, default_rulepack())
+            path = publish_document(out.parent, out.name, out_bytes)
+            typer.echo(f"wrote: {path} ({len(out_bytes.splitlines())} confirmed item(s); author-confirmed)")
+            return
+        verifier_family = _freeze_verifier_family(ACTIVE_FREEZE)
+        if verifier_family is None:
+            _fail(ExitCode.INPUT, f"no committed freeze record {ACTIVE_FREEZE}: the panel needs its verifier")
+        catalog = model_catalog()
+        out_bytes, ledger = apply_panel(
+            data,
+            list(zip(raters, texts, strict=True)),
+            files,
+            spec,
+            default_rulepack(),
+            protocol=_read_input(PANEL_PROTOCOL),
+            intended_freeze=ACTIVE_FREEZE,
+            verifier_family=verifier_family,
+            rater_families=RATER_FAMILIES,
+            writer_family_of=lambda deployment: catalog.lookup(deployment).family,
+        )
         path = publish_document(out.parent, out.name, out_bytes)
+        ledger_path = publish_document(out.parent, _panel_ledger_path(out).name, ledger)
+    parsed = PanelLedger.model_validate_json(ledger)
     typer.echo(
-        f"wrote: {path} ({len(out_bytes.splitlines())} confirmed item(s); author-confirmed, single rater)"
+        f"wrote: {path} ({len(out_bytes.splitlines())} item(s) every rater confirmed, with their parent)"
     )
+    typer.echo(f"wrote: {ledger_path} (votes of {', '.join(parsed.raters)})")
+    typer.echo("agreement (votes in rater order), per role and generator:")
+    for role, generator, votes, n in agreement(parsed):
+        typer.echo(f"  {role} {generator} {'/'.join(votes)}: {n}")
+    typer.echo("silver standard: model-panel-confirmed, not expert-labelled (ADR 0023)")
 
 
 @traps_app.command("verify")
@@ -1044,6 +1110,8 @@ def traps_verify_command(
     """
     settings = _settings(env_file)
     data = _read_input(traps)
+    ledger_path = _panel_ledger_path(traps)
+    ledger = _read_input(ledger_path) if ledger_path.is_file() else None
     try:
         active_freeze_sha256(settings, Path(FREEZE_DIR), _result_path(DEFAULT_CHALLENGE, ACTIVE_FREEZE))
     except FreezeError as err:
@@ -1056,6 +1124,9 @@ def traps_verify_command(
             spec = load_corpus_spec(dataset / SPEC)
             judge = current_judge(settings)
             catalog = model_catalog()
+            raters = (
+                panel_families(ledger, RATER_FAMILIES) if ledger is not None else frozenset[ModelFamily]()
+            )
             with build_challenge_ports(settings, emitter) as (ports, verifier):
                 result = verify_set(
                     TrapVerifyPorts(ports.literature, ports.verifier, ports.rules, ports.emitter),
@@ -1067,6 +1138,7 @@ def traps_verify_command(
                     verifier_family=verifier.family,
                     family_of=lambda deployment: catalog.lookup(deployment).family,
                     max_live_calls=settings.max_live_llm_calls,
+                    rater_families=raters,
                 )
             out = trap_result_bytes(result)
             attempt = publish_document(
@@ -1086,7 +1158,8 @@ def traps_verify_command(
             f"  {row.kind.value} {row.role} {row.generator}: n={row.n} flagged={row.flagged} "
             f"passed={row.passed} needs_review={row.needs_review} failed={row.failed} exact={row.exact}"
         )
-    typer.echo("exploratory, dev only; author-confirmed, single rater")
+    confirmed = "model-panel-confirmed silver standard (ADR 0023)" if ledger else "author-confirmed"
+    typer.echo(f"exploratory, dev only; {confirmed}")
     typer.echo(f"attempt: {attempt}")
     if record:
         try:
