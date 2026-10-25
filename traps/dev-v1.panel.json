@@ -1,0 +1,1963 @@
+{
+  "draft_sha256": "b222f76d60fbae2df15a2cd5f64df25e94cf8f7ea0ab6afddeb18686a0cf5c42",
+  "intended_freeze": "v2",
+  "protocol_sha256": "1fcfdf86623ddb2e663227ae0659b87c31e7adf55efb4cff437322c26dfbe270",
+  "raters": [
+    "gemini-4-argon",
+    "grok-4.7"
+  ],
+  "rows": [
+    {
+      "generator": "model",
+      "id": "t03405cd0724",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t488058a28da",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t0647b1f8897",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0647b1f8897",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t0679d663792",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0679d663792",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t080b826f709",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "te38081b8823",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t09aeeb87ab2",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0fe147559c4",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t0a5f270fb68",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t7ad4a8a852a",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t0adadf20661",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t0adadf20661",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t0ee897a68a9",
+      "kind": "certainty_inflation",
+      "pair_id": "t0ee897a68a9",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t0fe147559c4",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0fe147559c4",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t106ac3f17b2",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t106ac3f17b2",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t12190f66446",
+      "kind": "certainty_inflation",
+      "pair_id": "t12190f66446",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t144a36fb69a",
+      "kind": "certainty_inflation",
+      "pair_id": "t144a36fb69a",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t15a313ea8ff",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc2b8a702aba",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t164fbec8d23",
+      "kind": "background_as_result",
+      "pair_id": "tc86866b4833",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t17ad87fb877",
+      "kind": "certainty_inflation",
+      "pair_id": "tfdc6204e479",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t184b7eba757",
+      "kind": "certainty_inflation",
+      "pair_id": "t184b7eba757",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t1a66b902bf1",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t106ac3f17b2",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t1c066c7ef1e",
+      "kind": "correlation_as_causation",
+      "pair_id": "tae56555b5fd",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t1c6419ab214",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t1c6419ab214",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t2287c317710",
+      "kind": "certainty_inflation",
+      "pair_id": "t2287c317710",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t23ec1295a7e",
+      "kind": "correlation_as_causation",
+      "pair_id": "t23ec1295a7e",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t24cb18a0ac4",
+      "kind": "background_as_result",
+      "pair_id": "t24cb18a0ac4",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t264392cd1d8",
+      "kind": "certainty_inflation",
+      "pair_id": "t264392cd1d8",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t26e4fc17b93",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "td7ef2183d51",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t2ad60990050",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t897ab6beeed",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t2bd0f343c0b",
+      "kind": "correlation_as_causation",
+      "pair_id": "tae56555b5fd",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t2cbe8e88dea",
+      "kind": "certainty_inflation",
+      "pair_id": "t2cbe8e88dea",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t321d017eec0",
+      "kind": "certainty_inflation",
+      "pair_id": "t321d017eec0",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t3350969cdf2",
+      "kind": "background_as_result",
+      "pair_id": "tbd4ee377c2d",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t348952b2297",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t348952b2297",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t3565e76abdb",
+      "kind": "certainty_inflation",
+      "pair_id": "t2287c317710",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t38c62582662",
+      "kind": "correlation_as_causation",
+      "pair_id": "t38c62582662",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t40038d23315",
+      "kind": "background_as_result",
+      "pair_id": "t40038d23315",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t416d74b3ced",
+      "kind": "correlation_as_causation",
+      "pair_id": "t23ec1295a7e",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t418cb10fb83",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "taa1b99d07b9",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t420f8d40744",
+      "kind": "certainty_inflation",
+      "pair_id": "t42adebb16c3",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t42adebb16c3",
+      "kind": "certainty_inflation",
+      "pair_id": "t42adebb16c3",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t42f1059fec9",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "te2749390e58",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t434c24bbc8e",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tac21d684f41",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t4645408473b",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t75736d426f2",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t488058a28da",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t488058a28da",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t4963bb480bc",
+      "kind": "correlation_as_causation",
+      "pair_id": "t38c62582662",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t4cf22996592",
+      "kind": "certainty_inflation",
+      "pair_id": "t144a36fb69a",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t4d5c47d647a",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t5aef384bd31",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t4e5a01feea5",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t8ee26aed1e2",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t50a3dff9332",
+      "kind": "correlation_as_causation",
+      "pair_id": "t74ce6114691",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t5156fb0f90c",
+      "kind": "certainty_inflation",
+      "pair_id": "t184b7eba757",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t54b89d5ba9b",
+      "kind": "correlation_as_causation",
+      "pair_id": "t5745ac108c4",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t558fda50c85",
+      "kind": "correlation_as_causation",
+      "pair_id": "tdd98d447d24",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t5745ac108c4",
+      "kind": "correlation_as_causation",
+      "pair_id": "t5745ac108c4",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t57b687c8563",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t57b687c8563",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t587c504093b",
+      "kind": "certainty_inflation",
+      "pair_id": "t2cbe8e88dea",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t5aef384bd31",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t5aef384bd31",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t5be69f54731",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t884f7383ae5",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t5beb029b3fb",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0647b1f8897",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t5dbe76a1b69",
+      "kind": "correlation_as_causation",
+      "pair_id": "tdc530aa33cf",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t632d6f3b38b",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t632d6f3b38b",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t6862cf0b647",
+      "kind": "background_as_result",
+      "pair_id": "td9219cd7439",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t69310c9c897",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t69310c9c897",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t6bdaef7a5c3",
+      "kind": "background_as_result",
+      "pair_id": "t92d9419379e",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t6be623e883e",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "ta600ea23331",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t6da38cf739d",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tbb25cce6445",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t6dc95496938",
+      "kind": "certainty_inflation",
+      "pair_id": "t6dc95496938",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t724f14cdecc",
+      "kind": "certainty_inflation",
+      "pair_id": "t724f14cdecc",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t74ce6114691",
+      "kind": "correlation_as_causation",
+      "pair_id": "t74ce6114691",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t75736d426f2",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t75736d426f2",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t76820518080",
+      "kind": "correlation_as_causation",
+      "pair_id": "t76820518080",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t78d3a786656",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tff3644498f0",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t7ad4a8a852a",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t7ad4a8a852a",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t7bc963a3908",
+      "kind": "certainty_inflation",
+      "pair_id": "t264392cd1d8",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t7bfaeb6c007",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta50eb59d1a6",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t7d6d665eb59",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta158ffc84c2",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t7dc2380ca15",
+      "kind": "certainty_inflation",
+      "pair_id": "t7dc2380ca15",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t7e22d08f597",
+      "kind": "background_as_result",
+      "pair_id": "ta5c98139afa",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t813bf4f5df9",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta50eb59d1a6",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t822bf71aa33",
+      "kind": "certainty_inflation",
+      "pair_id": "t12190f66446",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t8304ce8035b",
+      "kind": "certainty_inflation",
+      "pair_id": "t7dc2380ca15",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t83c58ee906f",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t632d6f3b38b",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t84904624e85",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t9dbf4f6f920",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t856857f54d1",
+      "kind": "background_as_result",
+      "pair_id": "t8bb67bea9bf",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t86932df5b5c",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t69310c9c897",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t884f7383ae5",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t884f7383ae5",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t88b5bd6a6cf",
+      "kind": "correlation_as_causation",
+      "pair_id": "t88b5bd6a6cf",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t88f40ba3766",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t9dbf4f6f920",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t88fe098fd7b",
+      "kind": "certainty_inflation",
+      "pair_id": "tf705ad39ec6",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t897ab6beeed",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t897ab6beeed",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t8bb67bea9bf",
+      "kind": "background_as_result",
+      "pair_id": "t8bb67bea9bf",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t8dc4a7d2a2a",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t8dc4a7d2a2a",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t8e969d9b02c",
+      "kind": "certainty_inflation",
+      "pair_id": "tf705ad39ec6",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t8ee26aed1e2",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t8ee26aed1e2",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t8eebf42e220",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "taa1b99d07b9",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t90e959497b3",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t90e959497b3",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t92d9419379e",
+      "kind": "background_as_result",
+      "pair_id": "t92d9419379e",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "t93f5695a3ad",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t69310c9c897",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t952d5e9892d",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t9c04f091217",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t97fca727b0f",
+      "kind": "certainty_inflation",
+      "pair_id": "te59e4a78f03",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9b9b6720a87",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tdee705808d6",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9c04f091217",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t9c04f091217",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9c0abe19474",
+      "kind": "certainty_inflation",
+      "pair_id": "t9c0abe19474",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9dbf4f6f920",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t9dbf4f6f920",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9eee31814ec",
+      "kind": "certainty_inflation",
+      "pair_id": "t321d017eec0",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9f6b24f9a11",
+      "kind": "correlation_as_causation",
+      "pair_id": "t88b5bd6a6cf",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "t9f6c920d584",
+      "kind": "certainty_inflation",
+      "pair_id": "t0ee897a68a9",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "ta072f009735",
+      "kind": "correlation_as_causation",
+      "pair_id": "t76820518080",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "ta154187b5bc",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t8ee26aed1e2",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "ta158ffc84c2",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta158ffc84c2",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "ta1c99f938d0",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta1c99f938d0",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "ta4f5cb85cc2",
+      "kind": "correlation_as_causation",
+      "pair_id": "t74ce6114691",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "ta50eb59d1a6",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta50eb59d1a6",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "ta5c98139afa",
+      "kind": "background_as_result",
+      "pair_id": "ta5c98139afa",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "ta600ea23331",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "ta600ea23331",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "ta7f9c2bfbc8",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tb53519731af",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "taa1b99d07b9",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "taa1b99d07b9",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tabbd87caa0f",
+      "kind": "correlation_as_causation",
+      "pair_id": "tdc530aa33cf",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tac21d684f41",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tac21d684f41",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tae56555b5fd",
+      "kind": "correlation_as_causation",
+      "pair_id": "tae56555b5fd",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "taf84f04dcb0",
+      "kind": "certainty_inflation",
+      "pair_id": "tff7a4a952d3",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tb53519731af",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tb53519731af",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tb53faae6fc9",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tbf189a48ad9",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tbb25cce6445",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tbb25cce6445",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tbd4ee377c2d",
+      "kind": "background_as_result",
+      "pair_id": "tbd4ee377c2d",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tbefe2aa5631",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t90e959497b3",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tbf189a48ad9",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tbf189a48ad9",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc1d0b6aa30f",
+      "kind": "certainty_inflation",
+      "pair_id": "t6dc95496938",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc25c7b44d47",
+      "kind": "certainty_inflation",
+      "pair_id": "tc25c7b44d47",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc2b8a702aba",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc2b8a702aba",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc2e56d575dc",
+      "kind": "background_as_result",
+      "pair_id": "td9219cd7439",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tc321c74db31",
+      "kind": "certainty_inflation",
+      "pair_id": "t144a36fb69a",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc5576c4a97d",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t0adadf20661",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc62400427f5",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc62400427f5",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc7017fb5941",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tc7017fb5941",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc733f943aef",
+      "kind": "certainty_inflation",
+      "pair_id": "t724f14cdecc",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc82c9d3bb3c",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t1c6419ab214",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc86866b4833",
+      "kind": "background_as_result",
+      "pair_id": "tc86866b4833",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tc99ae41cc41",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc99ae41cc41",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tca8c23a458d",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc62400427f5",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tca9b17bf08a",
+      "kind": "certainty_inflation",
+      "pair_id": "tf8b104f1010",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tcb2e0289696",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t1c6419ab214",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tcfea1002207",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t897ab6beeed",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "td07e28e0c6b",
+      "kind": "background_as_result",
+      "pair_id": "tde9d9cd9192",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "td22a9c073ef",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "te7fe0a9a19a",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "td76b14a99c1",
+      "kind": "certainty_inflation",
+      "pair_id": "t2cbe8e88dea",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "td7ef2183d51",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "td7ef2183d51",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "td9219cd7439",
+      "kind": "background_as_result",
+      "pair_id": "td9219cd7439",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "td9b3bfc0427",
+      "kind": "certainty_inflation",
+      "pair_id": "t9c0abe19474",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tda1fd0cbd9d",
+      "kind": "certainty_inflation",
+      "pair_id": "tc25c7b44d47",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tda3bcc582b1",
+      "kind": "correlation_as_causation",
+      "pair_id": "t76820518080",
+      "role": "trap",
+      "votes": [
+        "reject",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tdb111f69593",
+      "kind": "background_as_result",
+      "pair_id": "t24cb18a0ac4",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tdbab13c4135",
+      "kind": "correlation_as_causation",
+      "pair_id": "ta1c99f938d0",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tdc530aa33cf",
+      "kind": "correlation_as_causation",
+      "pair_id": "tdc530aa33cf",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tdd98d447d24",
+      "kind": "correlation_as_causation",
+      "pair_id": "tdd98d447d24",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tde9d9cd9192",
+      "kind": "background_as_result",
+      "pair_id": "tde9d9cd9192",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tdee705808d6",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tdee705808d6",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tdf9b45f26af",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t348952b2297",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tdfc74d4ee42",
+      "kind": "correlation_as_causation",
+      "pair_id": "tdd98d447d24",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te0bc8c7d351",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t57b687c8563",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te2749390e58",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "te2749390e58",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te3667eb40b4",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc99ae41cc41",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te38081b8823",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "te38081b8823",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te59e4a78f03",
+      "kind": "certainty_inflation",
+      "pair_id": "te59e4a78f03",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te73038144e2",
+      "kind": "background_as_result",
+      "pair_id": "t40038d23315",
+      "role": "trap",
+      "votes": [
+        "reject",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te7fe0a9a19a",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "te7fe0a9a19a",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "te997a6365c0",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "te997a6365c0",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "teace842f05a",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "t8dc4a7d2a2a",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tef3b0772c05",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t348952b2297",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tf25f8eb3b9c",
+      "kind": "nonsignificant_as_effect",
+      "pair_id": "tc62400427f5",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tf34a00afdf6",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "t632d6f3b38b",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tf681b5e64c0",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tff3644498f0",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "rule_floor",
+      "id": "tf6df5be1291",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0647b1f8897",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tf705ad39ec6",
+      "kind": "certainty_inflation",
+      "pair_id": "tf705ad39ec6",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tf7435571ed3",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tc7017fb5941",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tf88ab200ff3",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "te997a6365c0",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tf8b104f1010",
+      "kind": "certainty_inflation",
+      "pair_id": "tf8b104f1010",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tf8be400322d",
+      "kind": "correlation_as_causation",
+      "pair_id": "t0679d663792",
+      "role": "trap",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tfdc6204e479",
+      "kind": "certainty_inflation",
+      "pair_id": "tfdc6204e479",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tff3644498f0",
+      "kind": "preclinical_to_clinical",
+      "pair_id": "tff3644498f0",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "reject"
+      ]
+    },
+    {
+      "generator": "model",
+      "id": "tff7a4a952d3",
+      "kind": "certainty_inflation",
+      "pair_id": "tff7a4a952d3",
+      "role": "parent",
+      "votes": [
+        "confirm",
+        "confirm"
+      ]
+    }
+  ],
+  "set_sha256": "b7d2b76d1490ca09030a1834ecd4c5afafa17b3030fcb280f0304dacb6f50593",
+  "sheet_sha256": [
+    "002e1bfcd45f1ed3d4d69b86a42b5a74bfc4bdfaf7e10ac2a9f5c2c75b85a9d0",
+    "2f2a2d73c9ba05522411caebf1204d415d66b059785d61b4e864ba81fc8aa3db"
+  ]
+}

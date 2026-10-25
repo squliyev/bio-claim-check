@@ -8,11 +8,10 @@ the repo; ask the maintainer for the rows relevant to your session.
 ## 1. Where things stand
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
-  S12b, S12c (tag `prompts-frozen-v2`). **S13 code is done** (ADR 0022, 0023); its data step is not (section 4).
+  S12b, S12c (tag `prompts-frozen-v2`), S13 (ADR 0022, 0023; `traps/dev-v1.jsonl`, a silver standard).
   CI is green on `main`.
-- **Next: finish S13** (the model-panel run, then commit the dev set), with the maintainer's
-  test-split audit in parallel (section 4). Then
-  the demo track: proof checkpoint → S17a (slim UI) → H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
+- **Next: the proof checkpoint** (section 4), with the maintainer's test-split audit in parallel. Then
+  the rest of the demo track: S17a (slim UI) → H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
 - Next free ids: invariant **I80**, ADR **0024**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
@@ -43,7 +42,7 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: finish S13 (dev trap set), with the test-split audit in parallel
+## 4. Next: the proof checkpoint, with the test-split audit in parallel
 
 **In parallel (maintainer, not an agent session):** the test-split eligibility audit and the
 unanswerable check. It gates only test-split traps. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
@@ -62,48 +61,31 @@ uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var
 - An agent may run these commands but never reads a test sheet or test abstract, and never commits a sheet
   (abstract text).
 
-**Finishing S13 (the dev trap set, [ADR 0022](adr/0022-trap-set-and-outcomes.md)):**
+**The proof checkpoint (dev-v1, [ADR 0022](adr/0022-trap-set-and-outcomes.md), [ADR 0023](adr/0023-model-panel-confirmation.md)):**
 
-Done:
-- The maintainer confirmed `TRAP_PROMPT` and ADR 0022 decision 8.
-- Live drafting finished with a top-up to `--per-kind 20`. Draft: `var/traps/dev-draft-20-b222f76d60fb.jsonl`.
-  Candidates: 9, 15, 17, 18 and 19 model traps per kind, plus 21 direction swaps (dev-log S13).
+What exists:
+- `traps/dev-v1.jsonl`: 38 items (16 parents, 15 model traps, 7 rule-floor traps), confirmed unanimously
+  by gemini-4-argon and grok-4.7 under `docs/protocols/trap-panel-v1.md`. Votes: `traps/dev-v1.panel.json`.
+- Per kind, model traps: correlation 6, nonsignificant 4, certainty 3, preclinical 2, background 0.
+  The attrition is in dev-log S13: one rater rejected 62 parents as close paraphrases, which dropped their
+  traps. The maintainer chose to keep the predeclared rules (2026-10-25).
 
-- The maintainer is not a biomedical researcher, so the author audit was replaced by a **two-model panel**
-  (ADR 0023, I79): gemini-4-argon and grok-4.7 at high reasoning effort, unanimous only, a **silver
-  standard**. The code is in commit F.
-- An advisory pass by gemini-4-argon read `VERIFY_PROMPT`, so it is discarded (ADR 0023 §7).
-
-Next (announced to the maintainer first):
+Next:
 
 ```bash
-# 1. delete the discarded advisory files
-rm var/audit/traps-dev-b222f76d60fb.advisory.csv var/audit/traps-dev-b222f76d60fb.advisory-summary.md
-# 2. one isolated folder per rater, holding only the protocol and a blank copy of the sheet
-for r in gemini-4-argon grok-4.7; do mkdir -p var/panel/$r
-  cp docs/protocols/trap-panel-v1.md var/panel/$r/protocol.md
-  cp var/audit/traps-dev-b222f76d60fb.csv var/panel/$r/sheet.csv; done
-# 3. run both raters as subagents in parallel (model = the rater id, high effort), each given the protocol
-#    verbatim and told to read and write only its own folder; then:
-uv run bio-claim-check traps apply-audit --draft var/traps/dev-draft-20-b222f76d60fb.jsonl \
-  --sheet var/panel/gemini-4-argon/sheet.csv --rater gemini-4-argon \
-  --sheet var/panel/grok-4.7/sheet.csv --rater grok-4.7
-# 4. commit G: traps/dev-v1.jsonl and traps/dev-v1.panel.json; fill the dev-log S13 flow and 2x2 tables
+uv run bio-claim-check traps verify            # refuses unless this code is freeze v2; 76 calls at most
+uv run bio-claim-check traps verify --record   # once the counts have been read
 ```
 
-- The protocol `docs/protocols/trap-panel-v1.md` is hashed into the ledger; never edit it after the run.
-- The cohort is fixed at the 177 candidates. Nothing is topped up or replaced after the panel.
-- Report per ADR 0023 §5: model traps primary, rule floor apart, numerators and denominators per kind and
-  generator, the attrition flow. Never call dev-v1 ground truth or expert-labelled.
-- `background_as_result` is capped at 9 (ADR 0022 §6). A kind still short of 12 confirmed traps after the
-  panel is reported as short, not topped up (ADR 0023 §3).
-- The draft, the sheet and the LLM cache (`var/cache.sqlite`) are all local. If only the draft or the sheet is
-  lost, rerun `generate --per-kind 20` with a budget of 180: every call is a cache hit, so the draft is
-  identical. If the cache is lost too, the drafts change, and the counts above no longer apply.
-- `traps verify` is the proof checkpoint's step, not S13's. It refuses unless this code is the active
-  freeze. Use `--record` once the counts have been read.
+- `traps verify` checks I79 (the ledger) before any call, and needs the budget for twice the items.
+- Report per ADR 0023 §5: model traps first, rule floor apart, parent false alarms, `needs_review` and
+  `failed`, all as **k of n**. With 2 to 6 traps per kind there are no per-kind rates or intervals. Always
+  say "silver standard" and "planted, controlled paired design"; never "accuracy" or "ground truth".
+- No tuning on these outcomes: the judge is frozen.
 - Never commit a draft or a sheet: drafts list gate problems, and sheets hold abstract text.
   `tests/arch/test_trap_set.py` allows only sets, their panel ledgers, results and the README under `traps/`.
+- The local panel sheets (`var/panel/<rater>/sheet.csv`, with the raters' reasons) are not committed;
+  their sha256s are in the ledger.
 
 **Bindings from S12b and S12c (must hold):**
 - Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside

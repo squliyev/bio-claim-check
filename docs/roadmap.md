@@ -5,10 +5,9 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S13 code done):** S01–S12c are done; tag `prompts-frozen-v2`. S13's generator, audit sheet,
-`apply-audit` and `traps verify` are built (ADR 0022), and the drafts are live. The maintainer is not a
-biomedical researcher, so the dev trap set is confirmed by a unanimous two-model panel and is a silver
-standard (ADR 0023); it lands after the panel run. Then the **demo track** (proof checkpoint → S17a → H1) before returning to S14.
+**Status (S13 done):** S01–S13 are done; tag `prompts-frozen-v2`. The dev trap set `traps/dev-v1.jsonl`
+(38 items, 15 model traps) is confirmed by a unanimous two-model panel and is a silver standard
+(ADR 0022, 0023). Next the **demo track** (proof checkpoint → S17a → H1) before returning to S14.
 The maintainer's test-split audit runs in parallel and gates only test-split traps.
 
 ## Product
@@ -98,8 +97,8 @@ can be contributed here as their own credited rule pack. No results from this re
 | Session | Scope |
 |---|---|
 | (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2`; runs in parallel with S13 and gates only test-split traps |
-| S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test; dev first. Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a `Report` (S13 ADR) |
-| Proof checkpoint | Trap disposition counts and catch rate per trap kind on dev; a false-alarm rate only on the confirmed dev parents. On dev-v1 these are silver-standard numbers (ADR 0023), model traps primary, rule floor apart. Exploratory, never pitched (go / adjust) |
+| S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test; dev first. Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a `Report` (S13 ADR). ✅ ADR 0022, 0023: dev-v1 is a silver standard, 38 items |
+| Proof checkpoint | Trap disposition counts per trap kind on dev (on dev-v1, k of n only: 2 to 6 model traps per kind, so no per-kind rates); a false-alarm rate only on the confirmed dev parents. On dev-v1 these are silver-standard numbers (ADR 0023), model traps primary, rule floor apart. Exploratory, never pitched (go / adjust) |
 | S17a | Demo track: slim Streamlit UI, Ask page (recorded runs, live under the call budget) and Trust report page, in the final layered form; Docker offline mode with live controls disabled (see below) |
 | H1 | Demo track: hackathon prep (trap papers, demo, pitch, disclosure); what is shown on the day is decided here and must respect the option C rule (no claimcheck results on the day) or change it by ADR |
 | S14 | Baselines: AlwaysFlag, MeSH-cue, optional NLI; shared verifier contract suite |
