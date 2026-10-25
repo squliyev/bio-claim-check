@@ -84,6 +84,7 @@ from bio_claim_check.app.usecases.corpus_audit import (
     export_sheet,
 )
 from bio_claim_check.app.usecases.llm_ping import PingResult, ping
+from bio_claim_check.app.usecases.proof_checkpoint import DEV_V1_SHA256, checkpoint, describe
 from bio_claim_check.app.usecases.retractions import (
     RetractionCheck,
     RetractionInputError,
@@ -139,6 +140,7 @@ from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_byt
 from bio_claim_check.features.report.models import Report
 from bio_claim_check.features.retrieval.errors import RetrievalError
 from bio_claim_check.features.traps.audit_sheet import TrapAuditError
+from bio_claim_check.features.traps.counts import DISPOSITIONS
 from bio_claim_check.features.traps.panel import PanelLedger, agreement, percent_agreement
 from bio_claim_check.features.traps.sampling import TrapSamplingError
 
@@ -1138,6 +1140,9 @@ def traps_verify_command(
     """
     settings = _settings(env_file)
     data = _read_input(traps)
+    recorded = traps.parent / "results" / f"{ACTIVE_FREEZE}-{traps.stem}.json"
+    if record and recorded.exists():
+        _fail(ExitCode.OUTPUT, f"{recorded} is already recorded; a set is recorded once per freeze")
     ledger_path = _panel_ledger_path(traps)
     ledger = _read_input(ledger_path) if ledger_path.is_file() else None
     try:
@@ -1189,12 +1194,27 @@ def traps_verify_command(
             f"  {row.kind.value} {row.role} {row.generator}: n={row.n} flagged={row.flagged} "
             f"passed={row.passed} needs_review={row.needs_review} failed={row.failed} exact={row.exact}"
         )
+    for pair in result.counts.pairs:
+        cells = " ".join(
+            f"{t.value}/{p.value}={pair.cell(t, p)}"
+            for t in DISPOSITIONS
+            for p in DISPOSITIONS
+            if pair.cell(t, p)
+        )
+        typer.echo(
+            f"  pairs {pair.kind.value} {pair.generator}: n={pair.n} "
+            f"discriminated={pair.discriminated} (trap/parent) {cells}"
+        )
+    if result.trap_set_sha256 == DEV_V1_SHA256:
+        typer.echo(describe(checkpoint(result)))
+    else:
+        typer.echo("no predeclared go/adjust rule for this set (ADR 0024 covers dev-v1 only)")
     confirmed = "model-panel-confirmed silver standard (ADR 0023)" if ledger else "author-confirmed"
     typer.echo(f"exploratory, dev only; {confirmed}")
     typer.echo(f"attempt: {attempt}")
     if record:
         try:
-            path = publish_document(traps.parent / "results", f"{ACTIVE_FREEZE}-{traps.stem}.json", out)
+            path = publish_document(recorded.parent, recorded.name, out)
         except OutputConflictError as err:
             _fail(ExitCode.OUTPUT, str(err))
         typer.echo(f"recorded: {path}")

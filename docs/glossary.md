@@ -50,6 +50,11 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   ([ADR 0022](./adr/0022-trap-set-and-outcomes.md)). Each source gives a **parent** (a supported claim),
   a **model trap** (the parent rewritten to commit one kind) and up to three **rule-floor traps** (a
   direction, operator or dose swap of the parent). Claims only, never abstract text.
+- **Pair table / discriminated:** for one (kind, generator), every trap's disposition against its own
+  parent's. A pair is **discriminated** when the trap is flagged and its parent passed
+  ([ADR 0024](./adr/0024-proof-checkpoint-go-adjust.md)). Shared parents make these descriptive counts.
+- **Go/adjust verdict:** the proof checkpoint's predeclared rule on dev-v1 (policy `adr-0024-v1`); it
+  changes how the demo frames the verifier, never whether counts are shown, and never tunes the judge.
 - **Caught / exact / false alarm:** a trap is *caught* when its disposition is `flagged`, and *exact* when
   its label (and reason, if declared) is also the expected one. A *false alarm* is a flagged parent.
   `needs_review` and `failed` stay in every denominator. All are exploratory on dev.

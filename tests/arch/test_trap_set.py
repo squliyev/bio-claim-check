@@ -1,4 +1,4 @@
-"""Every committed trap set and trap result holds its invariants (I76, I77, I79). A glob: zero files is fine.
+"""Every committed trap set and trap result holds its invariants (I76, I77, I79, ADR 0024). Zero is fine.
 
 Self-reported, like the challenge result: a result is checked against its set, the sealed dataset and the
 freeze record it is named after (judge, verifier, writer-family flag) and recounted, which proves
@@ -7,6 +7,7 @@ author's call in the sheet; only what CI can recompute is claimed here. A panel-
 recomputed from its committed ledger of votes (I79); the votes themselves are self-reported too.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ import pytest
 from bio_claim_check.app.container import default_rulepack, load_corpus_spec, read_dataset
 from bio_claim_check.app.freeze import FREEZE_DIR, FreezeRecord
 from bio_claim_check.app.models import RATER_FAMILIES, model_catalog
+from bio_claim_check.app.usecases.proof_checkpoint import DEV_V1_SHA256, checkpoint, describe
 from bio_claim_check.app.usecases.traps import (
     SCORED_KINDS,
     panel_families,
@@ -23,6 +25,7 @@ from bio_claim_check.app.usecases.traps import (
 )
 from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.features.corpus.layout import SPEC
+from bio_claim_check.features.traps.counts import TrapResult
 from bio_claim_check.features.traps.panel import PanelLedger
 from tests.support.paths import ROOT
 
@@ -113,3 +116,15 @@ def test_only_sets_and_results_are_committed_under_traps() -> None:
     allowed = {*SETS, *RESULTS, *LEDGERS, TRAPS / "README.md", TRAPS / "results"}
     stray = [p for p in TRAPS.rglob("*") if p not in allowed] if TRAPS.exists() else []
     assert stray == []  # no draft, sheet, rater reason or abstract text: those stay under the var dir
+
+
+def test_the_reported_go_adjust_verdict_is_the_one_code_gives() -> None:
+    """ADR 0024: dev-log S13p states the verdict that the predeclared rule gives on the committed result."""
+    for result in RESULTS:
+        parsed = TrapResult.model_validate_json(result.read_bytes())
+        if parsed.trap_set_sha256 != DEV_V1_SHA256:
+            continue
+        point = checkpoint(parsed)
+        log = (ROOT / "docs" / "dev-log" / "S13p.md").read_text(encoding="utf-8")
+        stated = set(re.findall(r"\*\*Verdict \(ADR 0024\): (GO|ADJUST)\*\*", log))
+        assert stated == {point.verdict.value}, describe(point)

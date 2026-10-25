@@ -67,6 +67,7 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `retractions.input` | `RetractionInputError` | `retractions`: the run id is malformed, or the run is missing, altered, not a live `run`, or not a report (checked before any request) |
 | `traps.audit_sheet` | `TrapAuditError` | A filled-in trap audit sheet was made from another draft, or has an added, missing, duplicated, edited or undecided row, or a rejection without a reason |
 | `traps.budget` | `TrapBudgetError` | `BCC_MAX_LIVE_LLM_CALLS` cannot cover a call and a repair per trap draft or trap item; refused before any call |
+| `traps.checkpoint` | `CheckpointError` | The ADR 0024 go/adjust rule was asked of a result that is not dev-v1 with its predeclared denominators (15 model traps, 16 parents, 38 items); it fails closed |
 | `traps.infeasible` | `TrapSamplingError` | A scored kind has no eligible dev source at all; nothing was drafted (a kind with fewer sources than `--per-kind` gets all it has, and the run reports the shortfall) |
 | `traps.input` | `TrapInputError` | The dataset is not sealed, a trap draft is edited or empty, or a trap set breaks I76/I77/I79 (non-dev question or source, changed hash, missing parent, contamination, not canonical; a panel without two registered raters of separate families, one sheet each, or a set its ledger does not attest) |
 | `traps.pool` | `TrapPoolError` | A sampled or committed trap source did not come back, with its sealed hash, in its dev pool |

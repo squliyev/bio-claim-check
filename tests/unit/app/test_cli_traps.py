@@ -295,6 +295,8 @@ def test_verify_writes_an_attempt_and_record_publishes_once(
     code, out, err = invoke(tmp_path, "traps", "verify", *args)
     assert code == 0, err
     assert "certainty_inflation trap model: n=1 flagged=0 passed=1" in out
+    assert "pairs certainty_inflation model: n=1 discriminated=0 (trap/parent) passed/passed=1" in out
+    assert "no predeclared go/adjust rule for this set" in out
     (attempt,) = (tmp_path / "var" / "traps" / "results").iterdir()
     code, out, err = invoke(tmp_path, "traps", "verify", *args, "--record")
     assert code == 0, err
@@ -302,6 +304,14 @@ def test_verify_writes_an_attempt_and_record_publishes_once(
     assert recorded.name.endswith("-dev-v1.json")
     assert recorded.read_bytes() == attempt.read_bytes()
     assert json.loads(recorded.read_bytes())["writer_family_flag"] is False
+
+    def no_ports(*_: object) -> None:
+        raise AssertionError("a second record must be refused before any port")
+
+    monkeypatch.setattr(cli, "build_challenge_ports", no_ports)
+    code, _, err = invoke(tmp_path, "traps", "verify", *args, "--record")
+    assert code == ExitCode.OUTPUT
+    assert "already recorded" in err
 
 
 def test_verify_refuses_a_set_its_ledger_does_not_attest_before_any_port(

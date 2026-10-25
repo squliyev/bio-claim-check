@@ -14,7 +14,7 @@ from bio_claim_check.features.contracts.labels import (
 )
 from bio_claim_check.features.contracts.outcome import PairOutcome
 from bio_claim_check.features.traps.audit_sheet import TrapDecision, confirmed_items
-from bio_claim_check.features.traps.counts import CountRow, TrapResult, counts, exact
+from bio_claim_check.features.traps.counts import CountRow, PairRow, TrapResult, counts, exact
 
 ROWS = (parent(), trap(), trap(claim="Drug X raised plaque in mice.", rule="direction"))
 ITEMS = confirmed_items(ROWS, tuple(TrapDecision(id=r.id, decision="confirm", reason=None) for r in ROWS))
@@ -121,3 +121,42 @@ def test_results_are_sorted_one_per_item() -> None:
     assert TrapResult.model_validate({**base, "outcomes": (one,)}).outcomes == (one,)
     with pytest.raises(ValidationError, match="sorted"):
         TrapResult.model_validate({**base, "outcomes": (one, one)})
+
+
+def test_pair_tables_cross_each_trap_with_its_own_parent() -> None:
+    p, t, f = BY_ROLE["parent", "model"], BY_ROLE["trap", "model"], BY_ROLE["trap", "rule_floor"]
+    outcomes = (
+        _judged(p.id, Label.SUPPORTED, Disposition.PASSED),
+        _judged(t.id, Label.OVERSTATED, Disposition.FLAGGED, KIND),
+        _failed(f.id),
+    )
+    pairs = {r.generator: r for r in counts(ITEMS, outcomes).pairs}
+    assert set(pairs) == {"model", "rule_floor"}
+    assert pairs["model"].n == 1
+    assert pairs["model"].discriminated == 1
+    assert pairs["rule_floor"].cell(Disposition.FAILED, Disposition.PASSED) == 1
+    assert pairs["rule_floor"].discriminated == 0
+
+
+def test_a_verifier_that_flags_everything_discriminates_nothing() -> None:
+    outcomes = tuple(_judged(i.id, Label.CONTRADICTED, Disposition.FLAGGED) for i in ITEMS)
+    for pair in counts(ITEMS, outcomes).pairs:
+        assert pair.discriminated == 0
+        assert pair.cell(Disposition.FLAGGED, Disposition.FLAGGED) == pair.n
+
+
+def test_a_trap_without_its_parent_is_refused() -> None:
+    t = BY_ROLE["trap", "model"]
+    with pytest.raises(ValueError, match="no parent"):
+        counts((t,), (_judged(t.id, Label.OVERSTATED, Disposition.FLAGGED, KIND),))
+
+
+def test_pair_tables_must_be_square_and_add_up() -> None:
+    zero = ((0, 0, 0, 0),) * 4
+    fields = {"kind": KIND, "generator": "model", "n": 1}
+    with pytest.raises(ValidationError, match="add up"):
+        PairRow.model_validate({**fields, "table": zero})
+    with pytest.raises(ValidationError, match="4 by 4"):
+        PairRow.model_validate({**fields, "table": ((1,),)})
+    with pytest.raises(ValidationError, match="negative"):
+        PairRow.model_validate({**fields, "table": ((2, -1, 0, 0), *zero[1:])})
