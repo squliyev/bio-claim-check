@@ -1,0 +1,695 @@
+{
+  "corpus_seal": "fd519195e96bdff2d4b7665c2f2c57acaf05d6efa89cc8d690bd18d45ce27fb5",
+  "counts": {
+    "pairs": [
+      {
+        "generator": "model",
+        "kind": "certainty_inflation",
+        "n": 3,
+        "table": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "generator": "model",
+        "kind": "correlation_as_causation",
+        "n": 6,
+        "table": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            4,
+            2,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "generator": "rule_floor",
+        "kind": "correlation_as_causation",
+        "n": 4,
+        "table": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            2,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "generator": "model",
+        "kind": "nonsignificant_as_effect",
+        "n": 4,
+        "table": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            3,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "generator": "rule_floor",
+        "kind": "nonsignificant_as_effect",
+        "n": 2,
+        "table": [
+          [
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "generator": "model",
+        "kind": "preclinical_to_clinical",
+        "n": 2,
+        "table": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            2,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "generator": "rule_floor",
+        "kind": "preclinical_to_clinical",
+        "n": 1,
+        "table": [
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ],
+          [
+            1,
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            0
+          ]
+        ]
+      }
+    ],
+    "rows": [
+      {
+        "exact": 2,
+        "failed": 0,
+        "flagged": 0,
+        "generator": "model",
+        "kind": "certainty_inflation",
+        "n": 3,
+        "needs_review": 1,
+        "passed": 2,
+        "role": "parent"
+      },
+      {
+        "exact": 2,
+        "failed": 0,
+        "flagged": 2,
+        "generator": "model",
+        "kind": "certainty_inflation",
+        "n": 3,
+        "needs_review": 1,
+        "passed": 0,
+        "role": "trap"
+      },
+      {
+        "exact": 5,
+        "failed": 0,
+        "flagged": 0,
+        "generator": "model",
+        "kind": "correlation_as_causation",
+        "n": 7,
+        "needs_review": 2,
+        "passed": 5,
+        "role": "parent"
+      },
+      {
+        "exact": 6,
+        "failed": 0,
+        "flagged": 6,
+        "generator": "model",
+        "kind": "correlation_as_causation",
+        "n": 6,
+        "needs_review": 0,
+        "passed": 0,
+        "role": "trap"
+      },
+      {
+        "exact": 3,
+        "failed": 0,
+        "flagged": 3,
+        "generator": "rule_floor",
+        "kind": "correlation_as_causation",
+        "n": 4,
+        "needs_review": 1,
+        "passed": 0,
+        "role": "trap"
+      },
+      {
+        "exact": 1,
+        "failed": 0,
+        "flagged": 0,
+        "generator": "model",
+        "kind": "nonsignificant_as_effect",
+        "n": 4,
+        "needs_review": 3,
+        "passed": 1,
+        "role": "parent"
+      },
+      {
+        "exact": 1,
+        "failed": 0,
+        "flagged": 4,
+        "generator": "model",
+        "kind": "nonsignificant_as_effect",
+        "n": 4,
+        "needs_review": 0,
+        "passed": 0,
+        "role": "trap"
+      },
+      {
+        "exact": 1,
+        "failed": 0,
+        "flagged": 1,
+        "generator": "rule_floor",
+        "kind": "nonsignificant_as_effect",
+        "n": 2,
+        "needs_review": 0,
+        "passed": 1,
+        "role": "trap"
+      },
+      {
+        "exact": 2,
+        "failed": 0,
+        "flagged": 0,
+        "generator": "model",
+        "kind": "preclinical_to_clinical",
+        "n": 2,
+        "needs_review": 0,
+        "passed": 2,
+        "role": "parent"
+      },
+      {
+        "exact": 2,
+        "failed": 0,
+        "flagged": 2,
+        "generator": "model",
+        "kind": "preclinical_to_clinical",
+        "n": 2,
+        "needs_review": 0,
+        "passed": 0,
+        "role": "trap"
+      },
+      {
+        "exact": 1,
+        "failed": 0,
+        "flagged": 1,
+        "generator": "rule_floor",
+        "kind": "preclinical_to_clinical",
+        "n": 1,
+        "needs_review": 0,
+        "passed": 0,
+        "role": "trap"
+      }
+    ]
+  },
+  "judge_sha256": "9ce2d728a67ae062ca294d6a66aef2a07b9c26f2a9a4930dca25a812b4975e11",
+  "outcomes": [
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t09aeeb87ab2",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t0fe147559c4",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t184b7eba757",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t23ec1295a7e",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t348952b2297",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t416d74b3ced",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t4e5a01feea5",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t50a3dff9332",
+      "label": "overstated",
+      "negation": "negated",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t5156fb0f90c",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t54b89d5ba9b",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t558fda50c85",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t5745ac108c4",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t6be623e883e",
+      "label": "overstated",
+      "negation": "negated",
+      "reason": "nonsignificant_as_effect"
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t724f14cdecc",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t74ce6114691",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t76820518080",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t7bfaeb6c007",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t813bf4f5df9",
+      "label": "overstated",
+      "negation": "negated",
+      "reason": "correlation_as_causation"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t84904624e85",
+      "label": "contradicted",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t88f40ba3766",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t8ee26aed1e2",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t90e959497b3",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "t9dbf4f6f920",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ta072f009735",
+      "label": "contradicted",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ta154187b5bc",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ta4f5cb85cc2",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ta50eb59d1a6",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "needs_review",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "ta600ea23331",
+      "label": "supported",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "taf84f04dcb0",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "certainty_inflation"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tbefe2aa5631",
+      "label": "contradicted",
+      "negation": "negated",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tc733f943aef",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "certainty_inflation"
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tdd98d447d24",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tdf9b45f26af",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "preclinical_to_clinical"
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tdfc74d4ee42",
+      "label": "contradicted",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "te997a6365c0",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tef3b0772c05",
+      "label": "contradicted",
+      "negation": "clear",
+      "reason": null
+    },
+    {
+      "disposition": "flagged",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tf88ab200ff3",
+      "label": "overstated",
+      "negation": "clear",
+      "reason": "preclinical_to_clinical"
+    },
+    {
+      "disposition": "passed",
+      "evidence_status": "located",
+      "failure_kind": null,
+      "id": "tff7a4a952d3",
+      "label": "supported",
+      "negation": "clear",
+      "reason": null
+    }
+  ],
+  "trap_set_sha256": "b7d2b76d1490ca09030a1834ecd4c5afafa17b3030fcb280f0304dacb6f50593",
+  "verifier": "claude-opus-4-8",
+  "writer_family_flag": false
+}

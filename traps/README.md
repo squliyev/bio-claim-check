@@ -10,8 +10,9 @@ Planted misreadings with predeclared expected outcomes, for measuring what the f
   `traps apply-audit` from the panel's sheets and is never edited by hand.
 - `dev-v1.panel.json`: the panel ledger, each rater's vote on each candidate with the draft, protocol and
   sheet hashes. No reasons and no claim text.
-- `results/<freeze>-<set>.json`: a `TrapResult` from `traps verify --record`, with one outcome per item and
-  the disposition counts per kind, role and generator.
+- `results/<freeze>-<set>.json`: a `TrapResult` from `traps verify --record` (`results/v2-dev-v1.json`: the
+  proof checkpoint, dev-log S13p), with one outcome per item, the disposition counts per kind, role and
+  generator, and the pair tables (ADR 0024).
 
 Nothing else belongs here. Drafts and audit sheets stay under the git-ignored var dir: drafts list gate
 problems, and sheets hold abstract text (ADR 0008). `tests/arch/test_trap_set.py` checks every file here on

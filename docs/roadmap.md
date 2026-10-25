@@ -5,9 +5,11 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S13 done):** S01–S13 are done; tag `prompts-frozen-v2`. The dev trap set `traps/dev-v1.jsonl`
+**Status (proof checkpoint done):** S01–S13 and the proof checkpoint (S13p) are done; tag `prompts-frozen-v2`. The dev trap set `traps/dev-v1.jsonl`
 (38 items, 15 model traps) is confirmed by a unanimous two-model panel and is a silver standard
-(ADR 0022, 0023). Next the **demo track** (proof checkpoint → S17a → H1) before returning to S14.
+(ADR 0022, 0023). The proof checkpoint gave **ADJUST** under its predeclared rule (ADR 0024): 14 of 15 model
+traps flagged and no parent flagged, but only 10 of 16 parents passed (6 went to `needs_review`). Next the rest of
+the **demo track** (S17a → H1) before returning to S14.
 The maintainer's test-split audit runs in parallel and gates only test-split traps.
 
 ## Product
@@ -98,7 +100,7 @@ can be contributed here as their own credited rule pack. No results from this re
 |---|---|
 | (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2`; runs in parallel with S13 and gates only test-split traps |
 | S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test; dev first. Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a `Report` (S13 ADR). ✅ ADR 0022, 0023: dev-v1 is a silver standard, 38 items |
-| Proof checkpoint | (S13p, ADR 0024: go/adjust rule and pair tables predeclared) Trap disposition counts per trap kind on dev (on dev-v1, k of n only: 2 to 6 model traps per kind, so no per-kind rates); a false-alarm rate only on the confirmed dev parents. On dev-v1 these are silver-standard numbers (ADR 0023), model traps primary, rule floor apart. Exploratory, never pitched (go / adjust) |
+| Proof checkpoint | (S13p, ADR 0024: go/adjust rule and pair tables predeclared) Trap disposition counts per trap kind on dev (on dev-v1, k of n only: 2 to 6 model traps per kind, so no per-kind rates); a false-alarm rate only on the confirmed dev parents. On dev-v1 these are silver-standard numbers (ADR 0023), model traps primary, rule floor apart. Exploratory, never pitched (go / adjust). ✅ S13p: ADJUST (parents passed 10/16 < 12) |
 | S17a | Demo track: slim Streamlit UI, Ask page (recorded runs, live under the call budget) and Trust report page, in the final layered form; Docker offline mode with live controls disabled (see below) |
 | H1 | Demo track: hackathon prep (trap papers, demo, pitch, disclosure); what is shown on the day is decided here and must respect the option C rule (no claimcheck results on the day) or change it by ADR |
 | S14 | Baselines: AlwaysFlag, MeSH-cue, optional NLI; shared verifier contract suite |
@@ -136,7 +138,10 @@ A safe demo early, built so that little is redone later:
   (`BCC_CACHE_MODE=read-only`) disables the live controls, so a click can never call a provider.
 - **Contract drift:** if S15 or S16 change `Report`, cached demo runs are regenerated; there is no migration
   code. The UI stays outside `JUDGE_FILES`, so freeze v2 holds.
-- **No numbers in the demo.** The proof-checkpoint figures are exploratory.
+- **No pitched numbers in the demo.** The proof-checkpoint figures are exploratory. If the Trust report page
+  shows them at all, it shows the complete k-of-n tables from `traps/results/v2-dev-v1.json`, framed by the
+  ADR 0024 verdict (ADJUST: "did not meet its predeclared bar; too cautious on correct claims"), never as
+  accuracy. Under ADJUST the demo leads with each claim's trace and reason.
 
 ### S09 — provider adapters (done)
 

@@ -8,11 +8,12 @@ the repo; ask the maintainer for the rows relevant to your session.
 ## 1. Where things stand
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
-  S12b, S12c (tag `prompts-frozen-v2`), S13 (ADR 0022, 0023; `traps/dev-v1.jsonl`, a silver standard).
+  S12b, S12c (tag `prompts-frozen-v2`), S13 (ADR 0022, 0023; `traps/dev-v1.jsonl`, a silver standard), the
+  proof checkpoint S13p (ADR 0024, I80; verdict **ADJUST**, dev-log S13p).
   CI is green on `main`.
-- **Next: the proof checkpoint** (section 4), with the maintainer's test-split audit in parallel. Then
-  the rest of the demo track: S17a (slim UI) → H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
-- Next free ids: invariant **I80**, ADR **0024**.
+- **Next: S17a** (slim UI, section 4), with the maintainer's test-split audit in parallel. Then
+  H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
+- Next free ids: invariant **I81**, ADR **0025**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
 - The judge is **frozen** (`freeze/v2.json` active, ADR 0020, 0021). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
@@ -42,7 +43,7 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: the proof checkpoint, with the test-split audit in parallel
+## 4. Next: S17a (slim UI), with the test-split audit in parallel
 
 **In parallel (maintainer, not an agent session):** the test-split eligibility audit and the
 unanswerable check. It gates only test-split traps. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
@@ -61,31 +62,38 @@ uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var
 - An agent may run these commands but never reads a test sheet or test abstract, and never commits a sheet
   (abstract text).
 
-**The proof checkpoint (dev-v1, [ADR 0022](adr/0022-trap-set-and-outcomes.md), [ADR 0023](adr/0023-model-panel-confirmation.md)):**
+**What the proof checkpoint found (S13p, [ADR 0024](adr/0024-proof-checkpoint-go-adjust.md), dev-log S13p):**
 
-What exists:
-- `traps/dev-v1.jsonl`: 38 items (16 parents, 15 model traps, 7 rule-floor traps), confirmed unanimously
-  by gemini-4-argon and grok-4.7 under `docs/protocols/trap-panel-v1.md`. Votes: `traps/dev-v1.panel.json`.
-- Per kind, model traps: correlation 6, nonsignificant 4, certainty 3, preclinical 2, background 0.
-  The attrition is in dev-log S13: one rater rejected 62 parents as close paraphrases, which dropped their
-  traps. The maintainer chose to keep the predeclared rules (2026-10-25).
+- `traps/results/v2-dev-v1.json`, recorded once under freeze v2. On dev-v1 (38 items, a silver standard,
+  ADR 0023), as k of n:
+  - model traps: 14 of 15 flagged, 1 `needs_review`, none passed;
+  - parents: 0 of 16 flagged, 10 of 16 passed, 6 `needs_review` (3 of them nonsignificant_as_effect);
+  - rule floor: 5 of 7 flagged;
+  - failed: 0 of 38.
+- **Verdict: ADJUST.** The predeclared rule needs at least 12 of 16 parents passed. That condition was added
+  by the plan review before the run; the maintainer's original three conditions would have given GO.
+  This is disclosed in S13p. I80 checks that the stated verdict is the one code gives.
+- **Never:**
+  - tune the judge on these outcomes;
+  - rerun or re-record dev-v1 under v2 (`--record` refuses);
+  - quote these as rates or as accuracy.
+  A prompt change goes only through a new freeze via the challenge set, and a later freeze needs its own
+  predeclared rule.
 
-Next:
+**S17a (the slim UI):** the plan is the roadmap's "Demo track" section (three layers, safe rendering,
+Docker offline mode). Bindings from the checkpoint:
+- Under ADJUST, the demo leads with each claim's trace and reason.
+- If the Trust report page shows checkpoint numbers at all, it shows the complete k-of-n tables from
+  `traps/results/v2-dev-v1.json`, with "silver standard, planted, controlled paired design, exploratory"
+  and "did not meet its predeclared bar; too cautious on correct claims". Never selected cells.
+- The UI stays outside `JUDGE_FILES`, so freeze v2 holds.
+- The usual session flow applies: plan with code sketches and a file tree → plan review → lettered commits
+  → implementation review → docs.
 
-```bash
-uv run bio-claim-check traps verify            # refuses unless this code is freeze v2; 76 calls at most
-uv run bio-claim-check traps verify --record   # once the counts have been read
-```
-
-- `traps verify` checks I79 (the ledger) before any call, and needs the budget for twice the items.
-- Report per ADR 0023 §5: model traps first, rule floor apart, parent false alarms, `needs_review` and
-  `failed`, all as **k of n**. With 2 to 6 traps per kind there are no per-kind rates or intervals. Always
-  say "silver standard" and "planted, controlled paired design"; never "accuracy" or "ground truth".
-- No tuning on these outcomes: the judge is frozen.
+Still true for traps:
 - Never commit a draft or a sheet: drafts list gate problems, and sheets hold abstract text.
   `tests/arch/test_trap_set.py` allows only sets, their panel ledgers, results and the README under `traps/`.
-- The local panel sheets (`var/panel/<rater>/sheet.csv`, with the raters' reasons) are not committed;
-  their sha256s are in the ledger.
+- The local panel sheets (`var/panel/<rater>/sheet.csv`) are not committed; their sha256s are in the ledger.
 
 **Bindings from S12b and S12c (must hold):**
 - Do not edit a judge file without a new freeze (ADR 0020). S13's trap generator lives outside
