@@ -109,10 +109,11 @@ population or quantity.
 dev sources. Each sampled source has one model call (`gpt-6.1-sol`) that drafts a supported parent and a
 trap of the sampled kind. A pure gate drops claims over 30 words, claims copying an 8-word run of the
 abstract, and claims echoing a 6-word run of a rule-pack example. Each parent and each trap, including
-the rule-floor swaps, is confirmed in one sheet. The maintainer is not a biomedical researcher, so dev-v1
-is confirmed by a two-model panel (gemini-4-argon and grok-4.7, unanimous only) and is a **silver
-standard** ([ADR 0023](adr/0023-model-panel-confirmation.md)): rows carry `origin = model` and
-`confirmed_by = model_panel`, and the votes are in `traps/dev-v1.panel.json`. Keeping only rows two LLMs
+the rule-floor swaps, is decided in one sheet. The maintainer is not a biomedical researcher, so dev-v1
+will be confirmed by a two-model panel (gemini-4-argon and grok-4.7, unanimous only) and will be a
+**silver standard** ([ADR 0023](adr/0023-model-panel-confirmation.md)): rows will carry `origin = model`
+and `confirmed_by = model_panel`, with the votes in `traps/dev-v1.panel.json`. Until the panel has run,
+no dev-v1 set exists. Keeping only rows two LLMs
 agree on probably keeps easy traps, so a catch rate on dev-v1 is probably inflated. This is a **controlled paired design**: one call writes
 both claims, which favours lexical contrasts, so trap catch rates are not rates on natural spin.
 The draft targeted 12 traps per kind; the cohort is fixed and a kind the panel leaves short stays short. `background_as_result` is capped at its 9 eligible dev

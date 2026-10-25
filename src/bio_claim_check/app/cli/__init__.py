@@ -104,6 +104,7 @@ from bio_claim_check.app.usecases.traps import (
     draft_bytes,
     generate,
     panel_families,
+    panel_problems,
     sheet_for,
     trap_result_bytes,
     verify_set,
@@ -138,7 +139,7 @@ from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_byt
 from bio_claim_check.features.report.models import Report
 from bio_claim_check.features.retrieval.errors import RetrievalError
 from bio_claim_check.features.traps.audit_sheet import TrapAuditError
-from bio_claim_check.features.traps.panel import PanelLedger, agreement
+from bio_claim_check.features.traps.panel import PanelLedger, agreement, percent_agreement
 from bio_claim_check.features.traps.sampling import TrapSamplingError
 
 DEFAULT_K = 4
@@ -1022,6 +1023,25 @@ def _freeze_verifier_family(name: str) -> ModelFamily | None:
     return model_catalog().lookup(str(record.judge.verifier["deployment"])).family
 
 
+def _panel_problems_of(data: bytes, ledger: bytes | None) -> list[str]:
+    """I79 on a set and the ledger beside it, as CI checks it; empty for an author set without a ledger."""
+    catalog = model_catalog()
+    freeze: str | None = None
+    if ledger is not None:
+        try:
+            freeze = PanelLedger.model_validate_json(ledger).intended_freeze
+        except ValidationError:
+            return ["the panel ledger is not valid"]
+    return panel_problems(
+        data,
+        ledger,
+        protocol=_read_input(PANEL_PROTOCOL) if ledger is not None else b"",
+        verifier_family=_freeze_verifier_family(freeze) if freeze is not None else None,
+        rater_families=RATER_FAMILIES,
+        writer_family_of=lambda deployment: catalog.lookup(deployment).family,
+    )
+
+
 @traps_app.command("apply-audit")
 def traps_apply_audit_command(
     draft: DraftFile,
@@ -1059,6 +1079,8 @@ def traps_apply_audit_command(
         files = read_dataset(dataset)
         spec = load_corpus_spec(dataset / SPEC)
         if not raters:
+            if _panel_ledger_path(out).exists():
+                _fail(ExitCode.OUTPUT, f"{_panel_ledger_path(out)} exists: an author set has no panel ledger")
             out_bytes = apply_audit(data, texts[0], files, spec, default_rulepack())
             path = publish_document(out.parent, out.name, out_bytes)
             typer.echo(f"wrote: {path} ({len(out_bytes.splitlines())} confirmed item(s); author-confirmed)")
@@ -1079,6 +1101,9 @@ def traps_apply_audit_command(
             rater_families=RATER_FAMILIES,
             writer_family_of=lambda deployment: catalog.lookup(deployment).family,
         )
+        for target, content in ((out, out_bytes), (_panel_ledger_path(out), ledger)):
+            if target.exists() and target.read_bytes() != content:
+                _fail(ExitCode.OUTPUT, f"{target} exists with other content; nothing was written")
         path = publish_document(out.parent, out.name, out_bytes)
         ledger_path = publish_document(out.parent, _panel_ledger_path(out).name, ledger)
     parsed = PanelLedger.model_validate_json(ledger)
@@ -1086,9 +1111,12 @@ def traps_apply_audit_command(
         f"wrote: {path} ({len(out_bytes.splitlines())} item(s) every rater confirmed, with their parent)"
     )
     typer.echo(f"wrote: {ledger_path} (votes of {', '.join(parsed.raters)})")
+    table = agreement(parsed)
     typer.echo("agreement (votes in rater order), per role and generator:")
-    for role, generator, votes, n in agreement(parsed):
+    for role, generator, votes, n in table:
         typer.echo(f"  {role} {generator} {'/'.join(votes)}: {n}")
+    for role, generator, agreed, n in percent_agreement(table):
+        typer.echo(f"  {role} {generator} agreed: {agreed}/{n} ({100 * agreed / n:.0f}%)")
     typer.echo("silver standard: model-panel-confirmed, not expert-labelled (ADR 0023)")
 
 
@@ -1124,6 +1152,9 @@ def traps_verify_command(
             spec = load_corpus_spec(dataset / SPEC)
             judge = current_judge(settings)
             catalog = model_catalog()
+            if problems := _panel_problems_of(data, ledger):
+                _print_problems("Refused: the set's confirmation does not hold (I79)", problems)
+                raise typer.Exit(code=ExitCode.INPUT)
             raters = (
                 panel_families(ledger, RATER_FAMILIES) if ledger is not None else frozenset[ModelFamily]()
             )

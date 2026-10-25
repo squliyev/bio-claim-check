@@ -48,34 +48,30 @@ make a claim false, and being a parent does not make it true.
 
 - **Parent: confirm only if both hold.**
   - The abstract fully supports the claim, with nothing overstated in any way.
-  - It is in its own words, not a close paraphrase of one abstract sentence (a clause-by-clause synonym swap
-    counts as close).
+  - It is in its own words, not a close paraphrase of one abstract sentence.
 - **Model trap: confirm only if all three hold.**
   1. The abstract does not support it.
   2. It overstates in **exactly its `kind`** (definitions below), and that is its one intended error. It adds
      no other material error: no changed number, population, dose or direction unless the kind requires it.
-  3. It is an overstatement, not a flat contradiction. For example, writing "statistically significant"
-     where the abstract reports a non-significant result contradicts the abstract; that is reject.
+  3. It is an overstatement, not a flat contradiction of the abstract.
 
-  Reject a trap that the abstract supports after all, for instance because a hedge was dropped from a
-  conclusion that the results already state without one. Also reject a trap that overstates in a different
-  kind, or that a careful expert could reasonably call supported.
+  Reject a trap that the abstract supports after all, that overstates in a different kind, or that a careful
+  expert could reasonably call supported.
 - **Rule-floor trap: confirm only if the swap changes a result that the abstract states, so the claim
   becomes contradicted or unsupported.** Reject it if the swapped word was not stated in the abstract, if
   the claim is still true, or if the sentence no longer makes sense.
 
 ## Kind definitions
 
-- `preclinical_to_clinical`: a finding from cells or animals is stated as if it held in patients.
-- `background_as_result`: something the abstract states as background, prior work or motivation is cited as
-  this study's finding. It is an attribution error rather than spin. A statement that this study itself
-  tested and found is not a trap of this kind. A study whose results refute the background claim makes the
-  trap a contradiction, so reject it.
-- `correlation_as_causation`: an association from an observational design is stated as a cause or an
-  effect. A randomised or interventional design is not observational.
-- `nonsignificant_as_effect`: a difference that was not statistically significant is stated as an effect or
-  as a trend that works.
-- `certainty_inflation`: hedged or preliminary findings are stated as established, or "may" becomes "does".
+These are the rule pack's definitions, verbatim; the trap writer was given the same ones.
+
+- `preclinical_to_clinical`: A finding from cells or animals is stated as if it held in patients.
+- `background_as_result`: Something the abstract states as background, prior work or motivation is cited as
+  this study's finding. An attribution error rather than spin.
+- `correlation_as_causation`: An association from an observational design is stated as a cause or effect.
+- `nonsignificant_as_effect`: A difference that was not statistically significant is stated as an effect or
+  a trend that works.
+- `certainty_inflation`: Hedged or preliminary findings are stated as established, or 'may' becomes 'does'.
 
 ## When you are done
 

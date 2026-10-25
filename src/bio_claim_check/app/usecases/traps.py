@@ -323,6 +323,8 @@ def apply_panel(
     writers = _writer_families(rows, writer_family_of)
     if problems := _rater_problems(raters, rater_families, writers, verifier_family):
         raise TrapInputError(problems)
+    if len({text for _, text in sheets}) != len(sheets):
+        raise TrapInputError(["two raters gave the same sheet; each rater fills in its own copy"])
     draft_sha = sha256_hex(draft)
     panels = [parse_decisions(text, rows, draft_sha) for _, text in sheets]
     items = confirmed_items(rows, unanimous(panels), "model_panel")

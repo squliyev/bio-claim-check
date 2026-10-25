@@ -11,6 +11,7 @@ from bio_claim_check.features.traps.panel import (
     agreement,
     kept_ids,
     ledger_rows,
+    percent_agreement,
     unanimous,
 )
 
@@ -74,11 +75,30 @@ def test_the_ledger_holds_every_candidates_votes_in_rater_order_and_no_text() ->
 
 def test_agreement_counts_each_vote_pattern_per_role_and_generator() -> None:
     table = agreement(_ledger({T1}, {T2}))
+    cc, cr, rc, rr = (
+        ("confirm", "confirm"),
+        ("confirm", "reject"),
+        ("reject", "confirm"),
+        ("reject", "reject"),
+    )
     assert table == (
-        ("parent", "model", ("confirm", "confirm"), 2),
-        ("trap", "model", ("confirm", "reject"), 1),
-        ("trap", "model", ("reject", "confirm"), 1),
-        ("trap", "rule_floor", ("confirm", "confirm"), 1),
+        ("parent", "model", cc, 2),
+        ("parent", "model", cr, 0),
+        ("parent", "model", rc, 0),
+        ("parent", "model", rr, 0),
+        ("trap", "model", cc, 0),
+        ("trap", "model", cr, 1),
+        ("trap", "model", rc, 1),
+        ("trap", "model", rr, 0),
+        ("trap", "rule_floor", cc, 1),
+        ("trap", "rule_floor", cr, 0),
+        ("trap", "rule_floor", rc, 0),
+        ("trap", "rule_floor", rr, 0),
+    )
+    assert percent_agreement(table) == (
+        ("parent", "model", 2, 2),
+        ("trap", "model", 0, 2),
+        ("trap", "rule_floor", 1, 1),
     )
 
 
@@ -87,7 +107,8 @@ def test_agreement_counts_each_vote_pattern_per_role_and_generator() -> None:
     [
         ({"raters": ("gemini-4-argon",), "sheet_sha256": ("d" * 64,)}, "at least two"),
         ({"raters": ("grok-4.7", "grok-4.7")}, "at least two"),
-        ({"sheet_sha256": ("d" * 64,)}, "one per rater"),
+        ({"sheet_sha256": ("d" * 64,)}, "one distinct sheet per rater"),
+        ({"sheet_sha256": ("d" * 64, "d" * 64)}, "one distinct sheet per rater"),
     ],
 )
 def test_a_malformed_ledger_is_invalid(change: dict[str, object], message: str) -> None:

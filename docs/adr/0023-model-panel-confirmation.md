@@ -46,8 +46,9 @@ prompt, so it is contaminated and is discarded (decision 7).
    - Every report gives numerators and denominators by generator and kind, parent false alarms,
      `needs_review`, `failed`, and the panel attrition (candidates → per rater → unanimous → pair kept).
    - A pooled number is secondary and labelled as a mixture.
-   - Agreement is reported as raw 2x2 vote tables per role and generator, printed by `apply-audit` from
-     committed code. There is no kappa: with a filtered, imbalanced cohort it would mislead.
+   - Agreement is reported as raw 2x2 vote tables per role and generator (every cell, zeros included) and
+     percent agreement, printed by `apply-audit` from committed code. There is no kappa: with a filtered,
+     imbalanced cohort it would mislead.
 6. **Raters and declared family separation (I79).**
    - The raters are gemini-4-argon (Google) and grok-4.7 (xAI), at high reasoning effort. They run as
      independent coding-agent subagents, because the app has no client for either family.
@@ -71,14 +72,24 @@ prompt, so it is contaminated and is discarded (decision 7).
      are not evidence. Then the role's rule applies: a parent must be fully supported and not a close
      paraphrase of one sentence; a model trap must be unsupported in exactly its kind, with no other
      material error and no flat contradiction; a rule-floor trap must change a result the abstract states.
-   - The protocol's clarifications (background, correlation, an explicit "statistically significant") were
-     informed by the discarded advisory pass on this same sheet. This is disclosed.
+   - **Not blind.** Each rater sees the row's role, kind and generator, so the panel confirms intended
+     labels rather than labelling blind. Stage 1 is instructed, not enforced. A blinded first pass needs a
+     second sheet format (backlog C7).
+   - **Generic, not tuned to this cohort.** The kind definitions are the rule pack's, verbatim, the same
+     ones the trap writer was given (a parity test checks this), and the rules are generic. A first draft
+     added clarifications drawn from the discarded advisory on this same sheet; they were removed before
+     any rater ran (S13 implementation review #10), because they would tune the filter to this cohort's
+     known failures. The person who wrote the protocol had still seen the advisory; this is disclosed.
 8. **The ledger is committed and attested.** `traps/<set>.panel.json` holds the set, draft and protocol
    hashes, the intended freeze, the rater ids, each sheet's sha256, and each candidate's votes in rater
    order. It holds **no reasons and no claim text**, since reasons may quote abstracts (ADR 0008). CI
    recomputes from it that the set is exactly the unanimous rows whose parent is unanimous, that every
    item is `model_panel`, and the family separation. A set without a ledger must be author-confirmed; a
-   mixed set is refused.
+   mixed set is refused. Two raters may not give the same sheet.
+   - **What CI cannot check.** The draft and the sheets are not committed (they hold rejected claims and
+     abstract text), so the draft and sheet hashes, the completeness of the ledger's rows and which vote
+     column is whose are **self-reported**. They are checked once, locally, by `apply-audit`, which reads
+     the draft and every sheet. `traps verify` runs the same I79 check as CI before any call.
 9. **Not reproducible.** Subagent runs cannot be replayed. The sheet sha256s are logged in the ledger and
    in dev-log S13, and the votes are self-reported, like every committed result.
 10. **The author path is unchanged.** One `--sheet` with no `--rater` writes an author-confirmed set and

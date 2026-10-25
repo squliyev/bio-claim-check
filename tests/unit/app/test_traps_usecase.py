@@ -97,7 +97,7 @@ def _generate(ports: TrapWriterPorts, budget: int | None = 40, files: dict[str, 
     return draft_bytes(rows)
 
 
-def _decide(sheet: str, reject: frozenset[str] = frozenset()) -> str:
+def _decide(sheet: str, reject: frozenset[str] = frozenset(), note: str = "") -> str:
     reader = csv.DictReader(io.StringIO(sheet))
     out = io.StringIO()
     writer: csv.DictWriter[str] = csv.DictWriter(out, fieldnames=reader.fieldnames or (), lineterminator="\n")
@@ -105,7 +105,7 @@ def _decide(sheet: str, reject: frozenset[str] = frozenset()) -> str:
     for row in reader:
         rejected = row["id"] in reject
         writer.writerow(
-            {**row, "decision": "reject" if rejected else "confirm", "reason": "no" if rejected else ""}
+            {**row, "decision": "reject" if rejected else "confirm", "reason": "no" if rejected else note}
         )
     return out.getvalue()
 
@@ -490,7 +490,7 @@ def _panel(
     sheet = sheet_for(source, draft, FILES, SPEC)
     return apply_panel(
         draft,
-        [(r, _decide(sheet, reject)) for r, reject in zip(raters, rejects, strict=True)],
+        [(r, _decide(sheet, reject, note=r)) for r, reject in zip(raters, rejects, strict=True)],
         FILES,
         SPEC,
         PACK,
@@ -546,6 +546,25 @@ def test_one_raters_rejected_parent_drops_the_pair() -> None:
 def test_a_panel_without_declared_family_separation_is_refused(raters: tuple[str, str], message: str) -> None:
     with pytest.raises(TrapInputError, match=message):
         _panel(raters=raters)
+
+
+def test_one_sheet_given_for_two_raters_is_refused() -> None:
+    ports, source, _ = _writer_ports()
+    draft = _generate(ports)
+    sheet = _decide(sheet_for(source, draft, FILES, SPEC))
+    with pytest.raises(TrapInputError, match="the same sheet"):
+        apply_panel(
+            draft,
+            [("rater-g", sheet), ("rater-x", sheet)],
+            FILES,
+            SPEC,
+            PACK,
+            protocol=PROTOCOL,
+            intended_freeze="v2",
+            verifier_family=ModelFamily.ANTHROPIC,
+            rater_families=RATERS,
+            writer_family_of=_families,
+        )
 
 
 def test_a_single_rater_is_not_a_panel() -> None:

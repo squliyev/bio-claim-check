@@ -225,7 +225,7 @@ def test_a_model_panel_writes_the_set_its_ledger_and_the_agreement(
     first = _sheet(tmp_path, draft, folder)
     _confirm_all(first)
     second = tmp_path / "second.csv"
-    second.write_text(first.read_text(encoding="utf-8"), encoding="utf-8")
+    second.write_text(first.read_text(encoding="utf-8").replace(",confirm,", ",confirm,ok"), encoding="utf-8")
     out = tmp_path / "traps" / "dev-v1.jsonl"
     base = ["--draft", str(draft), "--out", str(out), "--dataset", str(folder), "--sheet", str(first)]
     code, _, err = _apply(*base, "--sheet", str(second))
@@ -302,6 +302,55 @@ def test_verify_writes_an_attempt_and_record_publishes_once(
     assert recorded.name.endswith("-dev-v1.json")
     assert recorded.read_bytes() == attempt.read_bytes()
     assert json.loads(recorded.read_bytes())["writer_family_flag"] is False
+
+
+def test_verify_refuses_a_set_its_ledger_does_not_attest_before_any_port(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _replay(monkeypatch)
+    folder = _dataset(tmp_path)
+    draft = _draft(tmp_path)
+    sheet = _sheet(tmp_path, draft, folder)
+    _confirm_all(sheet)
+    traps = tmp_path / "traps" / "dev-v1.jsonl"
+    code, _, err = _apply(
+        "--draft", str(draft), "--sheet", str(sheet), "--out", str(traps), "--dataset", str(folder)
+    )
+    assert code == 0, err
+    (traps.parent / "dev-v1.panel.json").write_bytes(b"{}")  # an author set with a ledger beside it
+
+    def no_ports(*_: object) -> None:
+        raise AssertionError("no port may be built for a set whose confirmation does not hold")
+
+    def fresh(*_: object) -> str:
+        return "f" * 64
+
+    monkeypatch.setattr(cli, "active_freeze_sha256", fresh)
+    monkeypatch.setattr(cli, "build_challenge_ports", no_ports)
+    code, _, err = invoke(tmp_path, "traps", "verify", "--traps", str(traps), "--dataset", str(folder))
+    assert (code, "does not hold (I79)" in err) == (ExitCode.INPUT, True)
+
+
+def test_apply_audit_refuses_to_leave_a_set_and_a_stale_ledger_apart(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _replay(monkeypatch)
+    folder = _dataset(tmp_path)
+    draft = _draft(tmp_path)
+    monkeypatch.chdir(ROOT)  # the freeze record and the rater protocol are read from the repository
+    first = _sheet(tmp_path, draft, folder)
+    _confirm_all(first)
+    second = tmp_path / "second.csv"
+    second.write_text(first.read_text(encoding="utf-8").replace(",confirm,", ",confirm,ok"), encoding="utf-8")
+    out = tmp_path / "traps" / "dev-v1.jsonl"
+    out.parent.mkdir(parents=True)
+    stale = out.parent / "dev-v1.panel.json"
+    stale.write_bytes(b"{}")
+    author = ["--draft", str(draft), "--out", str(out), "--dataset", str(folder), "--sheet", str(first)]
+    code, _, err = _apply(*author)
+    assert (code, "an author set has no panel ledger" in err, out.exists()) == (ExitCode.OUTPUT, True, False)
+    code, _, err = _apply(*author, "--rater", "gemini-4-argon", "--sheet", str(second), "--rater", "grok-4.7")
+    assert (code, "nothing was written" in err, out.exists()) == (ExitCode.OUTPUT, True, False)
 
 
 def test_verify_refuses_a_stale_freeze_before_any_port(

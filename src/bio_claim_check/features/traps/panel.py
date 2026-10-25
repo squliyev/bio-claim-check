@@ -14,6 +14,7 @@ No LLM is involved in this module.
 
 from collections import Counter
 from collections.abc import Sequence
+from itertools import product
 from typing import Literal, Self
 
 from pydantic import model_validator
@@ -25,6 +26,7 @@ from bio_claim_check.features.traps.audit_sheet import TrapDecision, candidates
 from bio_claim_check.features.traps.models import DraftRow, Generator, Role
 
 Vote = Literal["confirm", "reject"]
+VOTES: tuple[Vote, ...] = ("confirm", "reject")
 
 
 class LedgerRow(ValidatedModel):
@@ -53,8 +55,8 @@ class PanelLedger(ValidatedModel):
     def _shape(self) -> Self:
         if len(self.raters) < 2 or len(set(self.raters)) != len(self.raters):
             raise ValueError("raters: at least two, all distinct")
-        if len(self.sheet_sha256) != len(self.raters):
-            raise ValueError("sheet_sha256: one per rater")
+        if len(set(self.sheet_sha256)) != len(self.raters):
+            raise ValueError("sheet_sha256: one distinct sheet per rater")
         if any(len(r.votes) != len(self.raters) for r in self.rows):
             raise ValueError("votes: one per rater on every row")
         ids = [r.id for r in self.rows]
@@ -112,8 +114,22 @@ def kept_ids(ledger: PanelLedger) -> frozenset[ClaimId]:
 
 
 def agreement(ledger: PanelLedger) -> tuple[tuple[Role, Generator, tuple[Vote, ...], int], ...]:
-    """How often each vote pattern occurred, per role and generator (for two raters, the 2x2 table)."""
+    """Every vote pattern's count, zeros included, per role and generator (for two raters, the 2x2 table)."""
     tally: Counter[tuple[Role, Generator, tuple[Vote, ...]]] = Counter(
         (r.role, r.generator, r.votes) for r in ledger.rows
     )
-    return tuple((role, gen, votes, n) for (role, gen, votes), n in sorted(tally.items()))
+    strata: list[tuple[Role, Generator]] = sorted({(r.role, r.generator) for r in ledger.rows})
+    patterns = sorted(product(VOTES, repeat=len(ledger.raters)))
+    return tuple((role, gen, votes, tally[role, gen, votes]) for role, gen in strata for votes in patterns)
+
+
+def percent_agreement(
+    table: Sequence[tuple[Role, Generator, tuple[Vote, ...], int]],
+) -> tuple[tuple[Role, Generator, int, int], ...]:
+    """Per role and generator: rows on which every rater voted alike, out of all rows. No kappa (ADR 0023)."""
+    totals: Counter[tuple[Role, Generator]] = Counter()
+    agreed: Counter[tuple[Role, Generator]] = Counter()
+    for role, gen, votes, n in table:
+        totals[role, gen] += n
+        agreed[role, gen] += n if len(set(votes)) == 1 else 0
+    return tuple((role, gen, agreed[role, gen], n) for (role, gen), n in sorted(totals.items()))

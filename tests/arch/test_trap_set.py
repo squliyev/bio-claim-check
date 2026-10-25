@@ -14,7 +14,13 @@ import pytest
 from bio_claim_check.app.container import default_rulepack, load_corpus_spec, read_dataset
 from bio_claim_check.app.freeze import FREEZE_DIR, FreezeRecord
 from bio_claim_check.app.models import RATER_FAMILIES, model_catalog
-from bio_claim_check.app.usecases.traps import panel_families, panel_problems, result_problems, set_problems
+from bio_claim_check.app.usecases.traps import (
+    SCORED_KINDS,
+    panel_families,
+    panel_problems,
+    result_problems,
+    set_problems,
+)
 from bio_claim_check.common.model_family import ModelFamily
 from bio_claim_check.features.corpus.layout import SPEC
 from bio_claim_check.features.traps.panel import PanelLedger
@@ -72,6 +78,12 @@ def test_every_committed_trap_set_attests_who_confirmed_it() -> None:
             writer_family_of=lambda deployment: catalog.lookup(deployment).family,
         )
     assert {name: found for name, found in problems.items() if found} == {}
+
+
+def test_the_panel_protocol_quotes_the_writers_kind_definitions_verbatim() -> None:
+    protocol = " ".join(PROTOCOL.read_text(encoding="utf-8").split())
+    rules = {r.reason: " ".join(r.definition.split()) for r in default_rulepack().rules}
+    assert [k.value for k in SCORED_KINDS if f"`{k.value}`: {rules[k]}" not in protocol] == []
 
 
 def test_every_panel_ledger_belongs_to_a_committed_set() -> None:
