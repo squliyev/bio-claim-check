@@ -6,6 +6,7 @@ from bio_claim_check.app.usecases.proof_checkpoint import (
     DEV_V1_SHA256,
     CheckpointError,
     Verdict,
+    applies,
     checkpoint,
     describe,
 )
@@ -58,7 +59,7 @@ def _result(
 
 
 def test_go_exactly_at_every_threshold() -> None:
-    point = checkpoint(_result())
+    point = checkpoint(_result(), "v2")
     assert (point.model_traps_flagged, point.parents_passed, point.parents_flagged, point.failed) == (
         10,
         12,
@@ -84,14 +85,21 @@ def test_one_threshold_missed_is_adjust(
         parents_review=parents_review,
         failed=failed,
     )
-    assert checkpoint(result).verdict is Verdict.ADJUST
+    assert checkpoint(result, "v2").verdict is Verdict.ADJUST
 
 
 def test_another_set_is_refused() -> None:
     with pytest.raises(CheckpointError, match="dev-v1 only"):
-        checkpoint(_result(sha="a" * 64))
+        checkpoint(_result(sha="a" * 64), "v2")
 
 
 def test_other_denominators_are_refused() -> None:
     with pytest.raises(CheckpointError, match="should have"):
-        checkpoint(_result(floor=8))
+        checkpoint(_result(floor=8), "v2")
+
+
+def test_another_freeze_is_refused() -> None:
+    assert not applies(_result(), "v3")
+    assert applies(_result(), "v2")
+    with pytest.raises(CheckpointError, match="freeze v2 only"):
+        checkpoint(_result(), "v3")

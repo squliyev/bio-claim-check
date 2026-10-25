@@ -40,8 +40,8 @@ Both are committed before any trap is verified.
    - failed ≤ 2 of 38.
 
    Rule-floor traps, `exact` and the pair tables are reported but do not decide. The rule is bound to
-   dev-v1's sha256 and its exact denominators, and refuses anything else (it fails closed instead of
-   rescaling).
+   dev-v1's sha256, its exact denominators and freeze v2, and refuses anything else (it fails closed
+   instead of rescaling). A run under a later freeze needs its own predeclared rule.
 3. **What the verdict changes.** Only how S17a and H1 frame the verifier. The full k-of-n tables are shown
    either way.
    - **GO:** the trust report may present these counts as "silver standard, planted, controlled paired
@@ -61,7 +61,8 @@ Both are committed before any trap is verified.
 5. **Budget wording.** `BCC_MAX_LIVE_LLM_CALLS` counts logical calls, at most two per item (76). Transport
    retries inside a call are bounded by the backend policy, are extra, and are reported from the tally.
 6. **The stated verdict is checked (I80).** Dev-log S13p states it as `**Verdict (ADR 0024): GO|ADJUST**`.
-   CI recomputes the verdict from the committed result and refuses a mismatch.
+   CI checks both directions: no verdict line may appear before `traps/results/v2-dev-v1.json` is
+   committed, and once it is, the line must be the verdict code recomputes from it.
 
 ## Consequences
 

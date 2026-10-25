@@ -15,7 +15,7 @@ import pytest
 from bio_claim_check.app.container import default_rulepack, load_corpus_spec, read_dataset
 from bio_claim_check.app.freeze import FREEZE_DIR, FreezeRecord
 from bio_claim_check.app.models import RATER_FAMILIES, model_catalog
-from bio_claim_check.app.usecases.proof_checkpoint import DEV_V1_SHA256, checkpoint, describe
+from bio_claim_check.app.usecases.proof_checkpoint import FREEZE, applies, checkpoint, describe
 from bio_claim_check.app.usecases.traps import (
     SCORED_KINDS,
     panel_families,
@@ -119,12 +119,15 @@ def test_only_sets_and_results_are_committed_under_traps() -> None:
 
 
 def test_the_reported_go_adjust_verdict_is_the_one_code_gives() -> None:
-    """ADR 0024: dev-log S13p states the verdict that the predeclared rule gives on the committed result."""
-    for result in RESULTS:
-        parsed = TrapResult.model_validate_json(result.read_bytes())
-        if parsed.trap_set_sha256 != DEV_V1_SHA256:
-            continue
-        point = checkpoint(parsed)
-        log = (ROOT / "docs" / "dev-log" / "S13p.md").read_text(encoding="utf-8")
-        stated = set(re.findall(r"\*\*Verdict \(ADR 0024\): (GO|ADJUST)\*\*", log))
-        assert stated == {point.verdict.value}, describe(point)
+    """ADR 0024 (I80): dev-log S13p states a verdict exactly when the v2 dev-v1 result is committed, and
+    it is the verdict the predeclared rule gives on that result."""
+    log = (ROOT / "docs" / "dev-log" / "S13p.md").read_text(encoding="utf-8")
+    stated = set(re.findall(r"\*\*Verdict \(ADR 0024\): (GO|ADJUST)\*\*", log))
+    result = TRAPS / "results" / f"{FREEZE}-dev-v1.json"
+    if not result.is_file():
+        assert stated == set(), "S13p states a verdict, but no v2 dev-v1 result is committed"
+        return
+    parsed = TrapResult.model_validate_json(result.read_bytes())
+    assert applies(parsed, FREEZE), f"{result.name} is not the result ADR 0024 was declared for"
+    point = checkpoint(parsed, FREEZE)
+    assert stated == {point.verdict.value}, describe(point)

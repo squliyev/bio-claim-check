@@ -6,7 +6,8 @@ verified, and here code produces the verdict, not a person. CI recomputes it fro
 checks it against the verdict line in dev-log S13p.
 Why here and not in the traps slice: the policy is a demo decision about one set, not a generic trap
 measure. Its thresholds are integers for dev-v1's exact composition (15 model traps, 16 parents, 38
-items), so the policy is bound to that set's sha256 and refuses anything else rather than rescaling.
+items), so the policy is bound to that set's sha256 and to freeze v2, and refuses anything else rather than
+rescaling.
 Must not: tune the judge, hide counts (both verdicts show the full k-of-n tables; the verdict changes the
 framing only), or apply to another set.
 No LLM is involved in this module.
@@ -20,6 +21,8 @@ from bio_claim_check.common.errors import BccError
 from bio_claim_check.features.traps.counts import TrapResult
 
 POLICY: Final = "adr-0024-v1"
+FREEZE: Final = "v2"
+"""The freeze the rule was declared for; a run under a later freeze needs its own predeclared rule."""
 DEV_V1_SHA256: Final = "b7d2b76d1490ca09030a1834ecd4c5afafa17b3030fcb280f0304dacb6f50593"
 MODEL_TRAPS: Final = 15
 PARENTS: Final = 16
@@ -52,8 +55,10 @@ class Checkpoint:
     verdict: Verdict
 
 
-def checkpoint(result: TrapResult) -> Checkpoint:
-    """Apply ADR 0024 to a dev-v1 result; refuse another set or other denominators (fail closed)."""
+def checkpoint(result: TrapResult, freeze: str) -> Checkpoint:
+    """Apply ADR 0024 to the dev-v1 result of freeze v2; refuse anything else (fail closed)."""
+    if freeze != FREEZE:
+        raise CheckpointError(f"the ADR 0024 rule applies to freeze {FREEZE} only, not {freeze}")
     if result.trap_set_sha256 != DEV_V1_SHA256:
         raise CheckpointError("the ADR 0024 rule applies to dev-v1 only")
     rows = result.counts.rows
@@ -73,6 +78,11 @@ def checkpoint(result: TrapResult) -> Checkpoint:
         and failed <= MAX_FAILED
     )
     return Checkpoint(flagged, passed, false_alarms, failed, Verdict.GO if go else Verdict.ADJUST)
+
+
+def applies(result: TrapResult, freeze: str) -> bool:
+    """Whether this result is the one the rule was declared for (dev-v1 under freeze v2)."""
+    return result.trap_set_sha256 == DEV_V1_SHA256 and freeze == FREEZE
 
 
 def describe(point: Checkpoint) -> str:

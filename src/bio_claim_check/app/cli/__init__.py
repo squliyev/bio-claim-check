@@ -84,7 +84,7 @@ from bio_claim_check.app.usecases.corpus_audit import (
     export_sheet,
 )
 from bio_claim_check.app.usecases.llm_ping import PingResult, ping
-from bio_claim_check.app.usecases.proof_checkpoint import DEV_V1_SHA256, checkpoint, describe
+from bio_claim_check.app.usecases.proof_checkpoint import applies, checkpoint, describe
 from bio_claim_check.app.usecases.retractions import (
     RetractionCheck,
     RetractionInputError,
@@ -1205,10 +1205,10 @@ def traps_verify_command(
             f"  pairs {pair.kind.value} {pair.generator}: n={pair.n} "
             f"discriminated={pair.discriminated} (trap/parent) {cells}"
         )
-    if result.trap_set_sha256 == DEV_V1_SHA256:
-        typer.echo(describe(checkpoint(result)))
+    if applies(result, ACTIVE_FREEZE):
+        typer.echo(describe(checkpoint(result, ACTIVE_FREEZE)))
     else:
-        typer.echo("no predeclared go/adjust rule for this set (ADR 0024 covers dev-v1 only)")
+        typer.echo("no predeclared go/adjust rule for this set (ADR 0024 covers dev-v1 under freeze v2 only)")
     confirmed = "model-panel-confirmed silver standard (ADR 0023)" if ledger else "author-confirmed"
     typer.echo(f"exploratory, dev only; {confirmed}")
     typer.echo(f"attempt: {attempt}")
