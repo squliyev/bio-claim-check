@@ -21,6 +21,9 @@ WORKDIR /app
 RUN mkdir -p /app/var && chown app:app /app/var
 # The About page reads the committed proof-checkpoint result (app.settings.CHECKPOINT_RESULT, relative to WORKDIR).
 COPY traps/results ./traps/results
+# Live `check` and `run` refuse sealed test-split ids (I84) and fail closed without the sealed dataset
+# (app.settings.SEALED_DATASET). It holds ids and hashes only, no abstracts.
+COPY datasets ./datasets
 USER app
 EXPOSE 8501
 CMD ["bio-claim-check", "ui", "--port", "8501", "--address", "0.0.0.0"]

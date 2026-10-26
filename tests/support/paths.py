@@ -11,3 +11,4 @@ DOCS = ROOT / "docs"
 ADR_DIR = DOCS / "adr"
 PYPROJECT = ROOT / "pyproject.toml"
 VENV_BIN = Path(sys.executable).parent  # the environment running pytest, wherever uv put it
+SEALED = ROOT / "datasets"  # the committed, sealed corpus (ids and hashes only)

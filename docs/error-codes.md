@@ -30,7 +30,7 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `answer.dev_input` | `DevAnswerInputError` | `answer dev` refused: the question is unknown or not in the dev split; nothing was fetched (I64) |
 | `answer.empty_pool` | `EmptyDevPoolError` | No paper of the question's dev pool came back usable (missing or edited since the build); nothing was answered |
 | `answer.invalid_claims` | `AnswerClaimsError` | An LLM answer has a claim with blank text, no cites, a duplicate cite or a malformed source id; refused, never repaired (I61) |
-| `app.dataset_read` | `DatasetReadError` | The dataset folder, or a file in it, cannot be read |
+| `app.dataset_read` | `DatasetReadError` | The dataset folder, or a file in it, cannot be read; or, for live `check` and `run`, the sealed dataset fails its seal check (they fail closed, I84) |
 | `app.freeze` | `FreezeError` | This code is not the active frozen judge (ADR 0020), so a test-split audit is refused |
 | `app.judge_read` | `JudgeReadError` | A judge file (ADR 0020) is missing from the installed package |
 | `app.missing_provider` | `MissingProviderError` | A live LLM role has no provider settings |
@@ -40,6 +40,7 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `cache.miss` | `CacheMissError` | Read-only cache mode and the key is absent |
 | `cache.write_failed` | `CacheWriteError` | A live response could not be stored in the cache; the attempt is recorded as unmeasured (ADR 0018) |
 | `check.input` | `CheckInputError` | `check`: the claim is blank, too long or has control characters, or the PMID is not 1 to 9 digits; refused before any request |
+| `check.test_split` | `HeldOutSourceError` | Live `check` names, or live `run` retrieves, a paper of the sealed test split; refused before the fetch (`check`) or before any LLM call (`run`) (I84) |
 | `challenge.input` | `ChallengeInputError` | The challenge set is malformed, or an item is not a sealed dev pair; nothing was fetched (I72) |
 | `challenge.pool` | `ChallengePoolError` | An item's source did not come back, with its sealed hash, in its dev pool |
 | `config.strict_yaml` | `StrictYamlError` | A YAML file is ambiguous (duplicate keys, merges, implicit types) |

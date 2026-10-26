@@ -8,13 +8,16 @@ recorded as CitationNotRetrieved (FLAGGED) and as a finding (invariant I18). Cla
 something outside themselves are flagged after the invented citations; they are still verified.
 Stage events (`retrieve`, `answer`, `verify`) go to the ports' emitter when one is given (S11).
 `check_answer` is everything after retrieval, shared with the dev path (`run_dev`, S12a), so live and dev
-answers are checked by one flow.
+answers are checked by one flow. A free question whose search returns a sealed test-split paper is
+refused before the answerer sees anything (I84, H1); it fails closed instead of filtering, because a
+filter would change which papers a run answers from (that is S15's call).
 Must not: do I/O (the caller writes the report), catch errors to keep going, or import the container,
 the driving adapters or infrastructure: it receives its ports in `RunPorts` (S05b).
 """
 
 from dataclasses import dataclass
 
+from bio_claim_check.app.usecases.check_claim import HeldOutSourceError
 from bio_claim_check.common.errors import BccError
 from bio_claim_check.engine.events.emitter import EventEmitter
 from bio_claim_check.engine.events.stage_events import stage
@@ -42,7 +45,8 @@ class RunInputError(BccError):
 class RunPorts:
     """Everything one run needs, chosen by the composition root. `rules_sha256` is the hash of the rule
     pack's file bytes, for the run manifest; `emitter` receives the stage events (S11). `models` names the
-    answerer and verifier of a live run and is `None` for a fake one (I71)."""
+    answerer and verifier of a live run and is `None` for a fake one (I71). `closed_ids` are the sealed
+    test-split ids a free question must not retrieve; required, so no builder forgets it (I84)."""
 
     literature: BaseLiteratureSource
     answerer: BaseAnswerer
@@ -50,6 +54,7 @@ class RunPorts:
     rules: RulePack
     provenance: Provenance
     rules_sha256: str
+    closed_ids: frozenset[SourceId]
     models: RunModels | None = None
     emitter: EventEmitter | None = None
 
@@ -65,6 +70,8 @@ def run_question(c: RunPorts, question: str, mode: AnswerMode, *, k: int) -> Rep
         papers = c.literature.search(question, limit=k)
     if len(papers) > k:
         raise ValueError(f"literature source returned {len(papers)} papers for limit={k}")
+    if sealed := {p.source_id for p in papers} & c.closed_ids:
+        raise HeldOutSourceError(sealed)
     return check_answer(c, question, papers, mode)
 
 

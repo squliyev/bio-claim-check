@@ -34,6 +34,14 @@ ERROR_COPY: Final[Mapping[str, str]] = MappingProxyType(
             "and a PMID of 1 to 9 digits "
             "(for example 12345678 or PMID:12345678)."
         ),
+        "check.test_split": (
+            "That paper is in the held-out test set, so it is not checked or shown. The test set stays "
+            "unseen so it can measure the checker honestly later."
+        ),
+        "app.dataset_read": (
+            "The sealed dataset this app needs to keep held-out papers out of live checks could not be "
+            "read or failed its seal check, so nothing was run."
+        ),
         "contracts.rule_pack": (
             "The installed rule pack could not be loaded, so nothing was checked. Reinstall the app."
         ),

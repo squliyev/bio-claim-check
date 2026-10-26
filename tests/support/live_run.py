@@ -94,6 +94,7 @@ class Provider:
                 rules=rules.pack,
                 provenance="live",
                 rules_sha256=rules.sha256,
+                closed_ids=frozenset(),
                 models=RunModels(
                     answerer=ModelUse(deployment=GPT.deployment, family=GPT.family),
                     verifier=ModelUse(deployment=self.verifier.deployment, family=self.verifier.family),

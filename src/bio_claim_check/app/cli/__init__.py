@@ -82,7 +82,7 @@ from bio_claim_check.app.usecases.challenge import (
     result_bytes,
     run_challenge,
 )
-from bio_claim_check.app.usecases.check_claim import CheckInputError, live_claim
+from bio_claim_check.app.usecases.check_claim import CheckInputError, HeldOutSourceError, live_claim
 from bio_claim_check.app.usecases.corpus_audit import (
     AuditInputError,
     apply_decisions,
@@ -521,7 +521,14 @@ def _live_exit_codes(dataset: Path) -> Generator[None]:
     """The exit code of every typed failure of a live command (`answer dev`, `run` live and --dev)."""
     try:
         yield
-    except (DatasetReadError, RunInputError, CheckInputError, PaperNotFoundError, NotCitableError) as err:
+    except (
+        DatasetReadError,
+        RunInputError,
+        CheckInputError,
+        HeldOutSourceError,
+        PaperNotFoundError,
+        NotCitableError,
+    ) as err:
         _fail(ExitCode.INPUT, str(err))
     except CorpusSpecError as err:
         _print_problems("Invalid corpus spec", err.problems)

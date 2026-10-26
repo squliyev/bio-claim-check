@@ -12,6 +12,7 @@ import httpx2
 import openai
 import pytest
 from tests.support.llm_fixtures import PROVIDERS, fixture_paths, load_fixture
+from tests.support.paths import SEALED
 from tests.support.settings import make_settings
 
 from bio_claim_check.app.container import (
@@ -182,7 +183,7 @@ def test_dev_answer_ports_cap_live_calls_with_the_configured_budget(tmp_path: Pa
 
 def test_live_run_ports_replay_read_only_and_declare_both_roles(tmp_path: Path) -> None:
     settings = make_settings(cache_mode=CacheMode.READ_ONLY, var_dir=tmp_path)
-    with build_live_run_ports(settings, AnswerMode.OVER_EAGER, None) as live:
+    with build_live_run_ports(settings, AnswerMode.OVER_EAGER, None, dataset=SEALED) as live:
         assert isinstance(live.ports.answerer, LlmAnswerer)
         assert isinstance(live.ports.verifier, LlmVerifier)
         assert live.ports.provenance == "live"
@@ -215,6 +216,7 @@ def test_one_budget_caps_the_answerer_and_the_verifier_together(tmp_path: Path) 
         settings,
         AnswerMode.STRICT,
         None,
+        dataset=SEALED,
         openai_http=openai.DefaultHttpxClient(transport=httpx2.MockTransport(handler)),
         anthropic_http=anthropic.DefaultHttpxClient(transport=httpx2.MockTransport(handler)),
     ) as live:

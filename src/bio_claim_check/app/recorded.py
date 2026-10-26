@@ -22,6 +22,7 @@ from typing import Final
 
 from bio_claim_check.app.container import (
     RECORD_OUTPUT_ERRORS,
+    DatasetReadError,
     MissingProviderError,
     UnsupportedProviderError,
     build_fake_check_ports,
@@ -33,7 +34,7 @@ from bio_claim_check.app.container import (
 )
 from bio_claim_check.app.run_record import CheckInputs, RunDetails, RunInputs, RunRecorder
 from bio_claim_check.app.settings import Settings
-from bio_claim_check.app.usecases.check_claim import CheckInputError, check_claim
+from bio_claim_check.app.usecases.check_claim import CheckInputError, HeldOutSourceError, check_claim
 from bio_claim_check.app.usecases.run import RunInputError, run_question
 from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.negation import NEGATION_RULES
@@ -70,6 +71,8 @@ UI_ERRORS: Final[tuple[type[BccError], ...]] = (
     RecordBusyError,
     RunInputError,
     CheckInputError,
+    HeldOutSourceError,
+    DatasetReadError,
     PaperNotFoundError,
     NotCitableError,
     CacheMissError,

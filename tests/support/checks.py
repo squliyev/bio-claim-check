@@ -32,6 +32,8 @@ CLAIM_TEXT = "OS-912 improves memory in patients with Alzheimer's disease."
 PAPER = Paper.model_validate({**FAKE_CORPUS[0].model_dump(), "source_id": SOURCE_ID})
 VERIFIER = ModelUse(deployment="verifier-test", family=ModelFamily.ANTHROPIC)
 NO_ABSTRACT_PMID = "11111111"
+SEALED_PMID = "22222222"
+SEALED_ID = f"MED:{SEALED_PMID}"  # stands in for a sealed test-split paper (I84)
 
 
 class PmidSource(InMemoryLiteratureSource):
@@ -54,6 +56,7 @@ def live_check_ports(emitter: EventEmitter | None = None) -> CheckPorts:
         rules=rules.pack,
         provenance="live",
         rules_sha256=rules.sha256,
+        closed_ids=frozenset({SEALED_ID}),
         verifier_model=VERIFIER,
         emitter=emitter,
     )

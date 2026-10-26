@@ -56,7 +56,7 @@ from bio_claim_check.app.run_record import (
     recording,
     trace_stem,
 )
-from bio_claim_check.app.settings import ENV_PREFIX, Settings
+from bio_claim_check.app.settings import ENV_PREFIX, SEALED_DATASET, Settings
 from bio_claim_check.app.usecases.answer_dev import DevAnswerPorts
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.challenge import ChallengePorts
@@ -103,13 +103,15 @@ from bio_claim_check.features.contracts.corpus import (
     CorpusSpec,
     CorpusSpecError,
     CorpusSplit,
+    SourceEntry,
     parse_corpus_spec,
 )
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError, parse_rulepack
 from bio_claim_check.features.contracts.verdict import Claim
-from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, audit_file
-from bio_claim_check.features.corpus.seal import sealed_bytes
+from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, SPEC, TEST_SOURCES, audit_file
+from bio_claim_check.features.corpus.seal import dataset_problems, sealed_bytes
 from bio_claim_check.features.report.models import ModelUse, RunModels
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import InMemoryLiteratureSource
@@ -244,6 +246,25 @@ def read_dataset(folder: Path) -> dict[str, bytes]:
         return {p.relative_to(folder).as_posix(): p.read_bytes() for p in visible}
     except OSError as err:
         raise DatasetReadError(f"cannot read the dataset under {folder}: {err}") from None
+
+
+def sealed_test_ids(folder: Path) -> frozenset[SourceId]:
+    """Every id the sealed test split names (each source and its cluster), for live `check` and `run` to
+    refuse (I84). The whole dataset must pass the seal check first, so an edited or missing file fails
+    closed as a `DatasetReadError` instead of quietly shrinking the set. Ids only; the dataset has no
+    abstracts, and none is returned or logged."""
+    files = read_dataset(folder)
+    try:
+        spec = load_corpus_spec(folder / SPEC)
+    except CorpusSpecError as err:
+        raise DatasetReadError(f"{folder} is not intact: {'; '.join(err.problems)}") from None
+    if problems := dataset_problems(files, spec):
+        raise DatasetReadError(f"{folder} is not intact: {'; '.join(problems)}")
+    entries = [SourceEntry.model_validate_json(line) for line in files[TEST_SOURCES].decode().splitlines()]
+    ids = frozenset(i for e in entries for i in (e.source_id, e.cluster_id))
+    if not ids:
+        raise DatasetReadError(f"{folder}/{TEST_SOURCES} names no test source")
+    return ids
 
 
 def write_seal(folder: Path, manifest: bytes) -> Path:
@@ -411,6 +432,7 @@ def build_fake_run_ports(emitter: EventEmitter | None = None) -> RunPorts:
         rules=rules.pack,
         provenance="fake",
         rules_sha256=rules.sha256,
+        closed_ids=frozenset(),  # the fictional corpus has no test split
         emitter=emitter,
     )
 
@@ -440,6 +462,7 @@ def build_fake_check_ports(emitter: EventEmitter | None = None) -> CheckPorts:
         rules=rules.pack,
         provenance="fake",
         rules_sha256=rules.sha256,
+        closed_ids=frozenset(),  # the fictional corpus has no test split
         emitter=emitter,
     )
 
@@ -675,6 +698,7 @@ def build_live_run_ports(
     mode: AnswerMode,
     emitter: EventEmitter | None,
     *,
+    dataset: Path = SEALED_DATASET,
     transport: httpx.BaseTransport | None = None,
     sleep: Callable[[float], None] = time.sleep,
     openai_http: openai.DefaultHttpxClient | None = None,
@@ -682,12 +706,14 @@ def build_live_run_ports(
 ) -> Generator[LiveRun]:
     """Europe PMC, the answerer (`answer_model`) and the LLM verifier (`verifier_model`) through one
     cache in the configured mode, every live client behind one shared `CallBudget` (ADR 0018, 0019).
+    The sealed test-split ids come from `dataset` before anything is built (I84).
 
     A read-only replay builds no provider client. `transport`/`*_http` are for tests.
     """
     roles = build_models(settings, model_catalog())
     answer, verifier = roles.answer, roles.verifier
     rules = default_rulepack_hashed()
+    closed = sealed_test_ids(dataset)
     with ExitStack() as stack:
         cache = _cache(settings, stack)
         source = _europe_pmc(settings, stack, cache, transport, sleep)
@@ -714,6 +740,7 @@ def build_live_run_ports(
             rules=rules.pack,
             provenance="live",
             rules_sha256=rules.sha256,
+            closed_ids=closed,
             models=RunModels(answerer=_model_use(answer), verifier=_model_use(verifier)),
             emitter=emitter,
         )
@@ -737,18 +764,21 @@ def build_live_check_ports(
     settings: Settings,
     emitter: EventEmitter | None,
     *,
+    dataset: Path = SEALED_DATASET,
     transport: httpx.BaseTransport | None = None,
     sleep: Callable[[float], None] = time.sleep,
     openai_http: openai.DefaultHttpxClient | None = None,
     anthropic_http: anthropic.DefaultHttpxClient | None = None,
 ) -> Generator[LiveCheck]:
     """Europe PMC and the LLM verifier (`verifier_model`) through one cache, behind one `CallBudget`: the
-    verifier role of `build_live_run_ports`, without an answerer (ADR 0025).
+    verifier role of `build_live_run_ports`, without an answerer (ADR 0025). The sealed test-split ids
+    come from `dataset` before anything is built, so a broken seal fails closed (I84).
 
     A read-only replay builds no provider client. `transport`/`*_http` are for tests.
     """
     verifier = build_models(settings, model_catalog()).verifier
     rules = default_rulepack_hashed()
+    closed = sealed_test_ids(dataset)
     with ExitStack() as stack:
         cache = _cache(settings, stack)
         source = _europe_pmc(settings, stack, cache, transport, sleep)
@@ -772,6 +802,7 @@ def build_live_check_ports(
             rules=rules.pack,
             provenance="live",
             rules_sha256=rules.sha256,
+            closed_ids=closed,
             verifier_model=_model_use(verifier),
             emitter=emitter,
         )

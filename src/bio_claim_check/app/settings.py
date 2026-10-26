@@ -102,6 +102,12 @@ working directory (the repository, or the container's workdir). A constant, not 
 forbids unknown `.env` keys, and there is one committed result per freeze."""
 
 
+SEALED_DATASET: Final = Path("datasets")
+"""The sealed corpus whose test-split ids live `check` and `run` refuse (I84), relative to the working
+directory (the repository, or the container's workdir). A constant for the same reason as
+`CHECKPOINT_RESULT`; `run --dev` and the dataset commands still take `--dataset`."""
+
+
 class UiSettings(BaseSettings):
     """What the UI needs to start and show recorded runs: no secrets and no contact email (S17a, R3).
 
