@@ -9,11 +9,14 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
   S12b, S12c (tag `prompts-frozen-v2`), S13 (ADR 0022, 0023; `traps/dev-v1.jsonl`, a silver standard), the
-  proof checkpoint S13p (ADR 0024, I80; verdict **ADJUST**, dev-log S13p).
-  CI is green on `main`.
-- **Next: S17a** (slim UI, section 4), with the maintainer's test-split audit in parallel. Then
-  H1, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
-- Next free ids: invariant **I81**, ADR **0025**.
+  proof checkpoint S13p (ADR 0024, I80; verdict **ADJUST**, dev-log S13p), and S17a (ADR 0025, I81–I83,
+  dev-log S17a). S17a added the layered Streamlit UI, `check` (one claim against one paper by PMID) and
+  `ui`. CI is green on `main`.
+- **Next** (section 4):
+  1. the S17a live smoke test, which needs the maintainer's consent because it makes paid calls;
+  2. then **H1**, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
+  The maintainer's test-split audit runs in parallel.
+- Next free ids: invariant **I84**, ADR **0026**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
 - The judge is **frozen** (`freeze/v2.json` active, ADR 0020, 0021). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
@@ -43,7 +46,27 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: S17a (slim UI), with the test-split audit in parallel
+## 4. Next: the S17a live smoke test, then H1 (test-split audit in parallel)
+
+**S17a live smoke (only with the maintainer's consent; announce the call count first):**
+1. `uv run bio-claim-check check "<a claim>" --pmid <a dev PMID>`: one verifier call. Use a dev source,
+   never a test one (section 8).
+2. `uv run bio-claim-check run "<question>"`: the answerer plus one verifier call per pair, under
+   `BCC_MAX_LIVE_LLM_CALLS`.
+3. `docker compose up --build offline`, then in the UI replay the same claim and question with **Replay**
+   (no network, cache only). The Trust report lists both runs.
+4. Stop with `docker compose --profile offline down`. Record the run ids and anything surprising in dev-log
+   S17a, as row "Live smoke".
+
+**H1 (hackathon prep):** decide what is shown on the day.
+- Option C holds unless it is changed by ADR: no claimcheck results on the day, and no pitched numbers.
+  The UI's only numbers are the complete, labelled S13p tables on About.
+- Under ADJUST the demo leads with each claim's trace and reason. `check` gives a guaranteed overstated
+  example that does not depend on what the answerer writes.
+- Trap papers come from dev or from outside the corpus, checked against the test split by id only.
+- Prepare the demo laptop: run the planned demo actions once live (with consent) so `var/cache.sqlite`
+  holds them, then demo with `docker compose up offline`. On another machine the cache is absent, so a
+  replay fails closed.
 
 **In parallel (maintainer, not an agent session):** the test-split eligibility audit and the
 unanswerable check. It gates only test-split traps. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
@@ -80,15 +103,21 @@ uv run bio-claim-check corpus apply-audit --kind <kind> --split test --sheet var
   A prompt change goes only through a new freeze via the challenge set, and a later freeze needs its own
   predeclared rule.
 
-**S17a (the slim UI):** the plan is the roadmap's "Demo track" section (three layers, safe rendering,
-Docker offline mode). Bindings from the checkpoint:
-- Under ADJUST, the demo leads with each claim's trace and reason.
-- If the Trust report page shows checkpoint numbers at all, it shows the complete k-of-n tables from
-  `traps/results/v2-dev-v1.json`, with "silver standard, planted, controlled paired design, exploratory"
-  and "did not meet its predeclared bar; too cautious on correct claims". Never selected cells.
+**What S17a built** (dev-log S17a, commits `d7e1525`…`1f95058`):
+- `BaseLiteratureSource.fetch(source_id)`: Europe PMC accepts strict `MED:<pmid>`, cached, with the citable
+  policy; the in-memory source has it too.
+- `ClaimCheck` (`check.json`, with an integrity validator) and `CheckInputs`, a manifest union under which
+  old `run` manifest bytes are unchanged.
+- `app/usecases/check_claim.py` (`parse_pmid`, `check_claim`) and `app/recorded.py` (`record_question`,
+  `record_check`, the process lock, `UI_ERRORS`). Both the CLI and the UI go through `recorded`.
+- `app/ui/`:
+  - `protocol.py`: ledger list and About view, from bytes;
+  - `run_view.py`: everything escaped, highlights only where `locate_quote` agrees;
+  - `error_copy.py`: curated copy;
+  - `page.py`: the only streamlit importer.
+- Offline mode turns Live into **Replay**, read-only cache, instead of disabling it.
+- The About page computes ADJUST with `proof_checkpoint.checkpoint` and shows every row, as k of n.
 - The UI stays outside `JUDGE_FILES`, so freeze v2 holds.
-- The usual session flow applies: plan with code sketches and a file tree → plan review → lettered commits
-  → implementation review → docs.
 
 Still true for traps:
 - Never commit a draft or a sheet: drafts list gate problems, and sheets hold abstract text.
@@ -103,9 +132,10 @@ Still true for traps:
 - Negation: `claim_shares_negation` false blocks are known (backlog C4). They are safe (`needs_review`).
 - Dev numbers stay exploratory; test numbers come only after `protocol-v1` (S15).
 
-**Exit:** the roadmap's S13 row; `make verify` and CI green.
+**Exit:** the live smoke is recorded in dev-log S17a, and H1's decision is written down (an ADR if option C
+changes); `make verify` and CI are green.
 
-## 5. Engine contracts you build on (S08–S12c)
+## 5. Engine contracts you build on (S08–S17a)
 
 - `engine/llm`: `LlmRequest`, `LlmResponse`, `Message`, `FinishReason`, `Usage`, `Price`, `Spend`,
   `cost()`, `ModelSpec`, `ModelCatalog`, `Provider`, `LlmCallError` (kinds: invalid output, truncated,
@@ -149,6 +179,12 @@ Still true for traps:
   `app/usecases/challenge.py` (`run_challenge`, `attestation_problems`); `app/container.py::current_judge`,
   `active_freeze_sha256`, `build_challenge_ports`; `corpus_audit` with `split`. Commands: `challenge run
   [--record]`, `freeze write`, `corpus audit-sheet|apply-audit --split test` (ADR 0020).
+- **S17a:** `BaseLiteratureSource.fetch`; `features/report/models.py::ClaimCheck`; `app/run_record.py::CheckInputs`;
+  `app/usecases/check_claim.py` (`parse_pmid`, `check_claim`, `CheckPorts`); `app/usecases/published_run.py`
+  (`load_published`, shared with retractions); `app/recorded.py` (`record_question`, `record_check`,
+  `UI_ERRORS`, `_RECORD_LOCK`); `app/container.py::build_{fake,live}_check_ports`, `read_ledger`;
+  `app/settings.py::UiSettings`, `CHECKPOINT_RESULT`; `app/ui/{protocol,run_view,error_copy,page}.py`.
+  Commands: `check CLAIM --pmid N` (or `--fake EXAMPLE`), `ui [--port] [--address] [--env-file]`.
 - **S12c:** `tests/arch/test_prompt_neutrality.py` (I75); rule pack `0.2.0`; challenge results in
   `challenge/results/<freeze>.json`; `challenge run --record` and `freeze write` default to `ACTIVE_FREEZE`
   (ADR 0021). `features/baselines/` is an empty package for S14.
@@ -163,9 +199,9 @@ Still true for traps:
 
 - **Before test-split traps:** the maintainer runs the test-split eligibility audit and unanswerable check; the
   audit records the active `freeze_sha256` (computed, never typed).
-- **S17a (demo track):** layered Streamlit UI (backlog B4): Ask and Trust report pages only; reads `Report` +
-  `RunManifest`; no trace view; Docker offline mode disables live controls; cached runs are regenerated after
-  contract changes (no migrations); stays outside `JUDGE_FILES`. Writes the UI ADR.
+- **UI (S17a, built):** new pages go in `page.py` only, built from a pure view in `run_view.py`/`protocol.py`
+  (I82). Every user-facing error needs copy (I83). Render HTML only through `st.html` with escaped views (I81).
+  Cached runs are regenerated after contract changes; there are no migrations.
 - **H1:** decides what is shown on the day; option C (no claimcheck results on the day, no numbers) holds
   unless changed by ADR. Trap papers from dev or outside the corpus, checked against the test split by id only.
 - **S17b:** Benchmark page, Markdown export, trap-outcome view.
@@ -194,6 +230,14 @@ Still true for traps:
 - **Pinned bytes move with `git mv`** (freeze records, challenge results), never by rewriting.
 - **Replays need the local cache.** `var/cache.sqlite` is git-ignored and machine-local; on another machine
   `BCC_CACHE_MODE=read-only` fails closed.
+- **UI tests run the page in-process** (`streamlit.testing.v1.AppTest`). `tests/conftest.py` chdirs into an empty
+  temp dir and strips `BCC_*`, so a test copies `traps/results/v2-dev-v1.json` in for About. After changing a
+  radio, call `.run()` before reading widgets that depend on it.
+- **Streamlit bound to 0.0.0.0 phones out** for the public IP unless `browser.serverAddress` is set; `ui`
+  sets it. Plain `docker compose down` does not stop the profiled `offline` service; use
+  `docker compose --profile offline down`.
+- **Replay still needs `Settings`** (`BCC_CONTACT_EMAIL`), but no provider keys: read-only `build_models` builds
+  no provider client.
 - **Live calls cost money.** Announce the call count first; re-runs use `BCC_CACHE_MODE=read-only`.
 
 ## 9. Useful commands
@@ -210,6 +254,10 @@ uv run bio-claim-check run "Does OS-912 slow cognitive decline?" --fake
 uv run bio-claim-check run glp1-q1 --dev --mode strict   # live over the dev pool; read-only replays free
 uv run bio-claim-check run "<question>"                   # live answer + LLM verifier, recorded
 uv run bio-claim-check retractions RUN_ID                 # re-check a live run's citations, uncached
+uv run bio-claim-check check --fake o1                    # a fictional check, offline
+uv run bio-claim-check check "<claim>" --pmid <dev PMID>  # live: one verifier call, recorded
+uv run bio-claim-check ui                                 # http://localhost:8501
+docker compose up offline                                 # the UI in replay mode (cache only)
 uv run bio-claim-check corpus verify
 uv run bio-claim-check challenge run                      # live; BCC_CACHE_MODE=read-only replays free
 gh run list --limit 3
