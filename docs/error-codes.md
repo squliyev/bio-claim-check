@@ -76,4 +76,6 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `traps.infeasible` | `TrapSamplingError` | A scored kind has no eligible dev source at all; nothing was drafted (a kind with fewer sources than `--per-kind` gets all it has, and the run reports the shortfall) |
 | `traps.input` | `TrapInputError` | The dataset is not sealed, a trap draft is edited or empty, or a trap set breaks I76/I77/I79 (non-dev question or source, changed hash, missing parent, contamination, not canonical; a panel without two registered raters of separate families, one sheet each, or a set its ledger does not attest) |
 | `traps.pool` | `TrapPoolError` | A sampled or committed trap source did not come back, with its sealed hash, in its dev pool |
+| `ui.about` | `AboutLoadError` | The UI cannot read the committed proof-checkpoint result, or it is not a trap result; the About tables are not shown |
+| `ui.ledger` | `LedgerError` | The UI found a run-ledger line that is not a ledger row; the run list is not shown rather than shown with a line skipped |
 | `verdict.negation_rules_mismatch` | `NegationRulesMismatchError` | A stored verdict was made under other negation rules; re-run it rather than re-score it (ADR 0017) |

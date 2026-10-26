@@ -9,7 +9,7 @@ Real values live only in the git-ignored ``.env`` file; ``.env.example`` documen
 """
 
 from pathlib import Path
-from typing import Literal
+from typing import Final, Literal
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, EmailStr, PositiveInt, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -94,6 +94,41 @@ class Settings(BaseSettings):
     def configured_providers(self) -> tuple[str, ...]:
         candidates = {"foundry": self.foundry, "anthropic": self.anthropic, "ollama": self.ollama}
         return tuple(name for name, cfg in candidates.items() if cfg is not None)
+
+
+CHECKPOINT_RESULT: Final = Path("traps/results/v2-dev-v1.json")
+"""The committed proof-checkpoint result (ADR 0024) the UI's About page shows in full, relative to the
+working directory (the repository, or the container's workdir). A constant, not a setting: `Settings`
+forbids unknown `.env` keys, and there is one committed result per freeze."""
+
+
+class UiSettings(BaseSettings):
+    """What the UI needs to start and show recorded runs: no secrets and no contact email (S17a, R3).
+
+    The full `Settings` is loaded only when a live action starts, so an offline demo without a `.env`
+    still shows recorded runs, fictional runs and the About page. Other `BCC_` keys are ignored here;
+    `Settings` validates them when it is loaded. Both read the same `.env`, so they agree on `var_dir`.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix=ENV_PREFIX,
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        extra="ignore",
+        frozen=True,
+    )
+
+    var_dir: Path = Path("var")
+    """The same root as `Settings.var_dir`: recorded runs are read from it, fictional runs written to it."""
+
+    cache_mode: CacheMode = CacheMode.READ_WRITE
+    """``read-only`` disables live actions in the UI, so a click can never reach a provider."""
+
+
+def load_ui_settings(env_file: Path | None = Path(".env")) -> UiSettings:
+    """Load the UI's settings from the environment and, if present, ``env_file``."""
+    return UiSettings(_env_file=env_file)  # pyright: ignore[reportCallIssue] - as in `load_settings`
 
 
 def load_settings(env_file: Path | None = Path(".env")) -> Settings:

@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 from tests.support.settings import make_settings
 
-from bio_claim_check.app.settings import Settings, load_settings
+from bio_claim_check.app.settings import Settings, UiSettings, load_settings, load_ui_settings
 from bio_claim_check.engine.cache.policy import CacheMode
 
 pytestmark = pytest.mark.unit
@@ -65,3 +65,24 @@ def test_dotenv_file_is_read(tmp_path: Path) -> None:
     env = tmp_path / ".env"
     env.write_text("BCC_CONTACT_EMAIL=someone@example.org\nBCC_CACHE_MODE=read-only\n")
     assert load_settings(env_file=env).cache_mode == "read-only"
+
+
+def test_the_ui_starts_without_a_contact_email_or_any_secret(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in ("BCC_CONTACT_EMAIL", "BCC_VAR_DIR", "BCC_CACHE_MODE"):
+        monkeypatch.delenv(key, raising=False)
+    ui = load_ui_settings(None)
+    assert ui.var_dir == Path("var")
+    assert ui.cache_mode is CacheMode.READ_WRITE
+    assert set(UiSettings.model_fields) == {"var_dir", "cache_mode"}
+
+
+def test_the_ui_reads_its_keys_from_the_same_env_file_and_ignores_the_rest(tmp_path: Path) -> None:
+    env = tmp_path / ".env"
+    env.write_text(
+        "BCC_CONTACT_EMAIL=someone@example.org\nBCC_VAR_DIR=elsewhere\nBCC_CACHE_MODE=read-only\n"
+        "BCC_ANTHROPIC__API_KEY=not-a-real-key\nBCC_MAX_LIVE_LLM_CALLS=3\n"
+    )
+    ui = load_ui_settings(env)
+    assert ui.var_dir == Path("elsewhere")
+    assert ui.cache_mode is CacheMode.READ_ONLY
+    assert load_settings(env).var_dir == ui.var_dir
