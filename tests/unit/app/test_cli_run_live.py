@@ -146,6 +146,7 @@ def test_a_dev_run_answers_from_the_dev_pool_and_records_its_drops(
     folder = _dataset(tmp_path)
     code, out, err = invoke(tmp_path, "run", DEV_Q, "--dev", "--dataset", str(folder), "--k", "8")
     assert code == 0, err
+    assert provider.datasets == [folder]  # the closed set comes from the dataset the run was checked against
     assert f"{DEV_Q}: 2 dev paper(s); dropped: not_dev=3\n" in out
     (row,) = ledger(tmp_path)
     record_manifest = manifest(tmp_path, row)

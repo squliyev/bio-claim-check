@@ -1,11 +1,13 @@
 """The H1 demo papers come from the predeclared rule: dev only, never test, never a paper already used."""
 
 import json
+from pathlib import Path
 
 import pytest
 
 from bio_claim_check.app.container import default_rulepack, load_corpus_spec, read_dataset, sealed_test_ids
 from bio_claim_check.features.contracts.corpus import CorpusSplit, SourceEntry
+from bio_claim_check.features.contracts.labels import OverstatedReason
 from bio_claim_check.features.corpus.layout import DEV_SOURCES, SPEC
 from bio_claim_check.features.corpus.layout import SEALED as SEALED_FILE
 from bio_claim_check.features.traps.validity import MAX_CLAIM_WORDS, contamination, pair_problems
@@ -14,12 +16,28 @@ from tests.support.paths import ROOT, SEALED
 
 pytestmark = pytest.mark.arch
 
-PRIOR = used_ids(ROOT / "challenge" / "dev-v1.jsonl", ROOT / "traps" / "dev-v1.jsonl")
-
 
 def _dev() -> list[SourceEntry]:
     lines = read_dataset(SEALED)[DEV_SOURCES].decode().splitlines()
     return [SourceEntry.model_validate_json(line) for line in lines]
+
+
+PRIOR = used_ids(_dev(), ROOT / "challenge" / "dev-v1.jsonl", ROOT / "traps" / "dev-v1.jsonl")
+
+
+def test_prior_use_excludes_a_cluster_sibling(tmp_path: Path) -> None:
+    base = next(e for e in _dev() if e.candidates).model_dump(mode="json")
+    kind, rule = base["candidates"][0]["kind"], base["candidates"][0]["rule"]
+    head, sibling, other = (
+        SourceEntry.model_validate({**base, "source_id": s, "cluster_id": c})
+        for s, c in (("MED:1", "MED:1"), ("MED:2", "MED:1"), ("MED:3", "MED:3"))
+    )
+    used = tmp_path / "used.jsonl"
+    used.write_text('{"source_id": "MED:2"}\n')
+    excluded = used_ids([head, sibling, other], used)
+    assert excluded == {"MED:2", "MED:1"}
+    picked = shortlist([head, sibling, other], OverstatedReason(kind), rule, salt="s", excluded=excluded)
+    assert [e.source_id for e in picked] == ["MED:3"]
 
 
 def test_every_kind_has_a_full_dev_only_unused_shortlist() -> None:
@@ -43,7 +61,9 @@ def test_the_shortlist_ignores_input_order() -> None:
 MANIFEST = ROOT / "demo" / "h1-trap-papers.json"
 
 
-def test_the_picks_are_the_rule_s_first_eligible_papers_and_their_claims_are_usable() -> None:
+def test_the_picks_are_the_rule_s_first_eligible_papers_and_their_claims_pass_the_offline_checks() -> None:
+    # The eight-word copy check of `claim_problems` needs the abstract, which the repo never holds; it was
+    # run once by hand before B2 and is recorded in dev-log H1. This test covers what needs no abstract.
     doc = json.loads(MANIFEST.read_text())
     spec, files = load_corpus_spec(SEALED / SPEC), read_dataset(SEALED)
     assert doc["dataset_seal"] == files[SEALED_FILE].decode().strip()

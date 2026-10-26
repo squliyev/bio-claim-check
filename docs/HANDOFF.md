@@ -9,14 +9,13 @@ the repo; ask the maintainer for the rows relevant to your session.
 
 - Done: S01, S02, S02b, S03, S04, S05, S05b, S06, S07a, the rule audit, S07b, S08, S08b, S09, S10, S11, S12a,
   S12b, S12c (tag `prompts-frozen-v2`), S13 (ADR 0022, 0023; `traps/dev-v1.jsonl`, a silver standard), the
-  proof checkpoint S13p (ADR 0024, I80; verdict **ADJUST**, dev-log S13p), and S17a (ADR 0025, I81–I83,
-  dev-log S17a). S17a added the layered Streamlit UI, `check` (one claim against one paper by PMID) and
-  `ui`. CI is green on `main`.
-- **Next** (section 4):
-  1. the S17a live smoke test, which needs the maintainer's consent because it makes paid calls;
-  2. then **H1**, then back to S14 ([roadmap](roadmap.md#demo-track-s13--proof--s17a--h1-then-back-to-s14)).
-  The maintainer's test-split audit runs in parallel.
-- Next free ids: invariant **I84**, ADR **0026**.
+  proof checkpoint S13p (ADR 0024, I80; verdict **ADJUST**, dev-log S13p), S17a (ADR 0025, I81–I83,
+  dev-log S17a) and H1 (I84, dev-log H1). S17a added the layered Streamlit UI, `check` (one claim against
+  one paper by PMID) and `ui`. H1 closed the demo track: live `check` and `run` refuse sealed test-split
+  papers, three dev demo papers were predeclared and checked once, and option C holds. CI is green on `main`.
+- **Next: S14**, baselines (section 4). The demo track is done; the hackathon prep is private (outside
+  the repo). The maintainer's test-split audit runs in parallel.
+- Next free ids: invariant **I85**, ADR **0026**.
 - The evaluation dataset in `datasets/` is **sealed** (`datasets/SEALED`, tag `prereg-corpus-v1`). Do not
   edit it. Prompt and rule-pack tuning (S10, S12a, S12b) may use **dev-split sources only**.
 - The judge is **frozen** (`freeze/v2.json` active, ADR 0020, 0021). Any edit to a judge file (`app/freeze.py::JUDGE_FILES`),
@@ -46,27 +45,22 @@ Follow the process in [roadmap.md](roadmap.md#per-session-process-every-session)
    `make graph` (after import changes), `make schemas` (after contract changes).
 7. Secret/IP scans clean; commit with a clear message; push; check CI with `gh run list`.
 
-## 4. Next: the S17a live smoke test, then H1 (test-split audit in parallel)
+## 4. Next: S14, baselines (test-split audit in parallel)
 
-**S17a live smoke (only with the maintainer's consent; announce the call count first):**
-1. `uv run bio-claim-check check "<a claim>" --pmid <a dev PMID>`: one verifier call. Use a dev source,
-   never a test one (section 8).
-2. `uv run bio-claim-check run "<question>"`: the answerer plus one verifier call per pair, under
-   `BCC_MAX_LIVE_LLM_CALLS`.
-3. `docker compose up --build offline`, then in the UI replay the same claim and question with **Replay**
-   (no network, cache only). The Trust report lists both runs.
-4. Stop with `docker compose --profile offline down`. Record the run ids and anything surprising in dev-log
-   S17a, as row "Live smoke".
+**S14** (roadmap row S14): AlwaysFlag, a MeSH-cue baseline, an optional NLI baseline, and a shared verifier
+contract suite.
+- `features/baselines/` is an empty package waiting for it. `tests/contract/test_verifier_contract.py` is
+  the existing verifier suite to extend or share.
+- Follow the slice order in AGENTS.md: port, models, pure logic, in-memory or scripted, contract suite, and
+  only then a backend. Any baseline with a model or a new dependency is classified in
+  `tests/arch/test_dependency_policy.py`.
+- ADR 0010 notes that the MeSH-cue baseline shares the sieve's signal; say so wherever it is reported.
+- A baseline is not a judge file. Keep it outside `JUDGE_FILES` so freeze v2 holds.
+- Write the S14 plan first, with code sketches and a file tree (AGENTS.md), and have it reviewed.
 
-**H1 (hackathon prep):** decide what is shown on the day.
-- Option C holds unless it is changed by ADR: no claimcheck results on the day, and no pitched numbers.
-  The UI's only numbers are the complete, labelled S13p tables on About.
-- Under ADJUST the demo leads with each claim's trace and reason. `check` gives a guaranteed overstated
-  example that does not depend on what the answerer writes.
-- Trap papers come from dev or from outside the corpus, checked against the test split by id only.
-- Prepare the demo laptop: run the planned demo actions once live (with consent) so `var/cache.sqlite`
-  holds them, then demo with `docker compose up offline`. On another machine the cache is absent, so a
-  replay fails closed.
+**Demo (H1, done):** option C holds. Nothing claimcheck produces is shown on 1 Dec, so there is no UI on the
+day and no numbers. The pitch slide is hand-made. The maintainer's private prep (slide text, pitch notes and
+disclosure, laptop checklist, snippet sheet) is outside the repo. Do not bring any of it into the repo.
 
 **In parallel (maintainer, not an agent session):** the test-split eligibility audit and the
 unanswerable check. It gates only test-split traps. The test audit is gated on the active freeze (I74). For each of the 5 scored kinds in
@@ -132,8 +126,21 @@ Still true for traps:
 - Negation: `claim_shares_negation` false blocks are known (backlog C4). They are safe (`needs_review`).
 - Dev numbers stay exploratory; test numbers come only after `protocol-v1` (S15).
 
-**Exit:** the live smoke is recorded in dev-log S17a, and H1's decision is written down (an ADR if option C
-changes); `make verify` and CI are green.
+**What H1 built** (dev-log H1, commits `a91e266`, `cc49483`, `6e11d3b` and the docs commit):
+- **I84:** `container.sealed_test_ids(dataset)` runs the full seal check, then returns every test
+  `source_id` and `cluster_id`. Live `check` refuses one before the fetch; live `run` refuses a search that
+  returns one before the answerer (`HeldOutSourceError`, code `check.test_split`). `CheckPorts.closed_ids`
+  and `RunPorts.closed_ids` are required. Only the fictional ports pass `frozenset()`.
+- The live builders take `dataset=` (default `SEALED_DATASET`), and the seal check is their first
+  statement. `run --dev --dataset X` passes `X`.
+- The image copies `datasets/` (ids and hashes only), and `chmod`s it with `traps/` before `USER`
+  (`tests/arch/test_dockerfile.py`).
+- `demo/h1-protocol.md` and `demo/h1-trap-papers.json` hold the predeclared demo papers (dev only) and the
+  claims; `tests/support/demo_pick.py` holds the rule, and `tests/arch/test_demo_papers.py` re-runs it.
+  Never re-pick or re-check them to get a better result.
+
+**Exit for S14:** its plan is reviewed, its slice follows the order above, and `make verify` and CI are
+green.
 
 ## 5. Engine contracts you build on (S08–S17a)
 
@@ -202,8 +209,10 @@ changes); `make verify` and CI are green.
 - **UI (S17a, built):** new pages go in `page.py` only, built from a pure view in `run_view.py`/`protocol.py`
   (I82). Every user-facing error needs copy (I83). Render HTML only through `st.html` with escaped views (I81).
   Cached runs are regenerated after contract changes; there are no migrations.
-- **H1:** decides what is shown on the day; option C (no claimcheck results on the day, no numbers) holds
-  unless changed by ADR. Trap papers from dev or outside the corpus, checked against the test split by id only.
+- **Demo (H1 done):** option C (no claimcheck results on the day, no numbers) holds unless changed by ADR.
+  Any new demo paper comes from dev or from outside the corpus. Live `check` and `run` refuse test papers (I84).
+- **S15:** a live `run` that retrieves a sealed paper refuses the whole question today (backlog B8). A
+  filter that drops the paper changes which papers a run answers from, so it belongs with the protocol.
 - **S17b:** Benchmark page, Markdown export, trap-outcome view.
 - **S15:** protocol hashes must equal `prompts-frozen-v2`, or each deviation is disclosed.
 - **S16/S19:** a pre-flight token estimate is a labelled heuristic range, never mixed with measured usage
@@ -238,6 +247,13 @@ changes); `make verify` and CI are green.
   `docker compose --profile offline down`.
 - **Replay still needs `Settings`** (`BCC_CONTACT_EMAIL`), but no provider keys: read-only `build_models` builds
   no provider client.
+- **A checkout can keep 0600 modes** (files written by `publish_once`). `COPY` keeps the mode, and the image
+  runs as non-root, so a new runtime path needs both a `COPY` and the `chmod` line
+  (`tests/arch/test_dockerfile.py`). CI's fresh checkout is 0644 and will not show it.
+- **pytest collects any class named `Test*`**, even an imported error class. That is why the guard error is
+  `HeldOutSourceError`.
+- **Tests that build live ports run the full seal check** (about 1 s each). Pass `dataset=SEALED`
+  (`tests.support.paths`), because `tests/conftest.py` chdirs into an empty folder.
 - **Live calls cost money.** Announce the call count first; re-runs use `BCC_CACHE_MODE=read-only`.
 
 ## 9. Useful commands

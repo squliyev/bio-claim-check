@@ -44,3 +44,9 @@ are labelled that way.
 - Six live `check` calls, one per claim.
 - A complete six-row table: paper, role, kind, disposition.
 - No aggregate rate, no tuning, and no swapped paper. A miss is disclosed as it is.
+
+## Amendment (H1 commit C, after the checks)
+The implementation review found that `used_ids` (B1) collected the prior **sources** but not their
+**clusters**, so the code was weaker than this protocol's "source or cluster" wording. The code now matches
+the text. Re-running the corrected rule gives the same three picks, so B2 and the six checks stand. This
+amendment changes no pick and no claim.

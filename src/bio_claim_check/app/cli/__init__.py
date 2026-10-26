@@ -349,7 +349,7 @@ def _run_dev(question: str, mode: AnswerMode, k: int, settings: Settings, datase
         with _live_exit_codes(dataset), record_run(settings.var_dir, "run", settings.cache_mode) as recorder:
             files = read_dataset(dataset)
             spec = load_corpus_spec(dataset / SPEC)
-            with build_live_run_ports(settings, mode, recorder.emitter) as live:
+            with build_live_run_ports(settings, mode, recorder.emitter, dataset=dataset) as live:
                 dev_record = run_dev(live.ports, files, spec, question, mode, k=k)
             details = RunDetails(
                 provenance="live",

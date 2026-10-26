@@ -24,6 +24,8 @@ COPY traps/results ./traps/results
 # Live `check` and `run` refuse sealed test-split ids (I84) and fail closed without the sealed dataset
 # (app.settings.SEALED_DATASET). It holds ids and hashes only, no abstracts.
 COPY datasets ./datasets
+# A checkout keeps the publisher's 0600 modes; the non-root app user needs to read both trees, never write them.
+RUN chmod -R a+rX,go-w traps datasets
 USER app
 EXPOSE 8501
 CMD ["bio-claim-check", "ui", "--port", "8501", "--address", "0.0.0.0"]

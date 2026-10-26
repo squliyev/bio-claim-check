@@ -5,12 +5,13 @@ sized for one agent-assisted working session. The detailed design of finished se
 ADRs and in `docs/dev-log/Sxx.md`; this file only says what each session is for and how it is gated.
 Story status lives in [backlog.md](backlog.md). Where to start a new session: [HANDOFF.md](HANDOFF.md).
 
-**Status (S17a built):** S01–S13, the proof checkpoint (S13p) and S17a are done; tag `prompts-frozen-v2`. The dev trap set `traps/dev-v1.jsonl`
+**Status (demo track done):** S01–S13, the proof checkpoint (S13p), S17a and H1 are done; tag `prompts-frozen-v2`. The dev trap set `traps/dev-v1.jsonl`
 (38 items, 15 model traps) is confirmed by a unanimous two-model panel and is a silver standard
 (ADR 0022, 0023). The proof checkpoint gave **ADJUST** under its predeclared rule (ADR 0024): 14 of 15 model
 traps flagged and no parent flagged, but only 10 of 16 parents passed (6 went to `needs_review`). S17a built the
-layered Streamlit UI and `check` (one claim against one paper by PMID, ADR 0025). Its live smoke test waits for
-the maintainer's consent. Next is **H1**, then back to S14.
+layered Streamlit UI and `check` (one claim against one paper by PMID, ADR 0025); its live smoke test passed in
+H1. H1 added the test-split guard (I84), predeclared three dev demo papers, and kept option C (dev-log H1).
+Next is **S14**.
 The maintainer's test-split audit runs in parallel and gates only test-split traps.
 
 ## Product
@@ -102,8 +103,8 @@ can be contributed here as their own credited rule pack. No results from this re
 | (maintainer) | Test-split eligibility audit and unanswerable check, only after `prompts-frozen-v2`; runs in parallel with S13 and gates only test-split traps |
 | S13 | Trap generator: rule floor + model traps within eligibility, validity gate, audit sheet, parent pairing, structural leakage test; dev first. Trap outcomes are recorded in their own minimal artifact (trap, parent, verifier outcome, manifest), not as a `Report` (S13 ADR). ✅ ADR 0022, 0023: dev-v1 is a silver standard, 38 items |
 | Proof checkpoint | (S13p, ADR 0024: go/adjust rule and pair tables predeclared) Trap disposition counts per trap kind on dev (on dev-v1, k of n only: 2 to 6 model traps per kind, so no per-kind rates); a false-alarm rate only on the confirmed dev parents. On dev-v1 these are silver-standard numbers (ADR 0023), model traps primary, rule floor apart. Exploratory, never pitched (go / adjust). ✅ S13p: ADJUST (parents passed 10/16 < 12) |
-| S17a | Demo track: slim Streamlit UI, Ask page (recorded runs, live under the call budget) and Trust report page, in the final layered form; Docker offline mode with live controls disabled (see below). ✅ ADR 0025, I81–I83: Ask, Check a claim (PMID), Trust report, About (complete S13p tables, ADJUST); offline mode replays instead of disabling (dev-log S17a). Live smoke pending consent |
-| H1 | Demo track: hackathon prep (trap papers, demo, pitch, disclosure); what is shown on the day is decided here and must respect the option C rule (no claimcheck results on the day) or change it by ADR |
+| S17a | Demo track: slim Streamlit UI, Ask page (recorded runs, live under the call budget) and Trust report page, in the final layered form; Docker offline mode with live controls disabled (see below). ✅ ADR 0025, I81–I83: Ask, Check a claim (PMID), Trust report, About (complete S13p tables, ADJUST); offline mode replays instead of disabling (dev-log S17a). Live smoke done in H1 |
+| H1 | Demo track: hackathon prep (trap papers, demo, pitch, disclosure); what is shown on the day is decided here and must respect the option C rule (no claimcheck results on the day) or change it by ADR. ✅ Option C kept; I84 (live `check`/`run` refuse sealed test papers); three dev papers and six claims predeclared (`demo/h1-trap-papers.json`) and checked once, recorded and not shown (dev-log H1) |
 | S14 | Baselines: AlwaysFlag, MeSH-cue, optional NLI; shared verifier contract suite |
 | S15 | Related work (spin, exaggeration NLP, SciFact family), pre-registered `protocol.md`, tag `protocol-v1`, readiness checklist |
 | S16 | Benchmark harness and statistics (cluster bootstrap, Newcombe paired, McNemar, Holm, Wilson) |

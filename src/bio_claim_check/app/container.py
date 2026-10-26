@@ -710,10 +710,10 @@ def build_live_run_ports(
 
     A read-only replay builds no provider client. `transport`/`*_http` are for tests.
     """
+    closed = sealed_test_ids(dataset)
     roles = build_models(settings, model_catalog())
     answer, verifier = roles.answer, roles.verifier
     rules = default_rulepack_hashed()
-    closed = sealed_test_ids(dataset)
     with ExitStack() as stack:
         cache = _cache(settings, stack)
         source = _europe_pmc(settings, stack, cache, transport, sleep)
@@ -776,9 +776,9 @@ def build_live_check_ports(
 
     A read-only replay builds no provider client. `transport`/`*_http` are for tests.
     """
+    closed = sealed_test_ids(dataset)
     verifier = build_models(settings, model_catalog()).verifier
     rules = default_rulepack_hashed()
-    closed = sealed_test_ids(dataset)
     with ExitStack() as stack:
         cache = _cache(settings, stack)
         source = _europe_pmc(settings, stack, cache, transport, sleep)

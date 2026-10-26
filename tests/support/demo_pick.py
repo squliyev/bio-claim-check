@@ -35,12 +35,13 @@ KINDS: Final[tuple[tuple[OverstatedReason, str, str], ...]] = (
 demo kind is a null result stated as an effect; it is never called a surrogate endpoint."""
 
 
-def used_ids(*jsonl_files: Path) -> frozenset[SourceId]:
-    """Every `source_id` of earlier sets (challenge, traps): their verifier results are already known."""
-    ids: set[SourceId] = set()
+def used_ids(entries: Iterable[SourceEntry], *jsonl_files: Path) -> frozenset[SourceId]:
+    """Every `source_id` of earlier sets (challenge, traps) and the `cluster_id` each one has in
+    `entries`: their verifier results are already known, and a cluster sibling is the same work."""
+    sources: set[SourceId] = set()
     for path in jsonl_files:
-        ids |= {json.loads(line)["source_id"] for line in path.read_text().splitlines() if line.strip()}
-    return frozenset(ids)
+        sources |= {json.loads(line)["source_id"] for line in path.read_text().splitlines() if line.strip()}
+    return frozenset(sources | {e.cluster_id for e in entries if e.source_id in sources})
 
 
 def shortlist(

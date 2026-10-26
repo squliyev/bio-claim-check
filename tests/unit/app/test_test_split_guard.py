@@ -17,6 +17,7 @@ from bio_claim_check.app.container import (
     DatasetReadError,
     build_fake_run_ports,
     build_live_check_ports,
+    build_live_run_ports,
     read_dataset,
     sealed_test_ids,
 )
@@ -101,6 +102,24 @@ def test_live_check_ports_carry_the_closed_set_and_fail_closed_without_it(tmp_pa
     with build_live_check_ports(settings, None, dataset=SEALED) as live:
         assert live.ports.closed_ids == sealed_test_ids(SEALED)
     with pytest.raises(DatasetReadError), build_live_check_ports(settings, None, dataset=tmp_path / "none"):
+        pass
+
+
+def test_live_run_ports_carry_the_closed_set_of_the_dataset_they_are_given(tmp_path: Path) -> None:
+    settings = make_settings(cache_mode=CacheMode.READ_ONLY, var_dir=tmp_path)
+    with build_live_run_ports(settings, AnswerMode.STRICT, None, dataset=SEALED) as live:
+        assert live.ports.closed_ids == sealed_test_ids(SEALED)
+
+
+def test_a_broken_dataset_is_reported_before_any_other_live_setup_error(tmp_path: Path) -> None:
+    settings = make_settings(cache_mode=CacheMode.READ_ONLY, var_dir=tmp_path, verifier_model="no-such-model")
+    missing = tmp_path / "none"
+    with (
+        pytest.raises(DatasetReadError),
+        build_live_run_ports(settings, AnswerMode.STRICT, None, dataset=missing),
+    ):
+        pass
+    with pytest.raises(DatasetReadError), build_live_check_ports(settings, None, dataset=missing):
         pass
 
 

@@ -63,9 +63,18 @@ class Provider:
         self.cache = InMemoryCache()
         self.verifier = verifier
         self.source: BaseLiteratureSource = InMemoryLiteratureSource(PAPERS)
+        self.datasets: list[Path | None] = []
 
     @contextlib.contextmanager
-    def ports(self, settings: Settings, mode: AnswerMode, emitter: EventEmitter | None) -> Generator[LiveRun]:
+    def ports(
+        self,
+        settings: Settings,
+        mode: AnswerMode,
+        emitter: EventEmitter | None,
+        *,
+        dataset: Path | None = None,
+    ) -> Generator[LiveRun]:
+        self.datasets.append(dataset)
         live = None if settings.cache_mode is CacheMode.READ_ONLY else self.client
         client = CachingLlmClient(live, self.cache, settings.cache_mode)
         rules = default_rulepack_hashed()
