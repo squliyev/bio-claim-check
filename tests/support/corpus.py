@@ -57,6 +57,10 @@ class QueryLiteratureSource(BaseLiteratureSource):
     def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
         raise NotImplementedError  # never asked: these tests only search
 
+    @override
+    def fetch(self, source_id: SourceId) -> Paper:
+        raise NotImplementedError  # never asked: these tests do not fetch by id
+
 
 ANIMAL = paper(1, mesh=("Animals", "Mice"))
 COHORT = paper(2, mesh=("Humans", "Cohort Studies"))

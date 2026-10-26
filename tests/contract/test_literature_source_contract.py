@@ -6,6 +6,7 @@ import pytest
 
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.retrieval.errors import PaperNotFoundError
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import EuropePmcLiteratureSource
 from bio_claim_check.features.retrieval.in_memory_literature_source import (
     FAKE_CORPUS,
@@ -117,3 +118,49 @@ def test_retraction_status_of_nothing_is_empty(status_source: BaseLiteratureSour
 def test_duplicate_retraction_ids_are_a_value_error(status_source: BaseLiteratureSource) -> None:
     with pytest.raises(ValueError, match="unique"):
         status_source.retraction_status(("MED:90000001", "MED:90000001"))
+
+
+# ---------------------------------------------------------------- fetch (S17a, ADR 0025)
+
+FETCH_IDS: dict[type[BaseLiteratureSource], tuple[str, str, str]] = {
+    EuropePmcLiteratureSource: ("MED:90000001", "MED:90000077", "FAKE:1"),
+    InMemoryLiteratureSource: ("FAKE:1", "FAKE:77", "MED:90000001"),
+}
+"""(held, not held, another source's scheme) for each implementation."""
+
+
+def _europe_pmc_fetch(source_id: str) -> BaseLiteratureSource:
+    pmid = source_id.removeprefix("MED:")
+    held = [r for r in mixed_records() if r.get("pmid") == pmid and r.get("source") == "MED"][:1]
+    return harness(ok(envelope(held))).source
+
+
+_FETCH_FACTORIES: dict[type[BaseLiteratureSource], Callable[[str], BaseLiteratureSource]] = {
+    EuropePmcLiteratureSource: _europe_pmc_fetch,
+    InMemoryLiteratureSource: lambda _: InMemoryLiteratureSource(),
+}
+
+
+@pytest.fixture(params=IMPLEMENTATIONS, ids=lambda c: c.__name__)
+def fetch_impl(request: pytest.FixtureRequest) -> type[BaseLiteratureSource]:
+    return request.param
+
+
+def test_fetch_returns_the_paper_with_exactly_that_id(fetch_impl: type[BaseLiteratureSource]) -> None:
+    held, _, _ = FETCH_IDS[fetch_impl]
+    paper = _FETCH_FACTORIES[fetch_impl](held).fetch(held)
+    assert paper.source_id == held
+    assert paper.abstract
+
+
+def test_fetch_of_an_unheld_id_is_not_found(fetch_impl: type[BaseLiteratureSource]) -> None:
+    _, missing, _ = FETCH_IDS[fetch_impl]
+    with pytest.raises(PaperNotFoundError) as caught:
+        _FETCH_FACTORIES[fetch_impl](missing).fetch(missing)
+    assert caught.value.source_id == missing
+
+
+def test_fetch_of_another_scheme_is_a_value_error(fetch_impl: type[BaseLiteratureSource]) -> None:
+    _, _, foreign = FETCH_IDS[fetch_impl]
+    with pytest.raises(ValueError, match=r"fetch|holds only"):
+        _FETCH_FACTORIES[fetch_impl](foreign).fetch(foreign)

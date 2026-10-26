@@ -63,6 +63,8 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `prompts.render` | `PromptRenderError` | Template placeholders and variables differ |
 | `retrieval.failed` | `RetrievalError` | The literature database failed or sent a malformed response |
 | `retrieval.malformed_record` | `MalformedRecordError` | A record field has a type the API was not seen to return |
+| `retrieval.not_citable` | `NotCitableError` | `fetch`: the record exists but is not a citable paper (no abstract, a letter, …); the reason is named |
+| `retrieval.not_found` | `PaperNotFoundError` | `fetch`: the literature database holds no record for the id |
 | `run.input` | `RunInputError` | `run`: the question is blank or `k` is not a positive int |
 | `retractions.input` | `RetractionInputError` | `retractions`: the run id is malformed, or the run is missing, altered, not a live `run`, or not a report (checked before any request) |
 | `traps.audit_sheet` | `TrapAuditError` | A filled-in trap audit sheet was made from another draft, or has an added, missing, duplicated, edited or undecided row, or a rejection without a reason |

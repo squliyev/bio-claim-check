@@ -42,6 +42,10 @@ class RaisingSource(BaseLiteratureSource):
     def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
         raise NotImplementedError  # never asked: these tests only search
 
+    @override
+    def fetch(self, source_id: SourceId) -> Paper:
+        raise NotImplementedError  # never asked: these tests do not fetch by id
+
 
 @pytest.fixture(autouse=True)
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

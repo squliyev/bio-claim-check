@@ -11,6 +11,8 @@ injected, so tests take no time. Requests are sequential, and consecutive reques
 so they never wait. One search is one request.
 `retraction_status` (S12a, ADR 0019) asks for exact `MED:` ids, at most `MAX_LIMIT` per request, with no
 citable filters and no cache: it reports the database's current state, not search eligibility.
+`fetch` (S17a, ADR 0025) asks for one exact `MED:` id through the cache, then applies the same citable
+policy as `search`: a single checked claim cites a citable paper, or nothing is checked.
 Must not: log request headers (they carry the contact email), rewrite the query, page beyond one request,
 or construct its own HTTP client (the app builds it with the User-Agent and timeouts).
 
@@ -20,6 +22,7 @@ No LLM is involved in this module.
 import hashlib
 import json
 import logging
+import re
 import time
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
@@ -41,7 +44,7 @@ from bio_claim_check.features.retrieval.citable import (
     record_to_paper,
     validate_shape,
 )
-from bio_claim_check.features.retrieval.errors import RetrievalError
+from bio_claim_check.features.retrieval.errors import NotCitableError, PaperNotFoundError, RetrievalError
 from bio_claim_check.features.retrieval.models import RetractionStatus
 from bio_claim_check.features.retrieval.query import (
     MAX_LIMIT,
@@ -63,6 +66,9 @@ MAX_RETRY_AFTER = 60.0
 RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
 _log = logging.getLogger(__name__)
+
+_FETCH_ID = re.compile(r"MED:[1-9][0-9]{0,8}")
+"""The only ids `fetch` sends: digits interpolated into a query string, nothing else."""
 
 
 def _not_json(token: str) -> object:
@@ -204,6 +210,29 @@ class EuropePmcLiteratureSource(BaseLiteratureSource):
             RetractionStatus(source_id=s, retracted=found.get(s[4:]) if s.startswith("MED:") else None)
             for s in source_ids
         )
+
+    @override
+    def fetch(self, source_id: SourceId) -> Paper:
+        if _FETCH_ID.fullmatch(source_id) is None:
+            raise ValueError(f"{source_id!r}: Europe PMC fetches only MED:<pmid> ids")
+        pmid = source_id.removeprefix("MED:")
+        params = {"query": build_id_query([pmid]), "resultType": "core", "format": "json", "pageSize": "2"}
+        shape: dict[str, JsonValue] = dict(params)
+        key = cache_key(CACHE_NAMESPACE, CACHE_VERSION, {"url": SEARCH_URL, "params": shape})
+        body = fetch_through(
+            self._cache, self._mode, key, lambda: self._fetch(params), namespace=CACHE_NAMESPACE
+        )
+        hits, records = _envelope(body)
+        if hits > 1 or len(records) > 1:
+            raise RetrievalError(f"Europe PMC response: {hits} records for the single id {source_id}")
+        if not records:
+            raise PaperNotFoundError(source_id)
+        record = records[0]
+        if record.get("source") != "MED" or record.get("pmid") != pmid:
+            raise RetrievalError("Europe PMC response: a record for an id that was not asked for")
+        if (reason := is_citable(record)) is not None:
+            raise NotCitableError(source_id, reason)
+        return record_to_paper(record)
 
     def _fetch(self, params: Mapping[str, str]) -> bytes:
         """One validated 200 body. Raises before returning, so nothing bad reaches the cache."""

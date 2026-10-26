@@ -15,6 +15,7 @@ from typing import override
 from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.paper import Paper
 from bio_claim_check.features.retrieval.base_literature_source import BaseLiteratureSource
+from bio_claim_check.features.retrieval.errors import PaperNotFoundError
 from bio_claim_check.features.retrieval.models import RetractionStatus
 from bio_claim_check.features.retrieval.query import validate_retraction_ids, validate_search
 
@@ -74,3 +75,12 @@ class InMemoryLiteratureSource(BaseLiteratureSource):
         validate_retraction_ids(source_ids)
         by_id = {p.source_id: p.retracted for p in self._corpus}
         return tuple(RetractionStatus(source_id=s, retracted=by_id.get(s)) for s in source_ids)
+
+    @override
+    def fetch(self, source_id: SourceId) -> Paper:
+        if not source_id.startswith("FAKE:") and all(p.source_id != source_id for p in self._corpus):
+            raise ValueError(f"{source_id}: the in-memory source holds only its own corpus ids")
+        for paper in self._corpus:
+            if paper.source_id == source_id:
+                return paper
+        raise PaperNotFoundError(source_id)

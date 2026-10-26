@@ -8,8 +8,8 @@ from tests.support.europepmc import envelope, fixture, good_record, harness, mix
 
 from bio_claim_check.engine.cache.in_memory_cache import InMemoryCache
 from bio_claim_check.engine.cache.policy import CacheMissError, CacheMode
-from bio_claim_check.features.retrieval.citable import QUERY_FILTERS
-from bio_claim_check.features.retrieval.errors import RetrievalError
+from bio_claim_check.features.retrieval.citable import QUERY_FILTERS, RejectReason
+from bio_claim_check.features.retrieval.errors import NotCitableError, RetrievalError
 from bio_claim_check.features.retrieval.europe_pmc_literature_source import (
     MAX_RETRY_AFTER,
     MIN_INTERVAL,
@@ -346,3 +346,57 @@ def test_retraction_status_refuses_an_answer_it_did_not_ask_for(
 def test_retraction_status_refuses_a_second_page() -> None:
     with pytest.raises(RetrievalError, match="more hits"):
         harness(ok(envelope([_med("90000001")], hit_count=2))).source.retraction_status(("MED:90000001",))
+
+
+# ---------------------------------------------------------------- fetch (S17a, ADR 0025)
+
+
+def _record(pmid: str) -> dict[str, object]:
+    return next(r for r in mixed_records() if r.get("pmid") == pmid and r.get("source") == "MED")
+
+
+def test_fetch_asks_for_exactly_one_med_id() -> None:
+    h = harness(ok(envelope([_record("90000001")])))
+    h.source.fetch("MED:90000001")
+    params = h.server.requests[0].url.params
+    assert params["query"] == "(EXT_ID:90000001 AND SRC:MED)"
+    assert (params["resultType"], params["pageSize"]) == ("core", "2")
+
+
+@pytest.mark.parametrize(
+    "source_id", ["MED:abc", "MED:0", "MED:01", "MED:1 OR x", "MED:1234567890", "PMC:123", "FAKE:1", "MED:"]
+)
+def test_fetch_refuses_anything_but_a_pmid_before_any_request(source_id: str) -> None:
+    h = harness()
+    with pytest.raises(ValueError, match=r"MED:<pmid>"):
+        h.source.fetch(source_id)
+    assert h.server.requests == []
+
+
+def test_fetch_of_a_record_that_is_not_citable_names_the_reason() -> None:
+    h = harness(ok(envelope([_record("90000007")])))
+    with pytest.raises(NotCitableError) as caught:
+        h.source.fetch("MED:90000007")
+    assert caught.value.reason is RejectReason.NO_ABSTRACT
+
+
+def test_fetch_refuses_a_record_for_another_id() -> None:
+    h = harness(ok(envelope([_record("90000002")])))
+    with pytest.raises(RetrievalError, match="not asked for"):
+        h.source.fetch("MED:90000001")
+
+
+def test_fetch_refuses_more_than_one_record() -> None:
+    h = harness(ok(envelope([_record("90000001"), _record("90000001")])))
+    with pytest.raises(RetrievalError, match="single id"):
+        h.source.fetch("MED:90000001")
+
+
+def test_fetch_is_cached_and_replays_offline() -> None:
+    cache = InMemoryCache()
+    first = harness(ok(envelope([_record("90000001")])), cache=cache).source.fetch("MED:90000001")
+    replay = harness(cache=cache, mode=CacheMode.READ_ONLY)
+    assert replay.source.fetch("MED:90000001") == first
+    assert replay.server.requests == []
+    with pytest.raises(CacheMissError):
+        replay.source.fetch("MED:90000002")

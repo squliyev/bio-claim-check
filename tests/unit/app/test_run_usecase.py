@@ -72,6 +72,10 @@ class FixedSource(BaseLiteratureSource):
     def retraction_status(self, source_ids: Sequence[SourceId]) -> tuple[RetractionStatus, ...]:
         raise NotImplementedError  # never asked: these tests only search
 
+    @override
+    def fetch(self, source_id: SourceId) -> Paper:
+        raise NotImplementedError  # never asked: these tests do not fetch by id
+
 
 def _container(**changes: object) -> RunPorts:
     return replace(build_fake_run_ports(), **changes)
