@@ -1,0 +1,46 @@
+{
+  "protocol": "demo/h1-protocol.md",
+  "selector_commit": "cc49483",
+  "dataset_seal": "fd519195e96bdff2d4b7665c2f2c57acaf05d6efa89cc8d690bd18d45ce27fb5",
+  "audit_salt": "bio-claim-check/audit/v1",
+  "claims_by": "coding agent (not a domain expert)",
+  "notice": "Purpose-built demo cases: not sampled, not an estimate, not expert-labelled. Not shown on the day (option C).",
+  "papers": [
+    {
+      "kind": "preclinical_to_clinical",
+      "rule": "animals_not_humans",
+      "name": "animal or cell result stated for humans",
+      "rank": 1,
+      "rejected": [],
+      "source_id": "MED:37729419",
+      "cluster_id": "MED:37729419",
+      "abstract_sha256": "2a1132360ee6b606816e7bf66b304acd8e777185405913a8c1d6e60d5aab0b8a",
+      "faithful": "In rats, GLP-1 receptors in the locus coeruleus help control food intake, and blocking them there reduced GLP-1-induced nausea-like behaviour.",
+      "overstated": "In people taking GLP-1 drugs, GLP-1 receptors in the locus coeruleus help control food intake, and blocking them there reduces nausea."
+    },
+    {
+      "kind": "background_as_result",
+      "rule": "prior_finding",
+      "name": "prior finding stated as this study's result",
+      "rank": 1,
+      "rejected": [],
+      "source_id": "MED:37852737",
+      "cluster_id": "MED:37852737",
+      "abstract_sha256": "5c4ef754d0cd8d92ba228bb187161dfe206c7ae205b28c6f41b4d11380e9b0db",
+      "faithful": "Earlier preclinical studies, cited as background, reported that metformin reduces T-cell exhaustion in tumours and strengthens PD-1 blockade.",
+      "overstated": "This phase II trial showed that metformin reduces T-cell exhaustion in tumours and strengthens PD-1 blockade."
+    },
+    {
+      "kind": "nonsignificant_as_effect",
+      "rule": "null_result",
+      "name": "null result stated as an effect",
+      "rank": 1,
+      "rejected": [],
+      "source_id": "MED:34815662",
+      "cluster_id": "MED:34815662",
+      "abstract_sha256": "21fe60689985b58021636d1bd177032d6e72d94ae69a30edd3ce0cb4124190b9",
+      "faithful": "In colon cancer stem cells, blocking miR-342-3p did not significantly change cell viability or apoptosis, although CD133 mRNA expression rose.",
+      "overstated": "In colon cancer stem cells, blocking miR-342-3p clearly changed cell viability and apoptosis, and CD133 mRNA expression rose."
+    }
+  ]
+}
