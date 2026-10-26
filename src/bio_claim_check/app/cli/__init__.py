@@ -6,19 +6,22 @@ infrastructure only through ``app.container`` (contract ``driving-adapters-use-t
 """
 
 import hashlib
+import os
 import re
+import sys
 from collections import Counter
 from collections.abc import Generator, Sequence
 from contextlib import contextmanager
 from datetime import date
 from enum import IntEnum
 from pathlib import Path
-from typing import Annotated, NoReturn
+from typing import Annotated, Final, NoReturn
 
 import typer
 from pydantic import ValidationError
 
 from bio_claim_check import __version__
+from bio_claim_check.app import ui as ui_package
 from bio_claim_check.app.container import (
     RECORD_OUTPUT_ERRORS,
     DatasetReadError,
@@ -406,6 +409,47 @@ def check(
     with _live_exit_codes(Path("datasets")):
         recorded = record_check(parsed, settings=settings, var_dir=settings.var_dir, on_events=_print_usage)
     _print_check(recorded.artifact, recorded.path)
+
+
+UI_PAGE: Final = Path(ui_package.__file__).parent / "page.py"
+"""The Streamlit script. Located, not imported: `app.ui.page` stays the only module importing streamlit."""
+
+
+def ui_command(port: int, address: str, env_file: Path) -> list[str]:
+    """The argv that serves the UI: headless, no usage statistics, the env file passed after `--`."""
+    return [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(UI_PAGE),
+        "--server.port",
+        str(port),
+        "--server.address",
+        address,
+        "--server.headless",
+        "true",
+        "--browser.gatherUsageStats",
+        "false",
+        "--",
+        "--env-file",
+        str(env_file),
+    ]
+
+
+@app.command("ui")
+def ui(
+    port: Annotated[int, typer.Option(min=1, max=65535, help="Port to serve on.")] = 8501,
+    address: Annotated[str, typer.Option(help="Address to bind; 0.0.0.0 inside a container.")] = "localhost",
+    env_file: EnvFile = Path(".env"),
+) -> None:
+    """Serve the web UI (Streamlit): ask a question, check a claim, read trust reports and the About page.
+
+    Starts without a `.env`: recorded runs, fictional mode and About need no secrets; live actions load the
+    full settings when they start. With BCC_CACHE_MODE=read-only, live actions replay the cache only.
+    """
+    argv = ui_command(port, address, env_file)
+    os.execv(argv[0], argv)  # noqa: S606 - replaces this process with streamlit; fixed argv, no shell
 
 
 def _check_fake(example: str, var_dir: Path) -> None:

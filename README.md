@@ -108,6 +108,30 @@ With Docker:
 docker compose run --rm app bio-claim-check --version
 ```
 
+## Run the UI
+
+The web UI has four sections. **Ask** runs a question. **Check a claim** checks one claim against one paper
+named by PMID. **Trust report** shows a recorded run. **About the verifier** shows the complete
+proof-checkpoint tables; that checkpoint did not meet its predeclared bar. The verifier reads abstracts only.
+
+```bash
+uv run bio-claim-check ui                      # http://localhost:8501
+```
+
+The UI starts without a `.env`. Recorded runs, Fictional mode and About need no secrets. A Live action loads
+the full settings when it starts; if they are missing, the UI says live is unavailable.
+
+With Docker (only `var/` is mounted):
+
+```bash
+docker compose up --build                      # live actions use .env, if present
+docker compose up offline                      # replay: BCC_CACHE_MODE=read-only
+```
+
+The offline service is for a demo laptop with no network. A replay reads only `var/cache`, so it can never
+reach a provider; an uncached request shows a cache-miss message instead. Replay still needs `.env` with
+`BCC_CONTACT_EMAIL`, but no API keys.
+
 ## Contributing
 
 Domain experts can contribute **misreading rules without writing code**; see

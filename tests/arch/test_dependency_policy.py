@@ -31,6 +31,7 @@ DIRECT_DEPENDENCIES: dict[str, tuple[str, Policy]] = {
     "pydantic-settings": ("pydantic_settings", "driver"),
     "pyyaml": ("yaml", "driver"),
     "rapidfuzz": ("rapidfuzz", "core"),
+    "streamlit": ("streamlit", "driver"),
     "typer": ("typer", "driver"),
 }
 

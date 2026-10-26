@@ -1,5 +1,7 @@
 # Local laptop target. `var/` is the ONLY writable mount: cache, ledger, runs and annotations survive
 # `docker compose down`/`up`. Secrets come from the git-ignored .env as environment, never as a mounted file.
+# `docker compose up` serves the UI on http://localhost:8501. `docker compose up offline` serves it in replay
+# mode (BCC_CACHE_MODE=read-only): live actions read var/cache only and never reach a provider. Run one at a time.
 services:
   app:
     build: .
@@ -9,3 +11,11 @@ services:
         required: false
     volumes:
       - ./var:/app/var
+    ports:
+      - "127.0.0.1:8501:8501"
+
+  offline:
+    extends: app
+    profiles: [offline]
+    environment:
+      BCC_CACHE_MODE: read-only

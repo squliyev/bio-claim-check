@@ -19,5 +19,8 @@ COPY --from=build /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 BCC_VAR_DIR=/app/var
 WORKDIR /app
 RUN mkdir -p /app/var && chown app:app /app/var
+# The About page reads the committed proof-checkpoint result (app.settings.CHECKPOINT_RESULT, relative to WORKDIR).
+COPY traps/results ./traps/results
 USER app
-CMD ["bio-claim-check", "--help"]
+EXPOSE 8501
+CMD ["bio-claim-check", "ui", "--port", "8501", "--address", "0.0.0.0"]

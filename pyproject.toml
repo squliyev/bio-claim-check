@@ -26,6 +26,7 @@ dependencies = [
     "pydantic[email]>=2.9",
     "pyyaml>=6.0.3",
     "rapidfuzz>=3.14",
+    "streamlit>=1.66.1",
     "typer>=0.15",
 ]
 
@@ -260,6 +261,27 @@ type = "forbidden"
 source_modules = ["bio_claim_check.app.cli", "bio_claim_check.app.ui"]
 forbidden_modules = ["bio_claim_check.infrastructure"]
 allow_indirect_imports = true  # the container is the one sanctioned path
+
+[[tool.importlinter.contracts]]
+id = "ui-page-is-on-top"
+name = "Nothing below the UI page imports it; it is the one streamlit importer (I82)"
+type = "forbidden"
+source_modules = [
+    "bio_claim_check.app.ui.error_copy",
+    "bio_claim_check.app.ui.protocol",
+    "bio_claim_check.app.ui.run_view",
+]
+forbidden_modules = ["bio_claim_check.app.ui.page"]
+
+[[tool.importlinter.contracts]]
+id = "ui-layers-are-independent"
+name = "The UI's pure layers never import each other (I82)"
+type = "independence"
+modules = [
+    "bio_claim_check.app.ui.error_copy",
+    "bio_claim_check.app.ui.protocol",
+    "bio_claim_check.app.ui.run_view",
+]
 
 [[tool.importlinter.contracts]]
 id = "usecases-are-interface-free"

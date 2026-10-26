@@ -101,6 +101,8 @@ ENGINE = "engine-is-feature-agnostic"
 TRANSPORT = "infrastructure-holds-only-transport"
 ADAPTERS = "driving-adapters-use-the-container"
 USECASES = "usecases-are-interface-free"
+UI_TOP = "ui-page-is-on-top"
+UI_INDEPENDENT = "ui-layers-are-independent"
 
 
 def _driver_cases() -> list[ContractCase]:
@@ -162,6 +164,10 @@ CASES: list[ContractCase] = [
     ContractCase(USECASES, "app.usecases", "infrastructure", "rogue"),
     ContractCase(USECASES, "app.usecases", "features.verify", "allowed"),
     ContractCase(USECASES, "app.container", "app.usecases", "allowed"),
+    ContractCase(UI_TOP, "app.ui.run_view", "app.ui.page", "rogue"),
+    ContractCase(UI_TOP, "app.ui.page", "app.ui.run_view", "allowed"),
+    ContractCase(UI_INDEPENDENT, "app.ui.run_view", "app.ui.protocol", "rogue"),
+    ContractCase(UI_INDEPENDENT, "app.ui.page", "app.ui.protocol", "allowed"),
 ]
 
 
