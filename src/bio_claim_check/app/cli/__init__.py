@@ -416,7 +416,11 @@ UI_PAGE: Final = Path(ui_package.__file__).parent / "page.py"
 
 
 def ui_command(port: int, address: str, env_file: Path) -> list[str]:
-    """The argv that serves the UI: headless, no usage statistics, the env file passed after `--`."""
+    """The argv that serves the UI: headless, no usage statistics, the env file passed after `--`.
+
+    `browser.serverAddress` is set so that Streamlit never looks up this machine's public IP (a request to an
+    outside service) when bound to 0.0.0.0; the UI makes no outbound call that the app did not ask for.
+    """
     return [
         sys.executable,
         "-m",
@@ -431,6 +435,8 @@ def ui_command(port: int, address: str, env_file: Path) -> list[str]:
         "true",
         "--browser.gatherUsageStats",
         "false",
+        "--browser.serverAddress",
+        "localhost",
         "--",
         "--env-file",
         str(env_file),

@@ -51,6 +51,7 @@ from bio_claim_check.engine.llm.errors import (
 from bio_claim_check.engine.llm.model_spec import UnknownDeploymentError
 from bio_claim_check.features.answer.answer_models import AnswerClaimsError
 from bio_claim_check.features.contracts.labels import AnswerMode
+from bio_claim_check.features.contracts.rulepack import RulePackError
 from bio_claim_check.features.contracts.verdict import Claim
 from bio_claim_check.features.report.canonical import CHECK_FILE, REPORT_FILE, canonical_bytes
 from bio_claim_check.features.report.models import ClaimCheck, Report
@@ -85,6 +86,7 @@ UI_ERRORS: Final[tuple[type[BccError], ...]] = (
     LlmUnexpectedResponseError,
     LlmBudgetExceededError,
     AnswerClaimsError,
+    RulePackError,
     *RECORD_OUTPUT_ERRORS,
 )
 """Every error a recorded question or check raises on purpose; each has curated UI copy (I83)."""

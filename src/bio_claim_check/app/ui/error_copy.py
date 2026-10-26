@@ -34,6 +34,9 @@ ERROR_COPY: Final[Mapping[str, str]] = MappingProxyType(
             "and a PMID of 1 to 9 digits "
             "(for example 12345678 or PMID:12345678)."
         ),
+        "contracts.rule_pack": (
+            "The installed rule pack could not be loaded, so nothing was checked. Reinstall the app."
+        ),
         "retrieval.not_found": "Europe PMC has no paper with that PMID.",
         "retrieval.not_citable": (
             "That PMID is not a paper the verifier can check against: for example it has no abstract, is not "

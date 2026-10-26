@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from bio_claim_check.app import recorded
+from bio_claim_check.app import container, recorded
 from bio_claim_check.app.cli import UI_PAGE
 from bio_claim_check.app.container import read_ledger
 from bio_claim_check.app.settings import CHECKPOINT_RESULT
@@ -26,6 +26,7 @@ from bio_claim_check.app.ui.page import (
     TRUST,
 )
 from bio_claim_check.app.ui.protocol import ADJUST_LABEL, list_runs, load_about
+from bio_claim_check.features.contracts.rulepack import RulePackError
 
 pytestmark = pytest.mark.e2e
 
@@ -163,3 +164,15 @@ def test_a_missing_about_result_shows_the_about_copy() -> None:
 
 def test_every_error_the_page_catches_has_copy() -> None:
     assert {e.code for e in PAGE_ERRORS} <= set(ERROR_COPY)
+
+
+def test_a_broken_rule_pack_shows_curated_copy_not_a_traceback(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken() -> None:
+        raise RulePackError(["secret detail"])
+
+    monkeypatch.setattr(container, "default_rulepack_hashed", broken)
+    app = _app()
+    app.button(key="ask_run").click().run()
+    assert not app.exception
+    assert _errors(app) == [ERROR_COPY["contracts.rule_pack"]]
+    assert all("secret detail" not in h for h in _html(app))

@@ -126,6 +126,7 @@ With Docker (only `var/` is mounted):
 ```bash
 docker compose up --build                      # live actions use .env, if present
 docker compose up offline                      # replay: BCC_CACHE_MODE=read-only
+docker compose --profile offline down          # stops both (plain `down` skips the offline service)
 ```
 
 The offline service is for a demo laptop with no network. A replay reads only `var/cache`, so it can never

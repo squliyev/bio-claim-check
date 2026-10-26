@@ -28,6 +28,7 @@ def test_ui_execs_streamlit_on_the_page_with_the_env_file(monkeypatch: pytest.Mo
     assert argv[1:5] == ["-m", "streamlit", "run", str(cli.UI_PAGE)]
     assert argv[argv.index("--server.headless") + 1] == "true"
     assert argv[argv.index("--browser.gatherUsageStats") + 1] == "false"
+    assert argv[argv.index("--browser.serverAddress") + 1] == "localhost"  # no public-IP lookup
     assert argv[-3:] == ["--", "--env-file", "x.env"]
     assert cli.UI_PAGE.is_file()
 
