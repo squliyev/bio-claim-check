@@ -30,7 +30,6 @@ from bio_claim_check.app.container import (
     active_freeze_sha256,
     build_challenge_ports,
     build_dev_answer_ports,
-    build_fake_run_ports,
     build_live_run_ports,
     build_llm_clients,
     build_replay,
@@ -40,6 +39,7 @@ from bio_claim_check.app.container import (
     current_judge,
     declared_answerer,
     default_rulepack,
+    fake_check_claims,
     file_sha256,
     load_corpus_spec,
     load_rulepack,
@@ -59,6 +59,7 @@ from bio_claim_check.app.container import (
 from bio_claim_check.app.freeze import ACTIVE_FREEZE, FREEZE_DIR, FreezeRecord, freeze_record
 from bio_claim_check.app.logging_setup import configure_logging
 from bio_claim_check.app.models import RATER_FAMILIES, model_catalog
+from bio_claim_check.app.recorded import record_check, record_question
 from bio_claim_check.app.run_record import RunDetails, RunInputs, RunRecorder
 from bio_claim_check.app.settings import ENV_PREFIX, Settings, load_settings
 from bio_claim_check.app.usecases.answer_dev import (
@@ -78,6 +79,7 @@ from bio_claim_check.app.usecases.challenge import (
     result_bytes,
     run_challenge,
 )
+from bio_claim_check.app.usecases.check_claim import CheckInputError, live_claim
 from bio_claim_check.app.usecases.corpus_audit import (
     AuditInputError,
     apply_decisions,
@@ -92,8 +94,8 @@ from bio_claim_check.app.usecases.retractions import (
     load_checked_run,
     retraction_check,
 )
-from bio_claim_check.app.usecases.run import RunInputError, run_question
-from bio_claim_check.app.usecases.run_dev import DevRunRecord, run_dev
+from bio_claim_check.app.usecases.run import RunInputError
+from bio_claim_check.app.usecases.run_dev import run_dev
 from bio_claim_check.app.usecases.traps import (
     SCORED_KINDS,
     TrapBudgetError,
@@ -136,9 +138,15 @@ from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError
 from bio_claim_check.features.corpus.audit_sheet import AuditSheetError
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, SPEC
 from bio_claim_check.features.corpus.seal import dataset_problems
-from bio_claim_check.features.report.canonical import REPORT_FILE, canonical_bytes
-from bio_claim_check.features.report.models import Report
-from bio_claim_check.features.retrieval.errors import RetrievalError
+from bio_claim_check.features.report.canonical import REPORT_FILE
+from bio_claim_check.features.report.models import (
+    ClaimCheck,
+    FailurePair,
+    NotRetrievedPair,
+    Report,
+    VerdictPair,
+)
+from bio_claim_check.features.retrieval.errors import NotCitableError, PaperNotFoundError, RetrievalError
 from bio_claim_check.features.traps.audit_sheet import TrapAuditError
 from bio_claim_check.features.traps.counts import DISPOSITIONS
 from bio_claim_check.features.traps.panel import PanelLedger, agreement, percent_agreement
@@ -310,61 +318,135 @@ def _run_flag_problem(
 
 def _run_fake(question: str, mode: AnswerMode, k: int, var_dir: Path) -> None:
     try:
-        with record_run(var_dir, "run", None) as recorder:
-            ports = build_fake_run_ports(recorder.emitter)
-            report = run_question(ports, question, mode, k=k)
-            details = RunDetails(
-                provenance=ports.provenance,
-                inputs=RunInputs(question_sha256=_sha256(question), mode=mode, k=k),
-                negation_rules=NEGATION_RULES,
-                rulepack_sha256=ports.rules_sha256,
-            )
-            recorder.prepare(REPORT_FILE, canonical_bytes(report), details)
+        recorded = record_question(question, mode, k, settings=None, var_dir=var_dir)
     except RunInputError as err:
         _fail(ExitCode.INPUT, str(err))
     except RECORD_OUTPUT_ERRORS as err:
         _fail(ExitCode.OUTPUT, str(err))
-    _print_report(report, _run_file(var_dir, recorder, REPORT_FILE))
+    _print_report(recorded.artifact, recorded.path)
 
 
 def _run_live(
     question: str, mode: AnswerMode, k: int, *, dev: bool, dataset: Path, env_file: Path | None
 ) -> None:
     settings = _settings(env_file or Path(".env"))
+    if dev:
+        _run_dev(question, mode, k, settings, dataset)
+        return
+    with _live_exit_codes(dataset):
+        recorded = record_question(
+            question, mode, k, settings=settings, var_dir=settings.var_dir, on_events=_print_usage
+        )
+    _print_report(recorded.artifact, recorded.path)
+
+
+def _run_dev(question: str, mode: AnswerMode, k: int, settings: Settings, dataset: Path) -> None:
     recorder: RunRecorder | None = None
-    dev_record: DevRunRecord | None = None
     try:
         with _live_exit_codes(dataset), record_run(settings.var_dir, "run", settings.cache_mode) as recorder:
-            files = read_dataset(dataset) if dev else None
-            spec = load_corpus_spec(dataset / SPEC) if dev else None
+            files = read_dataset(dataset)
+            spec = load_corpus_spec(dataset / SPEC)
             with build_live_run_ports(settings, mode, recorder.emitter) as live:
-                if files is not None and spec is not None:
-                    dev_record = run_dev(live.ports, files, spec, question, mode, k=k)
-                    report = dev_record.report
-                    artifact = pretty_json_bytes(dev_record.model_dump(mode="json"))
-                else:
-                    report = run_question(live.ports, question, mode, k=k)
-                    artifact = canonical_bytes(report)
+                dev_record = run_dev(live.ports, files, spec, question, mode, k=k)
             details = RunDetails(
                 provenance="live",
-                inputs=(
-                    RunInputs(question_id=question, mode=mode, k=k)
-                    if dev
-                    else RunInputs(question_sha256=_sha256(question), mode=mode, k=k)
-                ),
+                inputs=RunInputs(question_id=question, mode=mode, k=k),
                 negation_rules=NEGATION_RULES,
                 rulepack_sha256=live.ports.rules_sha256,
-                dataset_manifest_sha256=_sha256(files[MANIFEST]) if files is not None else None,
+                dataset_manifest_sha256=_sha256(files[MANIFEST]),
                 declared_llm=live.declared_llm,
             )
-            recorder.prepare(REPORT_FILE, artifact, details)
+            recorder.prepare(REPORT_FILE, pretty_json_bytes(dev_record.model_dump(mode="json")), details)
     finally:
         if recorder is not None:
             _print_usage(recorder.events)
-    if dev_record is not None:
-        dropped = ", ".join(f"{r.value}={n}" for r, n in dev_record.dropped.items() if n) or "none"
-        typer.echo(f"{dev_record.question_id}: {len(dev_record.papers)} dev paper(s); dropped: {dropped}")
-    _print_report(report, _run_file(settings.var_dir, recorder, REPORT_FILE))
+    dropped = ", ".join(f"{r.value}={n}" for r, n in dev_record.dropped.items() if n) or "none"
+    typer.echo(f"{dev_record.question_id}: {len(dev_record.papers)} dev paper(s); dropped: {dropped}")
+    _print_report(dev_record.report, _run_file(settings.var_dir, recorder, REPORT_FILE))
+
+
+@app.command("check")
+def check(
+    claim: Annotated[
+        str, typer.Argument(help="The claim to check; with --fake, a fictional example id (see --fake).")
+    ],
+    pmid: Annotated[
+        str | None, typer.Option("--pmid", help="Live: the PubMed id of the one paper the claim cites.")
+    ] = None,
+    fake: Annotated[
+        bool, typer.Option("--fake", help="A scripted claim on a fictional paper (offline demo).")
+    ] = False,
+    var_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--var-dir", help="--fake only: root for runs/, events/ and ledger.jsonl [default: var]."
+        ),
+    ] = None,
+    env_file: Annotated[Path | None, typer.Option(help="Live: dotenv file to read [default: .env].")] = None,
+) -> None:
+    """Check one claim against the one paper it names, and record it (ADR 0025).
+
+    Live fetches the paper's abstract from Europe PMC by PMID (cached) and asks the verifier once. With
+    --fake, CLAIM is a fictional example id; run `check --fake list` to see them.
+    """
+    if fake:
+        if pmid is not None or env_file is not None:
+            _fail(ExitCode.INPUT, "--fake takes a fictional example id; drop --pmid and --env-file")
+        _check_fake(claim, var_dir or DEFAULT_VAR_DIR)
+        return
+    if var_dir is not None:
+        _fail(ExitCode.INPUT, f"--var-dir is for --fake; live checks use {ENV_PREFIX}VAR_DIR")
+    if pmid is None:
+        _fail(ExitCode.INPUT, "a live check needs --pmid (the paper the claim cites)")
+    try:
+        parsed = live_claim(claim, pmid)
+    except CheckInputError as err:
+        _fail(ExitCode.INPUT, str(err))
+    settings = _settings(env_file or Path(".env"))
+    with _live_exit_codes(Path("datasets")):
+        recorded = record_check(parsed, settings=settings, var_dir=settings.var_dir, on_events=_print_usage)
+    _print_check(recorded.artifact, recorded.path)
+
+
+def _check_fake(example: str, var_dir: Path) -> None:
+    examples = {c.id: c for c in fake_check_claims()}
+    if example not in examples:
+        if example != "list":
+            typer.echo(f"error: no fictional example {example!r}", err=True)
+        for c in examples.values():
+            typer.echo(f"{c.id}  {c.cites[0]}  {c.text}", err=example != "list")
+        if example != "list":
+            raise typer.Exit(code=ExitCode.INPUT)
+        return
+    try:
+        recorded = record_check(examples[example], settings=None, var_dir=var_dir)
+    except RECORD_OUTPUT_ERRORS as err:
+        _fail(ExitCode.OUTPUT, str(err))
+    _print_check(recorded.artifact, recorded.path)
+
+
+def _print_check(result: ClaimCheck, path: Path) -> None:
+    typer.echo(result.notice)
+    if result.verifier is not None:
+        typer.echo(f"model: verifier={result.verifier.deployment} ({result.verifier.family})")
+    typer.echo(f"check: {path}")
+    paper = result.paper
+    typer.echo(f"paper: {paper.source_id} ({paper.year}) {paper.title}")
+    typer.echo(f"claim: {result.claim.claim.text}")
+    typer.echo(f"disposition: {result.claim.disposition.value}")
+    match result.claim.pairs[0]:
+        case VerdictPair(verdict=v):
+            label = v.semantic_label.value
+            if v.overstated_reason is not None:
+                label += f" ({v.overstated_reason.value})"
+            typer.echo(f"label: {label}")
+            typer.echo(f"reason: {v.reason}")
+            if v.evidence_quote is not None:
+                typer.echo(f"evidence ({v.evidence_status.value}): {v.evidence_quote}")
+        case FailurePair(failure=f):
+            typer.echo(f"verifier failed: {f.kind.value}")
+        case NotRetrievedPair():  # pragma: no cover - ClaimCheck refuses it
+            raise AssertionError("a claim check always retrieves its paper")
 
 
 def _print_report(report: Report, path: Path) -> None:
@@ -389,7 +471,7 @@ def _live_exit_codes(dataset: Path) -> Generator[None]:
     """The exit code of every typed failure of a live command (`answer dev`, `run` live and --dev)."""
     try:
         yield
-    except (DatasetReadError, RunInputError) as err:
+    except (DatasetReadError, RunInputError, CheckInputError, PaperNotFoundError, NotCitableError) as err:
         _fail(ExitCode.INPUT, str(err))
     except CorpusSpecError as err:
         _print_problems("Invalid corpus spec", err.problems)

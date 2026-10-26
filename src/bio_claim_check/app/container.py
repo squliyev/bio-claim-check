@@ -60,6 +60,9 @@ from bio_claim_check.app.settings import ENV_PREFIX, Settings
 from bio_claim_check.app.usecases.answer_dev import DevAnswerPorts
 from bio_claim_check.app.usecases.build_corpus import CorpusFiles
 from bio_claim_check.app.usecases.challenge import ChallengePorts
+from bio_claim_check.app.usecases.check_claim import CheckPorts
+from bio_claim_check.app.usecases.published_run import VIEWABLE_FILES, PublishedRunError
+from bio_claim_check.app.usecases.published_run import validate_run_id as validate_published_id
 from bio_claim_check.app.usecases.retractions import (
     REPORT_FILE,
     RetractionCheck,
@@ -90,7 +93,11 @@ from bio_claim_check.engine.llm.openai_llm_client import OpenAiLlmClient
 from bio_claim_check.engine.prompts.prompt_template import PromptTemplate
 from bio_claim_check.features.answer.llm_answerer import LlmAnswerer
 from bio_claim_check.features.answer.over_eager_answer_llm_agent import OverEagerAnswerLlmAgent
-from bio_claim_check.features.answer.scripted_answerer import ScriptedAnswerer
+from bio_claim_check.features.answer.scripted_answerer import (
+    OVER_EAGER_SCRIPT,
+    STRICT_SCRIPT,
+    ScriptedAnswerer,
+)
 from bio_claim_check.features.answer.strict_answer_llm_agent import StrictAnswerLlmAgent
 from bio_claim_check.features.contracts.corpus import (
     CorpusSpec,
@@ -100,6 +107,7 @@ from bio_claim_check.features.contracts.corpus import (
 )
 from bio_claim_check.features.contracts.labels import AnswerMode, OverstatedReason
 from bio_claim_check.features.contracts.rulepack import RulePack, RulePackError, parse_rulepack
+from bio_claim_check.features.contracts.verdict import Claim
 from bio_claim_check.features.corpus.layout import MANIFEST, SEALED, audit_file
 from bio_claim_check.features.corpus.seal import sealed_bytes
 from bio_claim_check.features.report.models import ModelUse, RunModels
@@ -108,7 +116,7 @@ from bio_claim_check.features.retrieval.in_memory_literature_source import InMem
 from bio_claim_check.features.traps.llm_trap_writer import LlmTrapWriter
 from bio_claim_check.features.traps.trap_llm_agent import TrapLlmAgent
 from bio_claim_check.features.verify.llm_verifier import LlmVerifier
-from bio_claim_check.features.verify.scripted_verifier import ScriptedVerifier
+from bio_claim_check.features.verify.scripted_verifier import VERDICT_SCRIPT, ScriptedVerifier
 from bio_claim_check.features.verify.verify_llm_agent import VerifyLlmAgent
 from bio_claim_check.infrastructure.line_files import AppendError, LineFile, append_line, create_numbered
 from bio_claim_check.infrastructure.publish import PublishError, publish_once
@@ -348,6 +356,30 @@ def read_run_files(var_dir: Path, run_id: str) -> tuple[bytes, bytes]:
         raise RetractionInputError(f"run {run_id}: cannot read {folder}: {err.strerror or err}") from None
 
 
+def read_published_files(var_dir: Path, run_id: str) -> tuple[bytes, bytes]:
+    """The manifest and artifact bytes of a published `run` or `check`; `PublishedRunError` if unreadable.
+    The artifact is whichever viewable file the folder holds; `load_published` then checks it is the one
+    the manifest names."""
+    folder = run_path(var_dir, validate_published_id(run_id))
+    present = [name for name in VIEWABLE_FILES if (folder / name).is_file()]
+    if len(present) != 1:
+        raise PublishedRunError(f"run {run_id}: expected one of {', '.join(VIEWABLE_FILES)} in {folder}")
+    try:
+        return (folder / MANIFEST_FILE).read_bytes(), (folder / present[0]).read_bytes()
+    except OSError as err:
+        raise PublishedRunError(f"run {run_id}: cannot read {folder}: {err.strerror or err}") from None
+
+
+def read_ledger(var_dir: Path) -> bytes:
+    """The run ledger's bytes; empty when no command has run yet."""
+    try:
+        return (var_dir / LEDGER_FILE).read_bytes()
+    except FileNotFoundError:
+        return b""
+    except OSError as err:
+        raise PublishedRunError(f"cannot read {var_dir / LEDGER_FILE}: {err.strerror or err}") from None
+
+
 def publish_retraction_check(var_dir: Path, check: RetractionCheck) -> Path:
     """Write `retractions/<run_id>-<UTC>-<n>.json` (one compact JSON line) by exclusive create, never
     under `runs/`."""
@@ -388,6 +420,28 @@ def _cache(settings: Settings, stack: ExitStack) -> BaseCache:
         return InMemoryCache()  # never read or written in this mode; no file is created
     read_only = settings.cache_mode is CacheMode.READ_ONLY
     return stack.enter_context(SqliteCache(settings.var_dir / CACHE_FILE, read_only=read_only))
+
+
+def fake_check_claims() -> tuple[Claim, ...]:
+    """The fictional claims a fake check can take: every scripted one-paper claim with a scripted verdict."""
+    return tuple(
+        c
+        for c in (*STRICT_SCRIPT, *OVER_EAGER_SCRIPT)
+        if len(c.cites) == 1 and (c.id, c.cites[0]) in VERDICT_SCRIPT
+    )
+
+
+def build_fake_check_ports(emitter: EventEmitter | None = None) -> CheckPorts:
+    """Fictional papers and scripted verdicts for `check --fake`. Needs no settings, network or `.env`."""
+    rules = default_rulepack_hashed()
+    return CheckPorts(
+        literature=InMemoryLiteratureSource(),
+        verifier=ScriptedVerifier(),
+        rules=rules.pack,
+        provenance="fake",
+        rules_sha256=rules.sha256,
+        emitter=emitter,
+    )
 
 
 @contextmanager
@@ -668,6 +722,62 @@ def build_live_run_ports(
             _declared(VerifyLlmAgent.name, VerifyLlmAgent.prompt, verifier),
         )
         yield LiveRun(ports=ports, declared_llm=tuple(sorted(declared, key=lambda d: d.agent)))
+
+
+@dataclass(frozen=True, slots=True)
+class LiveCheck:
+    """The ports of a live `check`, and the one LLM role it declares in its manifest (I71)."""
+
+    ports: CheckPorts
+    declared_llm: tuple[DeclaredLlm, ...]
+
+
+@contextmanager
+def build_live_check_ports(
+    settings: Settings,
+    emitter: EventEmitter | None,
+    *,
+    transport: httpx.BaseTransport | None = None,
+    sleep: Callable[[float], None] = time.sleep,
+    openai_http: openai.DefaultHttpxClient | None = None,
+    anthropic_http: anthropic.DefaultHttpxClient | None = None,
+) -> Generator[LiveCheck]:
+    """Europe PMC and the LLM verifier (`verifier_model`) through one cache, behind one `CallBudget`: the
+    verifier role of `build_live_run_ports`, without an answerer (ADR 0025).
+
+    A read-only replay builds no provider client. `transport`/`*_http` are for tests.
+    """
+    verifier = build_models(settings, model_catalog()).verifier
+    rules = default_rulepack_hashed()
+    with ExitStack() as stack:
+        cache = _cache(settings, stack)
+        source = _europe_pmc(settings, stack, cache, transport, sleep)
+        live: BaseLlmClient | None = None
+        if settings.cache_mode is not CacheMode.READ_ONLY:
+            clients = stack.enter_context(
+                build_llm_clients(
+                    settings,
+                    [verifier],
+                    sleep=sleep,
+                    emitter=emitter,
+                    openai_http=openai_http,
+                    anthropic_http=anthropic_http,
+                )
+            )
+            live = BudgetedLlmClient(clients[verifier.deployment], CallBudget(settings.max_live_llm_calls))
+        client = CachingLlmClient(live, cache, settings.cache_mode)
+        ports = CheckPorts(
+            literature=source,
+            verifier=LlmVerifier(VerifyLlmAgent(client, verifier, emitter=emitter)),
+            rules=rules.pack,
+            provenance="live",
+            rules_sha256=rules.sha256,
+            verifier_model=_model_use(verifier),
+            emitter=emitter,
+        )
+        yield LiveCheck(
+            ports=ports, declared_llm=(_declared(VerifyLlmAgent.name, VerifyLlmAgent.prompt, verifier),)
+        )
 
 
 class JudgeReadError(BccError):

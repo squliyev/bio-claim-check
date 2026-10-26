@@ -5,22 +5,21 @@ This re-asks the database about exactly the cited ids, uncached and without the 
 reports both values side by side (ADR 0019). The run is identified by its id and checked first: the
 manifest must hash to the id, the artifact must hash to the manifest's record of it, and the run must be
 a live `run` (a fake run cites fictional ids; a dev artifact is a tuning record). All of that is checked
-before any request.
+before any request; the hash chain is `published_run.load_published`, shared with the UI (S17a).
 Must not: modify, re-publish or re-derive anything under the run's folder; read files or the clock (the
 caller passes bytes and a time); call an LLM.
 
 No LLM is involved in this module.
 """
 
-import hashlib
-import json
-import re
 from collections.abc import Sequence
 from typing import Final
 
-from pydantic import AwareDatetime, ValidationError
+from pydantic import AwareDatetime
 
-from bio_claim_check.app.run_record import RunManifest, run_id_of
+from bio_claim_check.app.run_record import RunInputs
+from bio_claim_check.app.usecases import published_run
+from bio_claim_check.app.usecases.published_run import PublishedRunError, load_published, parse_manifest
 from bio_claim_check.common.errors import BccError
 from bio_claim_check.common.models import ValidatedModel
 from bio_claim_check.features.contracts.ids import SourceId
@@ -29,7 +28,6 @@ from bio_claim_check.features.retrieval.models import RetractionStatus
 
 REPORT_FILE: Final = "report.json"
 RECHECKED_NAMESPACE: Final = "MED:"
-_RUN_ID = re.compile(r"[0-9a-f]{16}")
 
 
 class RetractionInputError(BccError):
@@ -58,34 +56,31 @@ class RetractionCheck(ValidatedModel):
 
 def validate_run_id(run_id: str) -> str:
     """`run_id` if it is 16 lowercase hex characters (it becomes a path), else `RetractionInputError`."""
-    if not _RUN_ID.fullmatch(run_id):
-        raise RetractionInputError(f"a run id is 16 lowercase hex characters, got {run_id!r}")
-    return run_id
+    try:
+        return published_run.validate_run_id(run_id)
+    except PublishedRunError as err:
+        raise RetractionInputError(str(err)) from None
 
 
 def load_checked_run(manifest: bytes, artifact: bytes, run_id: str) -> Report:
-    """The run's report, after the hash chain and the run kind are checked (before any request)."""
+    """The run's report, after the hash chain (`load_published`) and the run kind are checked."""
     try:
-        parsed = RunManifest.model_validate(json.loads(manifest))
-    except (ValueError, ValidationError) as err:
-        raise RetractionInputError(f"run {run_id}: the manifest does not parse") from err
-    if run_id_of(manifest) != run_id:
-        raise RetractionInputError(f"run {run_id}: the manifest does not hash to the run id")
+        parsed = parse_manifest(manifest, run_id)
+    except PublishedRunError as err:
+        raise RetractionInputError(str(err)) from None
     if parsed.provenance != "live":
         raise RetractionInputError(f"run {run_id}: a {parsed.provenance} run cites no real papers")
     if parsed.command != "run" or parsed.artifact.name != REPORT_FILE:
         raise RetractionInputError(f"run {run_id}: not a recorded `run` report ({parsed.command})")
-    if parsed.inputs.question_id is not None:
+    if isinstance(parsed.inputs, RunInputs) and parsed.inputs.question_id is not None:
         raise RetractionInputError(f"run {run_id}: a --dev run is a tuning record, not a checked answer")
-    if hashlib.sha256(artifact).hexdigest() != parsed.artifact.sha256:
-        raise RetractionInputError(f"run {run_id}: {REPORT_FILE} does not match its manifest")
     try:
-        report = Report.model_validate(json.loads(artifact))
-    except (ValueError, ValidationError) as err:
-        raise RetractionInputError(f"run {run_id}: {REPORT_FILE} is not a report") from err
-    if report.provenance != parsed.provenance:
-        raise RetractionInputError(f"run {run_id}: {REPORT_FILE} says {report.provenance}, its manifest live")
-    return report
+        run = load_published(run_id, manifest, artifact)
+    except PublishedRunError as err:
+        raise RetractionInputError(str(err)) from None
+    if not isinstance(run.artifact, Report):  # pragma: no cover - the kind checks above exclude it
+        raise RetractionInputError(f"run {run_id}: not a report")
+    return run.artifact
 
 
 def cited_ids(report: Report) -> tuple[SourceId, ...]:

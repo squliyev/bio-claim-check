@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from typer.testing import CliRunner
 
-from bio_claim_check.app import cli
+from bio_claim_check.app import cli, recorded
 from bio_claim_check.app.container import LiveRun, build_answerer, default_rulepack_hashed
 from bio_claim_check.app.models import model_catalog
 from bio_claim_check.app.run_record import DeclaredLlm
@@ -105,7 +105,8 @@ class Provider:
 
 
 def use(monkeypatch: pytest.MonkeyPatch, provider: Provider) -> Provider:
-    monkeypatch.setattr(cli, "build_live_run_ports", provider.ports)
+    monkeypatch.setattr(cli, "build_live_run_ports", provider.ports)  # `run --dev`
+    monkeypatch.setattr(recorded, "build_live_run_ports", provider.ports)  # `run`, via the shared path
     return provider
 
 

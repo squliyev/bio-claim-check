@@ -44,6 +44,7 @@ from bio_claim_check.engine.events.llm_events import LlmCallFinished
 from bio_claim_check.engine.events.pipeline_event import ModelRef, PipelineEvent
 from bio_claim_check.engine.events.stage_events import StageFailed, StageFinished, StageStarted
 from bio_claim_check.engine.events.tee_event_sink import TeeEventSink
+from bio_claim_check.features.contracts.ids import SourceId
 from bio_claim_check.features.contracts.labels import AnswerMode
 
 RUNS_DIR: Final = "runs"
@@ -91,6 +92,15 @@ class RunInputs(ValidatedModel):
     k: Annotated[int, Field(strict=True, ge=1)]
 
 
+class CheckInputs(ValidatedModel):
+    """What a `check` run checked (ADR 0025): the sha256 of the claim's UTF-8 text and the paper's id. A
+    separate model, so the manifests of `run` keep their exact bytes."""
+
+    kind: Literal["check"] = "check"
+    claim_sha256: Sha256Hex
+    source_id: SourceId
+
+
 class DeclaredLlm(ValidatedModel):
     """One wired LLM role (agent) of a live run, named whether or not any of its calls finished, so a run
     whose verifier calls all failed, or that made none, still names the verifier's prompt (I71)."""
@@ -108,7 +118,7 @@ class RunDetails(ValidatedModel):
     `llm` (on the manifest) is what was observed."""
 
     provenance: Literal["fake", "live"]
-    inputs: RunInputs
+    inputs: RunInputs | CheckInputs
     negation_rules: Annotated[int, Field(strict=True, ge=1)]
     rulepack_sha256: Sha256Hex | None = None
     dataset_manifest_sha256: Sha256Hex | None = None

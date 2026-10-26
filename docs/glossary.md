@@ -36,6 +36,8 @@ counting rules are in [ADR 0006](./adr/0006-two-axis-verdict-and-disposition.md)
   the prompts hash, and its precision is labelled "author-confirmed, single rater".
 - **Prior finding:** the sieve rule for `background_as_result`: an early sentence reports prior evidence
   with an effect verb, and a later sentence reports this study's results.
+- **Claim check:** one claim checked against one paper a person names by PMID (command `check`, ADR
+  0025). Recorded like a run (`check.json`); a fictional check uses a scripted claim on a `FAKE:` paper.
 - **Challenge set:** `challenge/dev-v1.jsonl`, 16 curated dev (claim, source) items with expected labels.
   It is a regression and sanity check of the verifier, not an accuracy estimate (ADR 0020).
 - **Judge fingerprint (`judge_sha256`):** the sha256 over the bytes of the files that decide a verdict

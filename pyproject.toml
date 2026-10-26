@@ -141,6 +141,7 @@ source_modules = [
     "bio_claim_check.app.usecases.build_corpus",
     "bio_claim_check.app.usecases.corpus_audit",
     "bio_claim_check.app.usecases.proof_checkpoint",
+    "bio_claim_check.app.usecases.published_run",
     "bio_claim_check.app.usecases.retractions",
     "bio_claim_check.common",
     "bio_claim_check.engine.cache",

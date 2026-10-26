@@ -6,7 +6,10 @@ must equal what the model recomputes, so a stored number can never be forged or 
 Integrity is checked on construction, not only by the use case: every verdict is re-located against its
 paper's cleaned abstract, every invented-citation finding matches a not-retrieved pair, every finding
 names a claim in the report, and a fake report may only cite `FAKE:` sources (I19). A live report names
-its answerer and verifier and flags when they share a family (I71).
+its answerer and verifier and flags when they share a family (I71). `ClaimCheck` (S17a, ADR 0025) is the
+artifact of `check`: one claim a person wrote, checked against one paper they named. It carries the same
+integrity checks: the pair follows the cite, the verdict re-locates in the abstract, a fake check cites
+only `FAKE:` sources, and a live check names its verifier.
 Must not: change or re-judge an outcome, or compute rates (counts only; denominators are explicit).
 
 No LLM is involved in this module.
@@ -36,6 +39,11 @@ FAKE_NOTICE: Final = "FAKE RUN: fictional papers, scripted answer and verdicts. 
 LIVE_NOTICE: Final = (
     "LLM answer; each claim, if any, checked by an LLM verifier against the retrieved abstracts it cites. "
     "Labels are model judgements, not expert review."
+)
+CHECK_FAKE_NOTICE: Final = "FAKE CHECK: a fictional paper and a scripted verdict. Not a result."
+CHECK_LIVE_NOTICE: Final = (
+    "A claim you wrote, checked by an LLM verifier against the abstract of the paper you named. "
+    "The label is a model judgement, not expert review."
 )
 FAKE_PREFIX: Final = "FAKE:"
 
@@ -223,3 +231,35 @@ class Report(_Derived):
     @property
     def claim_counts(self) -> dict[Disposition, int]:
         return _counts([c.disposition for c in self.claims])
+
+
+class ClaimCheck(_Derived):
+    """One claim checked against one paper (command `check`). Not a `Report`: there is no question, answer
+    mode or answerer, and the paper was named by a person, not retrieved by a search."""
+
+    provenance: Provenance
+    claim: ClaimReport
+    paper: Paper
+    verifier: ModelUse | None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> Self:
+        if (self.verifier is None) != (self.provenance == "fake"):
+            raise ValueError("verifier: required for a live check and absent from a fake one")
+        if self.claim.claim.cites != (self.paper.source_id,):
+            raise ValueError("claim: a check cites exactly the paper it was checked against")
+        (pair,) = self.claim.pairs
+        result = pair.result
+        if isinstance(result, CitationNotRetrieved):
+            raise ValueError("claim: the paper of a check was fetched, so it cannot be not retrieved")
+        if isinstance(result, Verdict):
+            result.verify_against(self.paper.abstract)
+        if self.provenance == "fake" and not self.paper.source_id.startswith(FAKE_PREFIX):
+            raise ValueError(f"a fake check may cite only {FAKE_PREFIX} sources, got {self.paper.source_id}")
+        return self
+
+    @computed_field
+    @property
+    def notice(self) -> str:
+        """Stored in the artifact, so a fake check can never pass for a result."""
+        return CHECK_FAKE_NOTICE if self.provenance == "fake" else CHECK_LIVE_NOTICE

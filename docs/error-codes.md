@@ -39,6 +39,7 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `cache.failed` | `CacheError` | The cache cannot be opened or written |
 | `cache.miss` | `CacheMissError` | Read-only cache mode and the key is absent |
 | `cache.write_failed` | `CacheWriteError` | A live response could not be stored in the cache; the attempt is recorded as unmeasured (ADR 0018) |
+| `check.input` | `CheckInputError` | `check`: the claim is blank, too long or has control characters, or the PMID is not 1 to 9 digits; refused before any request |
 | `challenge.input` | `ChallengeInputError` | The challenge set is malformed, or an item is not a sealed dev pair; nothing was fetched (I72) |
 | `challenge.pool` | `ChallengePoolError` | An item's source did not come back, with its sealed hash, in its dev pool |
 | `config.strict_yaml` | `StrictYamlError` | A YAML file is ambiguous (duplicate keys, merges, implicit types) |
@@ -66,6 +67,8 @@ stable code. Which exit code a command uses for an error depends on the command 
 | `retrieval.not_citable` | `NotCitableError` | `fetch`: the record exists but is not a citable paper (no abstract, a letter, …); the reason is named |
 | `retrieval.not_found` | `PaperNotFoundError` | `fetch`: the literature database holds no record for the id |
 | `run.input` | `RunInputError` | `run`: the question is blank or `k` is not a positive int |
+| `runs.busy` | `RecordBusyError` | Another recorded `run` or `check` is in progress in this process (the UI); nothing was recorded |
+| `runs.published` | `PublishedRunError` | A published run's id is malformed, or the run is missing, altered (hash chain), or not a `run`/`check` this build can show |
 | `retractions.input` | `RetractionInputError` | `retractions`: the run id is malformed, or the run is missing, altered, not a live `run`, or not a report (checked before any request) |
 | `traps.audit_sheet` | `TrapAuditError` | A filled-in trap audit sheet was made from another draft, or has an added, missing, duplicated, edited or undecided row, or a rejection without a reason |
 | `traps.budget` | `TrapBudgetError` | `BCC_MAX_LIVE_LLM_CALLS` cannot cover a call and a repair per trap draft or trap item; refused before any call |

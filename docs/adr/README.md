@@ -53,6 +53,7 @@ invariants is in [`../invariants.md`](../invariants.md). New ADRs start from [`t
 | [0022](./0022-trap-set-and-outcomes.md) | The dev trap set and its outcome artifact | Accepted | Author-confirmed parent/trap pairs on dev with predeclared truth and metrics; `traps verify` only under the active freeze (I76–I78) |
 | [0023](./0023-model-panel-confirmation.md) | Model-panel confirmation of the dev trap set (a silver standard) | Accepted | A unanimous two-model panel confirms dev-v1; declared family separation; a committed, attested ledger of votes; predeclared bias and reporting (I79) |
 | [0024](./0024-proof-checkpoint-go-adjust.md) | The proof checkpoint's predeclared go/adjust rule and pair tables | Accepted | Before any trap is verified: pair tables in the counts, a GO/ADJUST rule bound to dev-v1 computed by code, counts shown either way, one record per freeze (I80) |
+| [0025](./0025-claim-check-run.md) | A single-claim check is a recorded run kind | Accepted | `check`: one claim against one paper fetched by PMID, recorded with its own inputs and artifact; one recording path for CLI and UI; one checked loader |
 
 ## Superseded / historical
 
