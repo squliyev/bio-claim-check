@@ -34,14 +34,14 @@ dependencies = [
 bio-claim-check = "bio_claim_check.app.cli:app"
 
 [build-system]
-requires = ["hatchling==1.32.4"]  # exact: build backend is not in uv.lock; Dependabot proposes bumps
+requires = ["hatchling==1.33.0"]  # exact: build backend is not in uv.lock; Dependabot proposes bumps
 build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
     "hypothesis>=6.170.5",
     "grimp>=3.17",  # import graph for the ancestor-import guard (tests/support/guards.py)
-    "import-linter==2.15.*",  # the rule-fire harness asserts on its CLI output format
+    "import-linter>=2.15,<2.17",  # the rule-fire harness asserts on its CLI output format
     "packaging>=26.0",  # parses [project].dependencies in the dependency-policy test
     "types-pyyaml>=6.0.12",
     "pre-commit>=4.7.0",
