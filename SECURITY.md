@@ -4,9 +4,8 @@
 
 Please **do not open a public issue** for a security problem.
 
-- **Status:** the repository is private during pre-alpha development. GitHub private vulnerability
-  reporting (**Security → Report a vulnerability**) will be enabled when it becomes public, and that will
-  be the reporting channel from then on. Reports will be acknowledged within 7 days.
+- Report it privately through GitHub private vulnerability reporting (**Security → Report a
+  vulnerability**). Reports will be acknowledged within 7 days.
 
 In scope:
 - Leaking secrets or provider endpoints through logs, reports or exported bundles.
