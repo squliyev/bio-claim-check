@@ -9,6 +9,10 @@ background sentence cited as its finding, will measure what the verifier actuall
 
 **Status: pre-alpha, under active development.** Nothing here is a validated result yet.
 
+A personal project, not affiliated with any employer or institution. No LLM endpoint or key is bundled:
+bring your own provider through a local `.env` ([`.env.example`](.env.example)). The test split's PMIDs are
+public in [`datasets/`](datasets/README.md), so models trained after publication may have seen them.
+
 ## What it is not
 
 - Not a fact-checker for papers: it checks whether a *claim* is faithful to the *abstract it cites*.
