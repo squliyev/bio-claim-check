@@ -1,7 +1,7 @@
 # Reproducible runtime: base images pinned by digest, dependencies from uv.lock (--frozen), non-root user.
 # Kept compatible with SciLifeLab Serve (single image, env-only configuration, non-root).
 
-FROM ghcr.io/astral-sh/uv:0.13.3@sha256:bee0a2a458fd956c5df7b8b4c5fed2257b0af34866e3da7b51db0be3acb375d1 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9@sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d AS uv
 
 FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f AS build
 COPY --from=uv /uv /usr/local/bin/uv
